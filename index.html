@@ -312,6 +312,21 @@ canvas{display:block;max-width:100%}
 .chip button{color:var(--t4);font-size:11px}
 .chip button:hover{color:var(--red)}
 
+#newmenu{position:absolute;right:0;top:36px;background:#fff;border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 8px 24px rgba(24,24,24,.14);display:none;min-width:190px;z-index:65;padding:4px}
+#newmenu.on{display:block}
+.nm-i{display:block;width:100%;text-align:left;padding:8px 12px;font-size:13px;border-radius:4px;font-weight:500}
+.nm-i:hover{background:var(--blue-l)}
+.nm-h{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);padding:6px 12px 2px;font-weight:700}
+.nm-sep{height:1px;background:var(--bdr);margin:4px 0}
+.faq details{border-bottom:1px solid var(--bdr)}
+.faq details:last-child{border-bottom:0}
+.faq summary{padding:11px 14px;font-weight:700;font-size:13px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.faq summary::after{content:"+";color:var(--t3);font-size:15px}
+.faq details[open] summary::after{content:"–"}
+.faq summary:hover{background:var(--sub)}
+.faq .fa{padding:0 14px 13px;font-size:12.5px;color:var(--t2);line-height:1.65}
+.faq .fa b{color:var(--t1)}
+.faq .fa code{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;padding:0 5px;font-size:11.5px}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#181818;color:#fff;padding:9px 16px;border-radius:var(--r);font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .18s;z-index:95;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw}
 .toast.show{opacity:1}
 #resumebar{position:fixed;top:0;left:0;right:0;z-index:80;background:var(--blue-l);border-bottom:1px solid var(--blue);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap}
@@ -355,7 +370,8 @@ canvas{display:block;max-width:100%}
   <div class="gh-search"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
   <div class="gh-right">
     <button class="gh-sync" onclick="nav('settings')" title="Sync status"><span class="sdot" id="sdot"></span><span id="stxt">Local only</span></button>
-    <button class="btn sm" onclick="openTask()">+ New</button>
+    <div style="position:relative"><button class="btn sm" onclick="toggleNewMenu(event)">+ New ▾</button><div id="newmenu"></div></div>
+    <button class="gh-sync" style="font-weight:800;font-size:14px" title="Help & FAQ" onclick="nav('help')">?</button>
   </div>
 </header>
 <nav id="navbar"></nav>
@@ -606,7 +622,7 @@ function renderNav(){const td=today();
   const nb=g('navbar');nb.innerHTML=NAVS.map(([id,lbl])=>`<button class="nt ${view===id||(view==='meeting'&&id==='planner')||(view==='deal'&&id==='pipeline')?'on':''}" onclick="nav('${id}')">${lbl}${bdg[id]?`<span class="bdg ${id==='home'?'hot':''}">${bdg[id]}</span>`:''}</button>`).join('');
   try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
 function nav(v,arg){view=v;viewArg=arg??null;renderView();}
-function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -794,12 +810,22 @@ function vHome(){const td=today();
       ${meets.length?seccard('Meetings today',meets.length,meets.map(mrowHtml).join(''),''):''}
       ${seccard("Needs me today",dueMe.length,dueMe.sort((a,b)=>(a.at||'99').localeCompare(b.at||'99')).map(t=>trow(t)).join(''),'Nothing due today. Open the planner and pull something forward.')}
       ${seccard('Calls due',calls.length,calls.sort((a,b)=>(a.when||'9').localeCompare(b.when||'9')).map(t=>trow(t)).join(''),'No calls pending.')}
+      ${upcomingHtml()}
     </div>
     <div>
       ${seccard("Today's focus",focus.length,focus.map((t,i)=>`<div class="top3-it"><span class="rank num">${i+1}</span><div style="flex:1;font-weight:600;font-size:12.5px">${esc(t.title)}</div><button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')"></button></div>`).join(''),'Star up to 3 tasks ★ to set focus.')}
-      ${seccard('Chase next',Math.min(chase.length,4),waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9')).slice(0,4).map(t=>`<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(t.title)}</div><div class="meta"><span class="pill b">${esc(pname(t.owner))}</span>${t.follow_up?`<span class="due ${t.follow_up<td?'over':t.follow_up===td?'today':''}">f/u ${fmtD(t.follow_up)}</span>`:''}</div></div></div>`).join(''),'Nothing delegated.')}
-      ${seccard('Account next actions',Math.min(naDue.length,4),naDue.slice(0,4).map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="font-size:12.5px;color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action||'')}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),'No account actions due.')}
+      ${seccard('Chase — waiting on others',chase.length,`<div class="row" style="background:var(--sub)"><div class="bd" style="font-size:11px;color:var(--t3)">Work you handed to someone that is still open. Ordered by follow-up date — tap to update or close.</div></div>`+waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9')).slice(0,4).map(t=>`<div class="row" style="cursor:pointer" onclick="openTask('${t.id}')"><div class="bd"><div class="tt" style="font-size:12.5px"><span style="color:var(--blue-d)">${esc(pname(t.owner))}</span> — ${esc(t.title)}</div><div class="meta">${t.follow_up?`<span class="due ${t.follow_up<td?'over':t.follow_up===td?'today':''}">follow up ${fmtD(t.follow_up)}</span>`:'<span>no follow-up date</span>'}</div></div></div>`).join(''),'Nothing delegated. Assign work with @name in the capture bar or the Owner field — it lands here until they deliver.',`<button class="btn xs" onclick="cTab='chase';nav('commit')">All ↗</button>`)}
+      ${seccard('Account next actions',naDue.length,naDue.slice(0,4).map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="font-size:12.5px;color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action||'')}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),'No account actions due.')}
     </div></div>`;}
+
+function upcomingHtml(){const td=today();let out='',n=0;
+  for(let i=1;i<=6&&n<12;i++){const ds=addDays(td,i);const items=dayItems(ds);if(!items.length)continue;
+    const d=new Date(ds+'T12:00');
+    out+=`<div class="row" style="background:var(--sub);font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)"><div class="bd">${d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</div></div>`;
+    items.slice(0,3).forEach(it=>{n++;const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`openTask('${it.o.id}')`;
+      out+=`<div class="row" style="cursor:pointer" onclick="${click}"><div class="bd"><div class="tt" style="font-size:12.5px;font-weight:500">${it.k==='m'?(it.o.time?'<span class="num">'+it.o.time+'</span> ':''):''}${esc(it.k==='m'?it.o.title:it.o.title)}</div><div class="meta">${it.k==='m'?'Meeting':it.k==='c'?'Call':pname(it.o.owner)==='Me'?'Task':'Waiting · '+esc(pname(it.o.owner))}</div></div></div>`;});
+    if(items.length>3)out+=`<div class="row"><div class="bd" style="font-size:11px;color:var(--t4)">+${items.length-3} more — see planner</div></div>`;}
+  return out?`<div class="card"><div class="ch"><span>Coming up — next 6 days</span><button class="btn xs" onclick="plTab='week';plAnchor=today();nav('planner')">Week ↗</button></div>${out}</div>`:'';}
 
 /* ═══ PLAN ITEMS (day top-3 / week priorities / month goals) ═══ */
 function planItems(scope,key){return PL().filter(p=>p.scope===scope&&p.key===key);}
@@ -854,11 +880,16 @@ function vDayPlanner(ds){const td=today();
         <div class="cb"><div class="capbar ${planned>cap?'over':''}"><div style="width:${pct}%"></div></div>
         ${planned>cap?`<div style="font-size:11.5px;color:var(--red);font-weight:700;margin-top:6px">Over capacity by ${Math.round((planned-cap)/60*10)/10}h — move something.</div>`:`<div style="font-size:11.5px;color:var(--t3);margin-top:6px">${Math.round((cap-planned)/60*10)/10}h free.</div>`}</div></div>
       ${seccard('To place on the day',unplaced.length,unplaced.map(t=>`<div class="row"><span class="pri ${t.priority}"></span><div class="bd"><div class="tt" style="font-size:12.5px">${esc(t.title)}</div><div class="meta"><span class="num">${t.estimate_min||30}m</span>${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}</div></div><input type="time" style="width:96px;padding:3px 5px;font-size:11.5px" onchange="setTaskAt('${t.id}',this.value)"></div>`).join(''),'Everything due today has a time.')}
-      ${seccard('Brain dump — unscheduled',dump.length,dump.slice(0,8).map(t=>`<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px;font-weight:500">${esc(t.title)}</div></div><div style="display:flex;gap:4px"><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${ds}')">This day</button><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${addDays(ds,1)}')">Next</button></div></div>`).join(''),'Empty. Capture ideas from the Home bar — no date needed.')}
+      <div class="card"><div class="ch"><span>Brain dump — unscheduled <span class="n num">(${dump.length})</span></span></div>
+      ${dump.slice(0,8).map(t=>`<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px;font-weight:500">${esc(t.title)}</div></div><div style="display:flex;gap:4px"><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${ds}')">This day</button><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${addDays(ds,1)}')">Next</button></div></div>`).join('')||'<div class="empty">Empty. Park ideas here — no date needed.</div>'}
+      <div class="addline"><input id="dumpInp" placeholder="Park an idea — no date" onkeydown="if(event.key==='Enter')addDump()"><button class="btn sm" onclick="addDump()">Add</button></div></div>
       ${ds<=td?`<div class="card"><div class="ch">Shutdown ritual</div><div class="cb" style="font-size:12px;color:var(--t3)">Close the day: unfinished items roll to tomorrow with their original dates preserved.<div style="margin-top:8px"><button class="btn sm" onclick="shutdownDay('${ds}')">Run shutdown</button></div></div></div>`:''}
     </div></div>`;}
 function setTaskAt(id,val){const t=tasks.find(x=>x.id===id);if(t&&val){t.at=val;t.updated_at=now();persist();renderView();}}
 function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t.original_due)t.original_due=ds;t.updated_at=now();persist();renderView();}}
+function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
+  tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});
+  if(i)i.value='';persist();renderView();}
 function shutdownDay(ds){const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
   if(!open.length){toast('Nothing open. Clean close — well done.');return;}
   if(!confirm(open.length+' unfinished item(s). Carry to tomorrow? Original due dates are kept for ageing.'))return;
@@ -1000,6 +1031,79 @@ function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='o
 function agendaAdd(pid){const i=g('agInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:pid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised';a.updated_at=now();persist();renderView();}}
 function agendaDel(id){const a=agenda.find(x=>x.id===id);if(a){a.deleted=true;a.updated_at=now();persist();renderView();}}
+/* ═══ + NEW MENU ═══ */
+function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)return;
+  if(m.classList.contains('on')){m.classList.remove('on');return;}
+  m.innerHTML=`<div class="nm-h">Plan</div>
+  <button class="nm-i" onclick="openTask()">Task</button>
+  <button class="nm-i" onclick="openTask(null,null,null,null,'call')">Call</button>
+  <button class="nm-i" onclick="newDump()">Brain dump idea</button>
+  <button class="nm-i" onclick="openMeeting()">Meeting</button>
+  <div class="nm-sep"></div><div class="nm-h">CRM</div>
+  <button class="nm-i" onclick="openCust()">Account</button>
+  <button class="nm-i" onclick="openDeal()">Deal</button>
+  <div class="nm-sep"></div><div class="nm-h">Other</div>
+  <button class="nm-i" onclick="openPerson()">Person</button>
+  <button class="nm-i" onclick="openDecision()">Decision</button>
+  <button class="nm-i" onclick="openOpp()">Improvement idea</button>`;
+  m.classList.add('on');}
+document.addEventListener('click',()=>{const m=g('newmenu');if(m)m.classList.remove('on');});
+function newDump(){openTask();const t=g('tTitle');if(t)t.placeholder='Park an idea — leave the date empty';toast('No date = stays in Brain dump until you schedule it.');}
+
+/* ═══ HELP / FAQ ═══ */
+function faqItem(q,a){return`<details><summary>${q}</summary><div class="fa">${a}</div></details>`;}
+function vHelp(){
+  return pagehead('HELP','How Clario works','Every feature, what it does, and how to use it','')+
+  `<div class="card faq"><div class="ch">Capturing work</div>
+  ${faqItem('Quick capture bar (Home)','Type anything and press Add. Clario reads the sentence: <code>@Priya MIS by friday</code> delegates to Priya with a Friday due date and starts chasing it. <code>call Rajesh tomorrow 3pm</code> creates a call scheduled for 3 pm tomorrow. <code>!high</code> or <code>urgent</code> sets priority. <code>today / tomorrow / monday…sunday / next week</code> set dates. No date at all sends it to the Brain dump. The 🎙 button dictates instead of typing (Edge/Chrome).')}
+  ${faqItem('+ New menu','The + New button in the top bar creates anything from anywhere: tasks, calls, brain-dump ideas, meetings, accounts, deals, people, decisions and improvement ideas. Inside the task window, the small + buttons beside Owner, Department and Account create a new person, department or account without leaving the form.')}
+  ${faqItem('Brain dump','A holding area for ideas that have no date yet, so they never clutter today. Add from the + New menu, from the capture bar (just omit any date word), or from the Brain dump box in the Day planner. When ready, open the Day view and tap "This day" or "Next" to schedule an idea, or open it and give it a date.')}
+  </div>
+  <div class="card faq"><div class="ch">Planner</div>
+  ${faqItem('Day view','Left side is your timeline, 7:00–21:00: meetings (blue), calls (green) and timed tasks (grey) placed at their hour, with a red line at the current time. Right side: Top 3 outcomes for the day, a capacity bar, tasks due today that still need a time slot ("To place"), and the Brain dump.')}
+  ${faqItem('Capacity bar','Adds up today’s meeting durations plus the time estimates of every task due today, against an 8-hour day. Turns red when you’ve committed more than 8 hours — the signal to move something before the day starts, not after it fails.')}
+  ${faqItem('Top 3 / focus stars','Two ways to force priority. Top 3 in the Day view: the three outcomes the day is for. The ★ star on any task marks it as focus (max three) and pins it to Today’s focus on Home.')}
+  ${faqItem('Shutdown ritual','At day end, press Run shutdown in the Day view. Every unfinished item rolls to tomorrow, but its original due date is kept — so slips stay visible and honest instead of resetting each night. The journal box saves your notes and reflections per day.')}
+  ${faqItem('Week and Month','Week shows seven columns with everything scheduled, plus weekly priorities on top — add items straight into any day with its Add box. Month shows the grid with monthly goals above it; tap a date to see and add to that day. ‹ › arrows move through time; Today jumps back.')}
+  ${faqItem('Meetings','Each meeting pulls the parked agenda items of its attendees automatically. During the meeting, record decisions and actions — actions assigned to others become chase items instantly. Complete meeting stamps the account’s activity log and marks raised agenda items. Import/export Outlook .ics files from the Meetings tab.')}
+  </div>
+  <div class="card faq"><div class="ch">Commitments & chasing</div>
+  ${faqItem('What is "Chase" / "waiting on others"?','Every task you assign to someone else (via @name, the Owner field, or a meeting action) becomes a <b>waiting</b> item: they owe it to you. The Chase card on Home shows the four most urgent by follow-up date; Commitments → To chase shows all of them grouped by person. Tap an item to update it, mark it done when delivered, or push the follow-up date after you’ve nudged them. If a delegated item is overdue on its follow-up, it shows red.')}
+  ${faqItem('My plate vs To chase','My plate is what you owe others — your own open tasks by due date. To chase is the mirror: what others owe you. The Home KPIs "Due today" and "To chase" track both directions.')}
+  ${faqItem('Calls','Calls are first-class items with a scheduled time and a phone number — the ✆ number dials directly on a phone. Completing a call linked to an account writes it into that account’s activity history automatically.')}
+  ${faqItem('Overdue and original dates','When a task slips, Clario shows both the current due date and the original one, with the age in days. Rollovers never erase history — the Review page surfaces your oldest slips by original commitment.')}
+  </div>
+  <div class="card faq"><div class="ch">People</div>
+  ${faqItem('Person pages and 1:1 agendas','Each person has a card: items parked to raise at your next meeting, everything you’re waiting on from them, and their recent deliveries. Park agenda items anytime; they surface automatically in any meeting that person attends.')}
+  </div>
+  <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
+  ${faqItem('Accounts','One page per customer: details, contact persons (tap ✆ to dial), open tasks and calls, upcoming meetings, linked deals, and a stamped activity timeline. Log call / Log note add entries manually; completed calls and meetings log themselves.')}
+  ${faqItem('Next action — the one rule','Every account should always carry exactly one next action with a date. Do it, press ✓ Done — it’s logged to the activity history and Clario immediately asks for the next one. Accounts with actions due today or overdue appear on Home and the Sales dashboard. This single habit keeps accounts from going quiet.')}
+  ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
+  ${faqItem('Stale deals and slipped closes','A deal with no logged activity for 14+ days is flagged stale (amber stripe). Deals whose expected close date has passed show ⚠ and appear on the Sales dashboard. Both are your prompt to act or kill the deal. Marking Lost asks for a reason so patterns become visible; marking Won stamps the quarter.')}
+  </div>
+  <div class="card faq"><div class="ch">Decide — tools & log</div>
+  ${faqItem('Decision log','Record every significant decision with its rationale and a review date. When the review date arrives, the decision resurfaces on the Decide page and Weekly Review — so you actually check whether it worked. Decisions recorded in a meeting link to it and its attendees.')}
+  ${faqItem('Weighted decision matrix','List options and criteria, weight each criterion 1–10, score options 0–10. Clario computes weighted totals and highlights the winner; File as decision writes it to the log with a 90-day review. If a small weight change flips the winner, the call is close — decide on the intangibles.')}
+  ${faqItem('Pre-mortem','Assume the plan already failed and list why. This framing surfaces risks optimism hides. Rate each reason’s likelihood, write a mitigation, then one tap turns every high-likelihood mitigation into a task due in 7 days.')}
+  ${faqItem('5 Whys','Start from the problem and ask why five times to reach the root cause, then define the countermeasure and convert it to a task. Fixes the source, not the symptom.')}
+  ${faqItem('Pareto 80/20','Enter causes with their counts (complaints, defects, delay-days, ₹ value). The chart sorts them and draws the cumulative line — the blue bars are the vital few driving ~80% of the effect. Work those first.')}
+  ${faqItem('SWOT','Four honest boxes: internal strengths and weaknesses, external opportunities and threats. Saved like every exercise, reopenable from Saved exercises.')}
+  ${faqItem('Improvement backlog','Capture every "we should fix this someday", score impact and effort 1–5, and read the quadrant: high impact + low effort = quick wins, do first. Track status open → in progress → done.')}
+  </div>
+  <div class="card faq"><div class="ch">Dashboards & review</div>
+  ${faqItem('Operations dashboard','Throughput trend (completed vs added, 8 weeks), overdue by department, a department scorecard with oldest slips, and delegation health per person — who’s sitting on what and for how long.')}
+  ${faqItem('Sales dashboard','Open pipeline, weighted forecast, won this quarter, stage-wise value, stale deals, slipped close dates, and account next actions due.')}
+  ${faqItem('Weekly review','One page to close the week: done vs added, overdue, stuck delegations, deals won, this week’s priorities scored, oldest slips by original date, and decisions due for review. Export as .md or print, then tap Plan next week to set the next three priorities while it’s fresh.')}
+  </div>
+  <div class="card faq"><div class="ch">Data, sync & devices</div>
+  ${faqItem('Where does my data live?','On each device (browser storage) and in one file — db.json — in your OneDrive. No server, no login to Clario itself. The app file and your data are fully separate.')}
+  ${faqItem('OneDrive account sync (all devices)','Settings → paste your Azure client ID → Sign in with Microsoft. Clario then reads/writes Apps/Clario/db.json in your OneDrive directly — works on iPhone, iPad, Android and desktop. It pulls before every save and checks for other-device changes every 20 seconds; edits merge record-by-record with the newer change winning.')}
+  ${faqItem('OneDrive folder sync (desktop fallback)','Edge/Chrome on desktop can instead link a local OneDrive folder from Settings. Same file, same merging; the link persists across launches.')}
+  ${faqItem('Excel import & export','Settings → Bulk data. Download a template per dataset (tasks, people, accounts, contacts, deals, decisions), fill it in Excel, save as CSV, import. Names do the linking — unknown people and accounts are created automatically. People, accounts and contacts update existing records by name; tasks, deals and decisions always add new rows, so don’t import the same task sheet twice. Export buttons dump current data in the same format.')}
+  ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Every device asks for the passphrase once. Losing the passphrase means losing the synced file — there is no recovery.')}
+  ${faqItem('Install as an app','Desktop Edge/Chrome: menu → Apps → Install. Android Chrome: menu → Install app. iPhone/iPad Safari: Share → Add to Home Screen. The installed app works offline; sync resumes when online.')}
+  </div>`;}
 /* ═══ ACCOUNTS (CRM) ═══ */
 function vAccounts(){
   if(viewArg){const c=CU().find(x=>x.id===viewArg);if(c)return acctPage(c);}
@@ -1347,7 +1451,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newProd" placeholder="Add product / service" style="flex:1"><button class="btn sm" onclick="addProd()">Add</button></div></div>
   <div class="setcard"><h4>Data</h4>
     <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button></div>
-  <div class="setcard"><h4>About</h4><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
+  <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
   </div></div>`;}
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
