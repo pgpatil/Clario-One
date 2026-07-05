@@ -389,7 +389,7 @@ canvas{display:block;max-width:100%}
   <div class="fld"><label>Title <span class="req">*</span></label><input id="tTitle"></div>
   <div class="g2">
     <div class="fld"><label>Type</label><select id="tType" onchange="taskTypeUI()"><option value="task">Task</option><option value="call">Call</option></select></div>
-    <div class="fld"><label>Owner</label><div style="display:flex;gap:6px"><select id="tOwner" onchange="taskTypeUI()" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNew('person')">+</button></div></div>
+    <div class="fld"><label>Owner</label><div style="display:flex;gap:6px"><select id="tOwner" onchange="ownerAutofill()" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNew('person')">+</button></div></div>
     <div class="fld"><label>Priority</label><select id="tPri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="tDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept')">+</button></div></div>
     <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue"></div>
@@ -429,6 +429,7 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Segment</label><input id="cSeg" placeholder="QSR / Hotel / Retail…"></div>
     <div class="fld"><label>City</label><input id="cCity"></div>
     <div class="fld"><label>Department</label><select id="cDept"></select></div>
+    <div class="fld"><label>Key account manager</label><div style="display:flex;gap:6px"><select id="cKam" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNewKam()">+</button></div></div>
   </div>
   <div class="fld"><label>Address</label><textarea id="cAddr" style="min-height:40px"></textarea></div>
   <div class="fld"><label>Notes</label><textarea id="cNotes"></textarea></div>
@@ -1022,7 +1023,7 @@ function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='o
   const decs=DC().filter(d=>(d.people_ids||[]).includes(p.id)).slice(-5).reverse();
   const nm=esc(p.name);
   return`<span class="backlink" onclick="nav('people')">← People</span>`+
-  pagehead('PERSON',nm,`${esc(p.role||'')}${p.role&&p.dept?' · ':''}${esc(p.dept||'')}`,
+  pagehead('PERSON',nm,`${esc(p.role||'')}${p.role&&p.dept?' · ':''}${esc(p.dept||'')}${(()=>{const ac=CU().filter(c=>(c.people_ids||[]).includes(p.id));return ac.length?' · '+ac.map(c=>esc(c.name)).join(', '):'';})()}`,
     `${p.phone?`<a class="btn gh2 sm" href="tel:${esc(p.phone)}">✆ Call</a>`:''}<button class="btn gh2 sm" onclick="openPerson('${p.id}')">Edit</button><button class="btn sm" onclick="openTask(null,'${p.id}')">+ Delegate</button>`)+
   `<div class="grid2"><div>
   <div class="card"><div class="ch"><span>Agenda — raise next meeting</span><span class="n num">${ag.length}</span></div>
@@ -1079,11 +1080,11 @@ function vHelp(){
   ${faqItem('Overdue and original dates','When a task slips, Clario shows both the current due date and the original one, with the age in days. Rollovers never erase history — the Review page surfaces your oldest slips by original commitment.')}
   </div>
   <div class="card faq"><div class="ch">People</div>
-  ${faqItem('Person pages and 1:1 agendas','Each person has a card: items parked to raise at your next meeting, everything you’re waiting on from them, and their recent deliveries. Park agenda items anytime; they surface automatically in any meeting that person attends.')}
+  ${faqItem('Person pages and 1:1 agendas','Each person has a card: items parked to raise at your next meeting, everything you’re waiting on from them, and their recent deliveries. A person can face several accounts — link them from the account page (Our team on this account), and every account they cover shows on their page.')}
   </div>
   <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
   ${faqItem('Accounts','One page per customer: details, contact persons (tap ✆ to dial), open tasks and calls, upcoming meetings, linked deals, and a stamped activity timeline. Log call / Log note add entries manually; completed calls and meetings log themselves.')}
-  ${faqItem('Next action — the one rule','Every account should always carry exactly one next action with a date. Do it, press ✓ Done — it’s logged to the activity history and Clario immediately asks for the next one. Accounts with actions due today or overdue appear on Home and the Sales dashboard. This single habit keeps accounts from going quiet.')}
+  ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action with a date. Do it, press ✓ Done — it’s logged to the activity history and Clario immediately asks for the next one. Accounts with actions due today or overdue appear on Home and the Sales dashboard. This single habit keeps accounts from going quiet.')}
   ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
   ${faqItem('Stale deals and slipped closes','A deal with no logged activity for 14+ days is flagged stale (amber stripe). Deals whose expected close date has passed show ⚠ and appear on the Sales dashboard. Both are your prompt to act or kill the deal. Marking Lost asks for a reason so patterns become visible; marking Won stamps the quarter.')}
   </div>
@@ -1119,10 +1120,10 @@ function vAccounts(){
     const dls=openDeals().filter(d=>d.customer_id===c.id);const dv=dls.reduce((a,d)=>a+(+d.value||0),0);
     const na=c.next_action?`${esc(c.next_action)}`:'<span style="color:var(--t4)">—</span>';
     const nad=c.next_action_due?`<span class="due ${c.next_action_due<td?'over':c.next_action_due===td?'today':''}">${fmtD(c.next_action_due)}</span>`:'';
-    return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${dls.length?dls.length+' · '+fmtMoney(dv):'—'}</td><td class="r num">${open||'—'}</td><td class="r num">${nCo}</td></tr>`;}).join('');
+    return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${dls.length?dls.length+' · '+fmtMoney(dv):'—'}</td><td class="r num">${open||'—'}</td></tr>`;}).join('');
   return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+
   `<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px"></div>
-  <div class="card" style="overflow-x:auto">${list.length?`<table class="t"><tr><th>Account</th><th>Segment</th><th>City</th><th>Next action</th><th class="r">Open deals</th><th class="r">Open items</th><th class="r">Contacts</th></tr>${rows}</table>`:'<div class="empty">Add accounts — name, city, contacts, next actions.</div>'}</div>`;}
+  <div class="card" style="overflow-x:auto">${list.length?`<table class="t"><tr><th>Account</th><th>KAM</th><th>Segment</th><th>City</th><th>Next action</th><th class="r">Open deals</th><th class="r">Open items</th></tr>${rows}</table>`:'<div class="empty">Add accounts — name, city, contacts, next actions.</div>'}</div>`;}
 function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id);
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
   const dls=DL().filter(d=>d.customer_id===c.id);
@@ -1130,7 +1131,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   const meets=M().filter(m=>m.customer_id===c.id&&m.status!=='done');
   const nm=esc(c.name);
   return`<span class="backlink" onclick="nav('accounts')">← Accounts</span>`+
-  pagehead('ACCOUNT',nm,`${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.address?' · '+esc(c.address):''}`,
+  pagehead('ACCOUNT',nm,`${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM: <b>'+esc(pname(c.kam_id))+'</b>':''}${c.address?' · '+esc(c.address):''}`,
     `<button class="btn gh2 sm" onclick="openCust('${c.id}')">Edit</button><button class="btn gh2 sm" onclick="openTask(null,null,null,'${c.id}','call')">+ Call</button><button class="btn gh2 sm" onclick="openDeal(null,'${c.id}')">+ Deal</button><button class="btn sm" onclick="openTask(null,null,null,'${c.id}')">+ Task</button>`)+
   `<div class="card" style="border-left:4px solid var(--blue)"><div class="ch"><span>Next action</span>${c.next_action?`<span class="due ${c.next_action_due&&c.next_action_due<td?'over':c.next_action_due===td?'today':''}">${c.next_action_due?fmtD(c.next_action_due):''}</span>`:''}</div>
     <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1140,6 +1141,10 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
     ${cos.map(x=>`<div class="row"><div class="bd"><div class="tt">${esc(x.name)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
     <div class="addline"><input id="coName" placeholder="Name" style="flex:1.2"><input id="coRole" placeholder="Role" style="flex:1"><input id="coPhone" placeholder="Phone" style="flex:1"><input id="coEmail" placeholder="Email" style="flex:1.2"><button class="btn sm" onclick="contactAdd('${c.id}')">Add</button></div></div>
+    ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id));const avail=P().filter(x=>!ids.includes(x.id));
+      return `<div class="card"><div class="ch"><span>Our team on this account</span><span class="n num">${ppl.length}</span></div>
+      ${ppl.map(x=>`<div class="row" style="cursor:pointer" onclick="nav('people','${x.id}')"><div class="bd"><div class="tt">${esc(x.name)}${c.kam_id===x.id?' <span class="pill b">KAM</span>':''}</div><div class="meta">${esc(x.role||'')}${x.role&&x.dept?' · ':''}${esc(x.dept||'')}</div></div><div class="rowacts">${c.kam_id===x.id?'':`<button class="iconb" title="Make KAM" onclick="event.stopPropagation();setKam('${c.id}','${x.id}')">★</button>`}<button class="iconb" title="New task for them on this account" onclick="event.stopPropagation();openTask(null,'${x.id}',null,'${c.id}')">+ task</button><button class="iconb" title="Unlink" onclick="event.stopPropagation();acctUnlinkPerson('${c.id}','${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">Link the people who face this account. Star one as KAM.</div>'}
+      <div class="addline"><select id="acctPersonSel" style="flex:1">${avail.length?avail.map(x=>`<option value="${x.id}">${esc(x.name)}${x.role?' — '+esc(x.role):''}</option>`).join(''):'<option value="">All people already linked</option>'}</select><button class="btn sm" onclick="acctLinkPerson('${c.id}')">Link</button><button class="btn gh2 sm" onclick="openPerson()">New person</button></div></div>`;})()}
     ${seccard('Open items',open.length,open.map(t=>trow(t,{star:false})).join(''),'Nothing open for '+nm+'.')}
     ${meets.length?seccard('Upcoming meetings',meets.length,meets.map(mrowHtml).join(''),''):''}
     ${c.notes?`<div class="card"><div class="ch">Notes</div><div class="cb" style="font-size:12.5px;color:var(--t2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
@@ -1160,6 +1165,9 @@ function logQuick(kind,cid,did){const t=prompt(kind==='call'?'Call summary — w
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
 function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&confirm('Remove '+x.name+'?')){x.deleted=true;x.updated_at=now();persist();renderView();}}
+function acctLinkPerson(cid){const sel=g('acctPersonSel');const pid=sel?sel.value:'';if(!pid)return;const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
+function acctUnlinkPerson(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=(c.people_ids||[]).filter(x=>x!==pid);if(c.kam_id===pid)c.kam_id=null;c.updated_at=now();persist();renderView();}
+function setKam(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.kam_id=pid;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
 
 /* ═══ PIPELINE ═══ */
 function vPipeline(){const td=today();
@@ -1511,13 +1519,15 @@ people:{label:'People',cols:['name','department','role','phone'],example:['Priya
   imp(o){if(!o.name)return'no name';const ex=P().find(x=>x.name.toLowerCase()===o.name.toLowerCase());const n=now();
     if(ex){if(o.department)ex.dept=ensureDept(o.department);if(o.role)ex.role=o.role;if(o.phone)ex.phone=o.phone;ex.updated_at=n;return'updated';}
     people.push({id:uid(),name:o.name,dept:ensureDept(o.department),role:o.role||'',phone:o.phone||'',created_at:n,updated_at:n});return null;}},
-accounts:{label:'Accounts (customers)',cols:['name','segment','city','department','address','next_action','next_action_due','notes'],
-  example:['LuLu Mall','Retail','Kochi','Sales','Edappally, Kochi','Share revised rate card','2026-07-09','Key account — monthly review'],
-  rows(){return CU().map(c=>[c.name,c.segment||'',c.city||'',c.dept||'',c.address||'',c.next_action||'',c.next_action_due||'',c.notes||'']);},
+accounts:{label:'Accounts (customers)',cols:['name','kam','segment','city','department','address','next_action','next_action_due','notes'],
+  example:['LuLu Mall','Priya Sharma','Retail','Kochi','Sales','Edappally, Kochi','Share revised rate card','2026-07-09','Key account — monthly review'],
+  rows(){return CU().map(c=>[c.name,c.kam_id?pname(c.kam_id):'',c.segment||'',c.city||'',c.dept||'',c.address||'',c.next_action||'',c.next_action_due||'',c.notes||'']);},
   imp(o){if(!o.name)return'no name';const ex=CU().find(x=>x.name.toLowerCase()===o.name.toLowerCase());const n=now();
+    const kamId=o.kam?getOrCreatePerson(o.kam,ensureDept(o.department)):null;
     if(ex){['segment','city','address','notes'].forEach(k=>{if(o[k])ex[k]=o[k];});if(o.department)ex.dept=ensureDept(o.department);
+      if(kamId){ex.kam_id=kamId;ex.people_ids=ex.people_ids||[];if(!ex.people_ids.includes(kamId))ex.people_ids.push(kamId);}
       if(o.next_action){ex.next_action=o.next_action;ex.next_action_due=normD(o.next_action_due)||addDays(today(),3);}ex.updated_at=n;return'updated';}
-    customers.push({id:uid(),name:o.name,segment:o.segment||'',city:o.city||'',dept:ensureDept(o.department),address:o.address||'',notes:o.notes||'',
+    customers.push({id:uid(),name:o.name,segment:o.segment||'',city:o.city||'',dept:ensureDept(o.department),kam_id:kamId,people_ids:kamId?[kamId]:[],address:o.address||'',notes:o.notes||'',
       next_action:o.next_action||null,next_action_due:o.next_action?(normD(o.next_action_due)||addDays(today(),3)):null,created_at:n,updated_at:n});return null;}},
 contacts:{label:'Contacts',cols:['account','name','role','phone','email'],example:['LuLu Mall','Rajesh Nair','Category Head','+91 98xxxxxx02','rajesh@example.com'],
   rows(){return CO().map(x=>[cname(x.customer_id),x.name,x.role||'',x.phone||'',x.email||'']);},
@@ -1581,6 +1591,7 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
   window._presetDeal=presetDeal||t?.deal_id||null;
   taskTypeUI();g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
+function ownerAutofill(){const oid=g('tOwner').value;if(oid&&oid!=='me'){const p=P().find(x=>x.id===oid);if(p&&p.dept&&!g('tDept').value)fillDept('tDept',p.dept);}taskTypeUI();}
 function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner').value!=='me';
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
   g('fDue').style.display=call?'none':'';g('fAt').style.display=call?'none':'';g('fEst').style.display=call?'none':'';
@@ -1616,12 +1627,15 @@ let editC=null;
 function openCust(id){editC=id?customers.find(x=>x.id===id):null;
   g('mCustTitle').textContent=editC?'Edit Account':'New Account';
   g('cName').value=editC?.name||'';g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
-  fillDept('cDept',editC?.dept||'');g('cAddr').value=editC?.address||'';g('cNotes').value=editC?.notes||'';
+  fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');g('cAddr').value=editC?.address||'';g('cNotes').value=editC?.notes||'';
   g('cDel').style.display=editC?'':'none';g('mCust').classList.add('open');setTimeout(()=>g('cName').focus(),50);}
 function saveCust(){const nm=g('cName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
-  if(editC)Object.assign(editC,d);else customers.push(Object.assign({id:uid(),created_at:n,next_action:null,next_action_due:null},d));
+  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
+  if(editC)Object.assign(editC,d);else editC2push(d,n);
+  if(d.kam_id){const cc=editC||customers[customers.length-1];cc.people_ids=cc.people_ids||[];if(!cc.people_ids.includes(d.kam_id))cc.people_ids.push(d.kam_id);}
   closeM();persist();renderView();}
+function editC2push(d,n){customers.push(Object.assign({id:uid(),created_at:n,next_action:null,next_action_due:null,people_ids:[]},d));}
+function quickNewKam(){const v=(prompt('New person name:')||'').trim();if(!v)return;const n=now();const ex=P().find(p=>p.name.toLowerCase()===v.toLowerCase());const id=ex?ex.id:(people.push({id:uid(),name:v,dept:g('cDept').value||'',role:'',phone:'',created_at:n,updated_at:n}),people[people.length-1].id);persist();fillOwner('cKam',id);}
 function delCust(){if(editC&&confirm('Delete '+editC.name+'? Linked items stay.')){editC.deleted=true;editC.updated_at=now();closeM();nav('accounts');}}
 
 let editDl=null;
