@@ -97,6 +97,7 @@ table.t th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:up
 table.t td{padding:8px 12px;border-bottom:1px solid var(--bdr);vertical-align:top}
 table.t tr:last-child td{border-bottom:0}
 table.t tr.click{cursor:pointer}
+.lnk{cursor:pointer;text-decoration:none}.lnk:hover{text-decoration:underline;filter:brightness(.92)}
 table.t tr.click:hover{background:var(--blue-l)}
 table.t td.r,table.t th.r{text-align:right}
 .pill{font-size:11px;border-radius:10px;padding:1px 8px;font-weight:600;white-space:nowrap}
@@ -129,6 +130,17 @@ table.t td.r,table.t th.r{text-align:right}
 .row:hover .rowacts{opacity:1}
 .telbtn{color:var(--grn);font-weight:700;font-size:11.5px}
 .addline{display:flex;gap:6px;padding:9px 12px;border-top:1px solid var(--bdr);flex-wrap:wrap;background:var(--sub)}
+.rte{min-height:64px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-size:12.5px;background:#fff;outline:none;line-height:1.5}
+.rte:focus{border-color:var(--blue)}
+.rte:empty::before{content:attr(data-ph);color:var(--t4)}
+.rte-tb{display:flex;gap:4px;margin-bottom:6px}
+.rte-tb button{border:1px solid var(--bdr);border-radius:5px;padding:3px 9px;font-size:12px;background:#fff;min-width:30px}
+.rte-tb button:hover{background:var(--bg)}
+.at-t ul,.at-t ol{margin:3px 0 3px 18px}.at-t li{margin:1px 0}
+.at-li{display:flex;align-items:flex-start;gap:6px}
+.at-li .mk{flex:1}
+.at-li .lit{opacity:0;font-size:11px;padding:0 5px;border:1px solid var(--bdr);border-radius:4px;white-space:nowrap;align-self:center}
+.at-li:hover .lit{opacity:1}
 .addline input,.addline select{flex:1;min-width:100px;font-size:12.5px;padding:6px 8px}
 
 /* ═══ KPI ═══ */
@@ -149,6 +161,15 @@ table.t td.r,table.t th.r{text-align:right}
 .tab.on{color:var(--blue-d);border-bottom-color:var(--blue)}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
 .filters select,.filters input{font-size:12.5px;padding:6px 9px}
+th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var(--blue-d)}th.srt .ar{opacity:.5;font-size:10px}
+.vtog{display:inline-flex;border:1px solid var(--bdr);border-radius:6px;overflow:hidden;margin-left:auto}
+.vtog button{padding:5px 11px;font-size:12px;background:#fff;color:var(--t3)}
+.vtog button.on{background:var(--blue);color:#fff}
+.acard{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:13px;cursor:pointer;box-shadow:var(--sh)}
+.acard:hover{border-color:var(--blue-b)}
+.acard .an{font-weight:700;font-size:13.5px;color:var(--blue-d)}
+.acard .ameta{font-size:11.5px;color:var(--t3);margin-top:2px}
+.acard .astats{display:flex;gap:12px;margin-top:8px;font-size:11.5px;color:var(--t2);flex-wrap:wrap}
 
 /* ═══ planner: month ═══ */
 .pl-nav{display:flex;align-items:center;gap:6px}
@@ -392,15 +413,15 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Owner</label><div style="display:flex;gap:6px"><select id="tOwner" onchange="ownerAutofill()" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNew('person')">+</button></div></div>
     <div class="fld"><label>Priority</label><select id="tPri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="tDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept')">+</button></div></div>
-    <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue"></div>
+    <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue" onchange="dueChanged()"></div>
     <div class="fld" id="fAt"><label>Time (for day plan)</label><input type="time" id="tAt"></div>
     <div class="fld" id="fEst"><label>Estimate (min)</label><input type="number" id="tEst" min="5" step="5" placeholder="30"></div>
     <div class="fld" id="fRepeat"><label>Repeat</label><select id="tRepeat"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
-    <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="date" id="tFup"></div>
+    <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="date" id="tFup" onchange="this.dataset.auto=0"></div>
     <div class="fld" id="fWhen" style="display:none"><label>Call by</label><input type="datetime-local" id="tWhen"></div>
     <div class="fld" id="fPhone" style="display:none"><label>Phone</label><input id="tPhone" placeholder="+91…"></div>
     <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="tCust" style="flex:1" onchange="fillContact('tContact',this.value||null,'')"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust')">+</button></div></div>
-    <div class="fld" id="fTContact"><label>Account contact</label><select id="tContact"></select></div>
+    <div class="fld" id="fTContact"><label>Account contact (FPR)</label><div style="display:flex;gap:6px"><select id="tContact" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New contact for this account" onclick="quickNewContact('tContact')">+</button></div></div>
     <div class="fld"><label>Status</label><select id="tStatus"><option value="open">Open</option><option value="waiting">Waiting on owner</option><option value="done">Done</option></select></div>
   </div>
   <div class="fld"><label>Notes</label><textarea id="tNotes"></textarea></div>
@@ -540,6 +561,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const now=()=>new Date().toISOString();
 const today=()=>new Date().toISOString().slice(0,10);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const jss=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
 const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000);
 const fmtD=ds=>ds?new Date(ds+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
@@ -561,7 +583,13 @@ function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{wind
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
 function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];}
 function persist(){stateUpdatedAt=now();try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
-function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}}
+function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
+function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
+  const dup=tasks.find(t=>t.customer_id===c.id&&t.is_next_action&&t.status!=='done');
+  if(!dup){const owner=c.kam_id||'me';const due=c.next_action_due||addDays(today(),3);
+    tasks.push({id:uid(),type:'task',title:c.next_action,owner,is_next_action:true,customer_id:c.id,dept:c.dept||'',due,original_due:due,at:null,estimate_min:5,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'',created_at:n,updated_at:n});m++;}
+  c.next_action=null;c.next_action_due=null;});
+  if(m)persist();}
 
 const T=()=>tasks.filter(t=>!t.deleted);
 const P=()=>people.filter(p=>!p.deleted);
@@ -577,6 +605,11 @@ const TR=()=>toolruns.filter(t=>!t.deleted);
 const OP=()=>opps.filter(o=>!o.deleted);
 const pname=id=>id==='me'||!id?'Me':(P().find(p=>p.id===id)||{}).name||'—';
 const cname=id=>id?(CU().find(c=>c.id===id)||{}).name||'':'';
+/* clickable name chips — navigate to the entity */
+const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
+const personLink=(id,cls)=>id&&id!=='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`:'';
+const deptLink=(d,cls)=>d?`<span class="${cls||'pill n'} lnk" onclick="event.stopPropagation();deptFilter('${esc(d)}')" title="Filter by department">${esc(d)}</span>`:'';
+function deptFilter(d){window._cd=d;cTab='mine';nav('commit');}
 const openMine=()=>T().filter(t=>t.status==='open'&&(t.owner==='me'||!t.owner));
 const waiting=()=>T().filter(t=>t.status==='waiting');
 const openDeals=()=>DL().filter(d=>d.stage!=='Won'&&d.stage!=='Lost');
@@ -671,10 +704,17 @@ g('ghSearch').addEventListener('input',e=>{const q=e.target.value.trim();const b
 document.addEventListener('click',e=>{if(!e.target.closest('.gh-search'))g('srchres').classList.remove('on');});
 
 /* ═══ SHARED RENDERERS ═══ */
+/* sortable table headers + list/card view toggle */
+var _sort={};
+function setSort(scope,key){const s=_sort[scope]||{};if(s.key===key)s.dir=s.dir===1?-1:1;else{s.key=key;s.dir=1;}_sort[scope]=s;renderView();}
+function sortHead(scope,key,label,cls){const s=_sort[scope]||{};const ar=s.key===key?(s.dir===1?'▲':'▼'):'⇅';return`<th class="srt ${cls||''}" onclick="setSort('${scope}','${key}')">${label} <span class="ar">${ar}</span></th>`;}
+function applySort(scope,arr,getters){const s=_sort[scope];if(!s||!s.key||!getters[s.key])return arr;const g2=getters[s.key];return[...arr].sort((a,b)=>{let x=g2(a),y=g2(b);if(typeof x==='string')x=x.toLowerCase();if(typeof y==='string')y=y.toLowerCase();if(x==null)x='';if(y==null)y='';return (x<y?-1:x>y?1:0)*s.dir;});}
+function viewToggle(scope,val){return`<div class="vtog"><button class="${val==='list'?'on':''}" onclick="_view['${scope}']='list';renderView()">List</button><button class="${val==='card'?'on':''}" onclick="_view['${scope}']='card';renderView()">Cards</button></div>`;}
+var _view={accounts:'list',people:'card'};
 function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
-  const ow=t.owner&&t.owner!=='me'?`<span class="pill b">${esc(pname(t.owner))}</span>`:'';
+  const ow=t.owner&&t.owner!=='me'?personLink(t.owner):'';
   const wt=t.status==='waiting'?`<span class="pill a">waiting${t.follow_up?' · f/u '+fmtD(t.follow_up):''}</span>`:'';
-  const cu=t.customer_id?`<span class="pill p">${esc(cname(t.customer_id))}</span>`:'';
+  const cu=t.customer_id?custLink(t.customer_id):'';
   const orig=ov&&t.original_due&&t.original_due!==t.due?` <span class="age">(orig ${fmtD(t.original_due)})</span>`:'';
   const dueH=t.type==='call'?(t.when?`<span class="due ${t.when.slice(0,10)<td?'over':t.when.slice(0,10)===td?'today':''}">${fmtDT(t.when)}</span>`:''):(t.due?`<span class="due ${ov?'over':t.due===td?'today':''}">${ov?'Overdue '+ageDays(t.due)+'d · was ':''}${fmtD(t.due)}</span>${orig}`:'');
   const tel=t.type==='call'&&t.phone?`<a class="telbtn" href="tel:${esc(t.phone)}">✆ ${esc(t.phone)}</a>`:'';
@@ -684,7 +724,7 @@ function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
     <span class="pri ${t.priority||'medium'}"></span>
     <button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')">${t.status==='done'?'✓':''}</button>
     <div class="bd"><div class="tt">${t.type==='call'?'Call: ':''}${esc(t.title)}</div>
-    <div class="meta">${dueH}${tel}${t.at?`<span class="pill n num">${t.at}</span>`:''}${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}${cu}${ow}${wt}${rep}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
+    <div class="meta">${dueH}${tel}${t.at?`<span class="pill n num">${t.at}</span>`:''}${t.dept?deptLink(t.dept):''}${cu}${ow}${wt}${rep}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
     <div class="rowacts">${opts.snooze&&t.status==='waiting'?`<button class="iconb" title="Push follow-up +1 day" onclick="snoozeFollow('${t.id}')">⏲</button>`:''}${t.type!=='call'&&t.status!=='done'?`<button class="iconb" title="Reschedule to tomorrow" onclick="bumpDue('${t.id}')">→</button>`:''}${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" onclick="openTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="rowDelTask('${t.id}')">✕</button></div></div>`;}
 async function rowDelTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();toast('Deleted.');}}
 function bumpDue(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();persist();reRender();toast('Moved to '+fmtD(t.due)+'.');}
@@ -719,7 +759,7 @@ function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,tim
   return r;}
 function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'').trim();if(!v)return;const r=parseQA(v);if(dueOverride)r.due=dueOverride;const n=now();
   if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
-  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?(r.due||addDays(today(),2)):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
+  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?(r.due?addDays(r.due,-1):addDays(today(),2)):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
   if(inp)inp.value='';persist();renderView();}
 function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
@@ -823,7 +863,7 @@ function vHome(){const td=today();
   const overdue=T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td);
   const calls=T().filter(t=>t.type==='call'&&t.status!=='done'&&(!t.when||t.when.slice(0,10)<=td));
   const chase=waiting();
-  const naDue=CU().filter(c=>c.next_action&&c.next_action_due&&c.next_action_due<=td);
+  const naDue=CU().map(c=>({c,t:acctNextTask(c.id)})).filter(x=>x.t&&x.t.due&&x.t.due<=td);
   const fc=openDeals().reduce((a,d)=>a+(+d.value||0)*(STAGE_P[d.stage]||0)/100,0);
   const meets=M().filter(m=>m.date===td&&m.status!=='done').sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   const focus=T().filter(t=>t.focus&&t.status!=='done').slice(0,3);
@@ -854,7 +894,7 @@ function vHome(){const td=today();
     <div>
       ${seccard("Today's focus",focus.length,focus.map((t,i)=>`<div class="top3-it"><span class="rank num">${i+1}</span><div style="flex:1;font-weight:600;font-size:12.5px">${esc(t.title)}</div><button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')"></button></div>`).join(''),'Star up to 3 tasks ★ to set focus.')}
       ${seccard('Chase — waiting on others',chase.length,`<div class="row" style="background:var(--sub)"><div class="bd" style="font-size:11px;color:var(--t3)">Work you handed to someone that is still open. Ordered by follow-up date — tap to update or close.</div></div>`+waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9')).slice(0,4).map(t=>`<div class="row" style="cursor:pointer" onclick="openTask('${t.id}')"><div class="bd"><div class="tt" style="font-size:12.5px"><span style="color:var(--blue-d)">${esc(pname(t.owner))}</span> — ${esc(t.title)}</div><div class="meta">${t.follow_up?`<span class="due ${t.follow_up<td?'over':t.follow_up===td?'today':''}">follow up ${fmtD(t.follow_up)}</span>`:'<span>no follow-up date</span>'}</div></div></div>`).join(''),'Nothing delegated. Assign work with @name in the capture bar or the Owner field — it lands here until they deliver.',`<button class="btn xs" onclick="cTab='chase';nav('commit')">All ↗</button>`)}
-      ${seccard('Account next actions',naDue.length,naDue.slice(0,4).map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="font-size:12.5px;color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action||'')}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),'No account actions due.')}
+      ${seccard('Account next actions',naDue.length,naDue.slice(0,4).map(({c,t})=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="font-size:12.5px;color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(t.title||'')}</span><span class="due ${t.due<td?'over':'today'}">${fmtD(t.due)}</span></div></div></div>`).join(''),'No account actions due.')}
     </div></div>`;}
 
 function upcomingHtml(){const td=today();let out='',n=0;
@@ -985,7 +1025,7 @@ function meetingAgenda(m){return AG().filter(a=>a.status==='open'&&((m.attendee_
 function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';return vPlanner();}
   const ag=meetingAgenda(m);const acts=T().filter(t=>t.meeting_id===m.id);const decs=DC().filter(d=>d.meeting_id===m.id);
   return`<span class="backlink" onclick="plTab='meet';nav('planner')">← Meetings</span>`+
-  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(pname).join(', ')||'No attendees'}${m.customer_id?' · '+esc(cname(m.customer_id)):''}${m.dept?' · '+esc(m.dept):''}`,
+  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
     `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button>${m.status!=='done'?`<button class="btn sm" onclick="completeMeeting('${m.id}')">Complete meeting</button>`:'<span class="pill g">Completed</span>'}`)+
   `<div class="grid2">
     <div class="card"><div class="ch"><span>Agenda</span><span class="n num">${ag.length}</span></div>
@@ -1055,12 +1095,24 @@ async function bulkReassign(){const who=await askChoice('Reassign selected to:',
 /* ═══ PEOPLE ═══ */
 function vPeople(){
   if(viewArg){const p=P().find(x=>x.id===viewArg);if(p)return personPage(p);}
-  const cards=P().map(p=>{const ag=AG().filter(a=>a.person_id===p.id&&a.status==='open').length;
-    const w=waiting().filter(t=>t.owner===p.id);const oldest=w.length?Math.max(...w.map(t=>ageDays((t.created_at||now()).slice(0,10)))):0;
+  const view=_view.people||'card';const td=today();
+  const stat=p=>{const w=waiting().filter(t=>t.owner===p.id);return{
+    ag:AG().filter(a=>a.person_id===p.id&&a.status==='open').length,w:w.length,
+    oldest:w.length?Math.max(...w.map(t=>ageDays((t.created_at||now()).slice(0,10)))):0};};
+  const getters={name:p=>p.name,role:p=>p.role||'',dept:p=>p.dept||'',waiting:p=>stat(p).w,oldest:p=>stat(p).oldest};
+  let list=applySort('people',P(),getters);if(!_sort.people)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  const head=pagehead('TEAM','People','Delegation and 1:1 agendas',`<button class="btn sm" onclick="openPerson()">+ Person</button>`)
+    +`<div class="filters">${viewToggle('people',view)}</div>`;
+  if(!P().length)return head+'<div class="card"><div class="empty">Add the people you delegate to and meet with.</div></div>';
+  if(view==='list'){
+    const rows=list.map(p=>{const s=stat(p);return`<tr class="click" onclick="nav('people','${p.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(p.name)}</td><td>${esc(p.role||'')}</td><td>${esc(p.dept||'')}</td><td class="r num">${s.ag||'—'}</td><td class="r num" style="${s.w?'font-weight:700':''}">${s.w||'—'}</td><td class="r num">${s.oldest>7?`<span style="color:var(--amb)">${s.oldest}d</span>`:s.oldest?s.oldest+'d':'—'}</td></tr>`;}).join('');
+    return head+`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('people','name','Name')}${sortHead('people','role','Role')}${sortHead('people','dept','Department')}<th class="r">Agenda</th>${sortHead('people','waiting','Waiting','r')}${sortHead('people','oldest','Oldest','r')}</tr>${rows}</table></div>`;
+  }
+  const cards=list.map(p=>{const s=stat(p);
     return`<div class="pcard" onclick="nav('people','${p.id}')"><div class="pn">${esc(p.name)}</div><div class="pr">${esc(p.role||'')}${p.role&&p.dept?' · ':''}${esc(p.dept||'')}</div>
-    <div class="pstats"><span>Agenda <b class="num">${ag}</b></span><span class="${w.length?'warn':''}">Waiting <b class="num">${w.length}</b></span>${oldest>7?`<span class="bad">Oldest <b class="num">${oldest}d</b></span>`:''}</div></div>`;}).join('');
-  return pagehead('TEAM','People','Delegation and 1:1 agendas',`<button class="btn sm" onclick="openPerson()">+ Person</button>`)+
-  (P().length?`<div class="pgrid">${cards}</div>`:'<div class="card"><div class="empty">Add the people you delegate to and meet with.</div></div>');}
+    <div class="pstats"><span>Agenda <b class="num">${s.ag}</b></span><span class="${s.w?'warn':''}">Waiting <b class="num">${s.w}</b></span>${s.oldest>7?`<span class="bad">Oldest <b class="num">${s.oldest}d</b></span>`:''}</div></div>`;}).join('');
+  return head+`<div class="pgrid">${cards}</div>`;}
+
 function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='open');
   const w=waiting().filter(t=>t.owner===p.id).sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
   const doneRecent=T().filter(t=>t.owner===p.id&&t.status==='done').sort((a,b)=>(b.updated_at||'').localeCompare(a.updated_at||'')).slice(0,5);
@@ -1101,9 +1153,10 @@ document.addEventListener('click',()=>{const m=g('newmenu');if(m)m.classList.rem
 function newDump(){openTask();const t=g('tTitle');if(t)t.placeholder='Park an idea — leave the date empty';toast('No date = stays in Brain dump until you schedule it.');}
 
 /* ═══ HELP / FAQ ═══ */
-function faqItem(q,a){return`<details><summary>${q}</summary><div class="fa">${a}</div></details>`;}
+function faqItem(q,a){const key=(q+' '+a).replace(/<[^>]+>/g,' ').toLowerCase();return`<details class="faqi" data-k="${esc(key)}"><summary>${q}</summary><div class="fa">${a}</div></details>`;}
 function vHelp(){
   return pagehead('HELP','How Clario works','Every feature, what it does, and how to use it','')+
+  `<div class="card"><div class="cb"><input id="faqQ" placeholder="Search the FAQ — e.g. 'follow up', 'encryption', 'kanban'" value="${esc(window._faqQ||'')}" oninput="faqSearch(this.value)" style="width:100%"><div id="faqNo" class="note" style="display:none;margin-top:6px">No matches.</div></div></div>`+
   `<div class="card faq"><div class="ch">Capturing work</div>
   ${faqItem('Quick capture bar (Home)','Type anything and press Add. Clario reads the sentence: <code>@Priya MIS by friday</code> delegates to Priya with a Friday due date and starts chasing it. <code>call Rajesh tomorrow 3pm</code> creates a call scheduled for 3 pm tomorrow. <code>!high</code> or <code>urgent</code> sets priority. <code>today / tomorrow / monday…sunday / next week</code> set dates. No date at all sends it to the Brain dump. The 🎙 button dictates instead of typing (Edge/Chrome).')}
   ${faqItem('+ New menu','The + New button in the top bar creates anything from anywhere: tasks, calls, brain-dump ideas, meetings, accounts, deals, people, decisions and improvement ideas. Inside the task window, the small + buttons beside Owner, Department and Account create a new person, department or account without leaving the form.')}
@@ -1127,11 +1180,12 @@ function vHelp(){
   ${faqItem('Recurring tasks','Give any task a Repeat (daily, weekly, fortnightly, monthly). When you complete it, Clario schedules the next occurrence automatically from its due date — for standing work like weekly MIS or a monthly review, you enter it once. A ↻ badge marks repeating items.')}
   </div>
   <div class="card faq"><div class="ch">People</div>
-  ${faqItem('Person pages and 1:1 agendas','Each person has a card: items parked to raise at your next meeting, everything you’re waiting on from them, and their recent deliveries. A person can face several accounts — link them from the account page (Our team on this account), and every account they cover shows on their page.')}
+  ${faqItem('People — cards or list','The team view toggles between Cards and List (top right); the list sorts by name, role, department, waiting count or oldest item. Each person opens a page: items parked for your next 1:1, everything you’re waiting on from them, and recent deliveries. A person can face several accounts — link them from the account page (Our team on this account), and every account they cover shows on theirs.')}
   </div>
   <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
-  ${faqItem('Accounts','One page per customer: details, contact persons (tap ✆ to dial), open tasks and calls, upcoming meetings, linked deals, and a stamped activity timeline. Log call / Log note add entries manually; completed calls and meetings log themselves.')}
-  ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action with a date. Do it, press ✓ Done — it’s logged to the activity history and Clario immediately asks for the next one. Accounts with actions due today or overdue appear on Home and the Sales dashboard. This single habit keeps accounts from going quiet.')}
+  ${faqItem('Accounts — list, sort, filter, cards','The accounts list sorts by any column — click a header to sort, click again to reverse. Filter by KAM or segment, or search name, city and segment. Toggle between List and Cards (top right). Each account opens its own page: details, contacts (tap ✆ to dial), open items, meetings, deals, the rich Notes & calls panel, and a stamped activity timeline.')}
+  ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action. That next action is now a <b>real task</b> tagged to the account and owned by the KAM (or you), so it appears on Home, in the planner and in Commitments with everything else — not in a separate silo. Press ✓ Done and it’s completed and logged, and Clario immediately asks for the next one. Actions due today or overdue also surface on the Sales dashboard. This single habit keeps accounts from going quiet.')}
+  ${faqItem('Notes & calls','On an account or a deal, the Notes & calls box takes rich text — bold, italic, bulleted or numbered lists, and links, via the small toolbar. <b>Save note</b> or <b>Log as call</b> timestamps it into the activity trail. Write your notes as a list of points, and each saved point shows a <b>+ task</b> on hover — one click turns that line into a task tagged to the account or deal. Completed calls and meetings also land in the trail automatically. Names shown anywhere — account, person, department — are clickable and jump straight to that record.')}
   ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
   ${faqItem('Stale deals and slipped closes','A deal with no logged activity for 14+ days is flagged stale (amber stripe). Deals whose expected close date has passed show ⚠ and appear on the Sales dashboard. Both are your prompt to act or kill the deal. Marking Lost asks for a reason so patterns become visible; marking Won stamps the quarter.')}
   ${faqItem('Line items on a deal','Inside a deal, add line items — product, quantity and rate. Clario totals them (qty × rate) and, when any line exists, that total becomes the deal value automatically, overriding the plain Value field. The deal page then shows a full line-item table with per-line amounts and a grand total. Products typed here are remembered for next time.')}
@@ -1147,6 +1201,7 @@ function vHelp(){
   ${faqItem('Improvement backlog','Capture every "we should fix this someday", score impact and effort 1–5, and read the quadrant: high impact + low effort = quick wins, do first. Track status open → in progress → done.')}
   </div>
   <div class="card faq"><div class="ch">Dashboards & review</div>
+  ${faqItem('Searching this FAQ','Use the search box at the top of Help to filter these entries by keyword — matches expand automatically. Everything in Clario is cross-linked too: names of accounts, people and departments are clickable wherever they appear, and every number and row on the dashboards jumps to the underlying list.')}
   ${faqItem('Operations dashboard','Throughput trend (completed vs added, 8 weeks), overdue by department, a department scorecard with oldest slips, and delegation health per person — who’s sitting on what and for how long.')}
   ${faqItem('Sales dashboard','Open pipeline, weighted forecast, won this quarter, stage-wise value, stale deals, slipped close dates, and account next actions due.')}
   ${faqItem('Weekly review','One page to close the week: done vs added, overdue, stuck delegations, deals won, this week’s priorities scored, oldest slips by original date, and decisions due for review. Export as .md or print, then tap Plan next week to set the next three priorities while it’s fresh.')}
@@ -1159,6 +1214,11 @@ function vHelp(){
   ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Every device asks for the passphrase once. Losing the passphrase means losing the synced file — there is no recovery.')}
   ${faqItem('Install as an app','Desktop Edge/Chrome: menu → Apps → Install. Android Chrome: menu → Install app. iPhone/iPad Safari: Share → Add to Home Screen. The installed app works offline; sync resumes when online.')}
   </div>`;}
+function faqSearch(q){window._faqQ=q;q=(q||'').trim().toLowerCase();
+  document.querySelectorAll('.faqi').forEach(d=>{const hit=!q||(d.getAttribute('data-k')||'').includes(q);d.style.display=hit?'':'none';if(q&&hit)d.open=true;if(!q)d.open=false;});
+  document.querySelectorAll('.card.faq').forEach(card=>{const any=[...card.querySelectorAll('.faqi')].some(d=>d.style.display!=='none');card.style.display=any?'':'none';});
+  const anyAll=[...document.querySelectorAll('.faqi')].some(d=>d.style.display!=='none');const no=g('faqNo');if(no)no.style.display=anyAll?'none':'';}
+
 /* ═══ ACCOUNTS (CRM) ═══ */
 const CADENCE_DAYS={weekly:7,fortnightly:14,monthly:30,quarterly:92};
 function supplyLapsed(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])return false;return ageDays(c.last_order)>Math.round(CADENCE_DAYS[c.cadence]*1.5);}
@@ -1166,17 +1226,40 @@ function supplyDue(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])ret
 function logOrderToday(cid){const c=customers.find(x=>x.id===cid);if(!c)return;c.last_order=today();c.updated_at=now();logActivity('note','Order logged',cid,null);persist();renderView();toast('Order dated today.');}
 function vAccounts(){
   if(viewArg){const c=CU().find(x=>x.id===viewArg);if(c)return acctPage(c);}
-  const q=(window._cq||'').toLowerCase();const td=today();
-  const list=CU().filter(c=>!q||(c.name+' '+(c.city||'')+' '+(c.segment||'')).toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
-  const rows=list.map(c=>{const nCo=CO().filter(x=>x.customer_id===c.id).length;
-    const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').length;
-    const dls=openDeals().filter(d=>d.customer_id===c.id);const dv=dls.reduce((a,d)=>a+(+d.value||0),0);
-    const na=c.next_action?`${esc(c.next_action)}`:'<span style="color:var(--t4)">—</span>';
-    const nad=c.next_action_due?`<span class="due ${c.next_action_due<td?'over':c.next_action_due===td?'today':''}">${fmtD(c.next_action_due)}</span>`:'';
-    return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${dls.length?dls.length+' · '+fmtMoney(dv):'—'}</td><td class="r num">${open||'—'}</td></tr>`;}).join('');
-  return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+
-  `<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px"></div>
-  <div class="card" style="overflow-x:auto">${list.length?`<table class="t"><tr><th>Account</th><th>KAM</th><th>Segment</th><th>City</th><th>Next action</th><th class="r">Open deals</th><th class="r">Open items</th></tr>${rows}</table>`:'<div class="empty">Add accounts — name, city, contacts, next actions.</div>'}</div>`;}
+  const q=(window._cq||'').toLowerCase();const td=today();const kf=window._caKam||'';const sf=window._caSeg||'';
+  let list=CU().filter(c=>(!q||(c.name+' '+(c.city||'')+' '+(c.segment||'')).toLowerCase().includes(q))
+    &&(!kf||(kf==='__none'?!c.kam_id:c.kam_id===kf))&&(!sf||(c.segment||'')===sf));
+  const meta=c=>{const dls=openDeals().filter(d=>d.customer_id===c.id);return{
+    nCo:CO().filter(x=>x.customer_id===c.id).length,
+    open:T().filter(t=>t.customer_id===c.id&&t.status!=='done').length,
+    dls:dls.length,dv:dls.reduce((a,d)=>a+(+d.value||0),0),nt:acctNextTask(c.id)};};
+  const getters={name:c=>c.name,kam:c=>c.kam_id?pname(c.kam_id):'',segment:c=>c.segment||'',city:c=>c.city||'',
+    deals:c=>meta(c).dv,open:c=>meta(c).open,na:c=>{const t=acctNextTask(c.id);return t&&t.due?t.due:'9999';}};
+  list=applySort('accounts',list,getters);
+  if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  const segs=[...new Set(CU().map(c=>c.segment).filter(Boolean))].sort();
+  const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))];
+  const view=_view.accounts||'list';
+  const filters=`<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
+    <select onchange="window._caKam=this.value;renderView()"><option value="">All KAMs</option><option value="__none"${kf==='__none'?' selected':''}>— No KAM —</option>${kams.map(id=>`<option value="${id}"${kf===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>
+    <select onchange="window._caSeg=this.value;renderView()"><option value="">All segments</option>${segs.map(x=>`<option${sf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
+    ${(kf||sf||q)?`<button class="btn gh2 sm" onclick="window._cq='';window._caKam='';window._caSeg='';renderView()">Clear</button>`:''}
+    ${viewToggle('accounts',view)}</div>`;
+  let body;
+  if(!list.length){body='<div class="card"><div class="empty">No accounts match. Add one, or clear the filters.</div></div>';}
+  else if(view==='card'){
+    body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>
+      <div class="ameta">${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM '+esc(pname(c.kam_id)):''}</div>
+      <div class="astats"><span>Contacts <b class="num">${m.nCo}</b></span><span>Open <b class="num">${m.open}</b></span>${m.dls?`<span>Deals <b class="num">${m.dls}</b> · ${fmtMoney(m.dv)}</span>`:''}</div>
+      ${m.nt?`<div class="ameta" style="margin-top:6px"><span class="due ${m.nt.due&&m.nt.due<td?'over':m.nt.due===td?'today':''}">${m.nt.due?fmtD(m.nt.due):''}</span> ${esc(m.nt.title)}</div>`:'<div class="ameta" style="margin-top:6px;color:var(--t4)">No next action</div>'}</div>`;}).join('')}</div>`;
+  }else{
+    const rows=list.map(c=>{const m=meta(c);const na=m.nt?esc(m.nt.title):'<span style="color:var(--t4)">—</span>';
+      const nad=m.nt&&m.nt.due?`<span class="due ${m.nt.due<td?'over':m.nt.due===td?'today':''}">${fmtD(m.nt.due)}</span>`:'';
+      return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
+    body=`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('accounts','name','Account')}${sortHead('accounts','kam','KAM')}${sortHead('accounts','segment','Segment')}${sortHead('accounts','city','City')}${sortHead('accounts','na','Next action')}${sortHead('accounts','deals','Open deals','r')}${sortHead('accounts','open','Open items','r')}</tr>${rows}</table></div>`;
+  }
+  return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body;}
+
 function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id);
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
   const dls=DL().filter(d=>d.customer_id===c.id);
@@ -1184,12 +1267,10 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   const meets=M().filter(m=>m.customer_id===c.id&&m.status!=='done');
   const nm=esc(c.name);
   return`<span class="backlink" onclick="nav('accounts')">← Accounts</span>`+
-  pagehead('ACCOUNT',nm,`${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM: <b>'+esc(pname(c.kam_id))+'</b>':''}${c.address?' · '+esc(c.address):''}`,
+  pagehead('ACCOUNT',nm,`${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM: '+personLink(c.kam_id,'pill b'):''}${c.address?' · '+esc(c.address):''}`,
     `<button class="btn gh2 sm" onclick="openCust('${c.id}')">Edit</button><button class="btn gh2 sm" onclick="openTask(null,null,null,'${c.id}','call')">+ Call</button><button class="btn gh2 sm" onclick="openDeal(null,'${c.id}')">+ Deal</button><button class="btn sm" onclick="openTask(null,null,null,'${c.id}')">+ Task</button>`)+
-  `<div class="card" style="border-left:4px solid var(--blue)"><div class="ch"><span>Next action</span>${c.next_action?`<span class="due ${c.next_action_due&&c.next_action_due<td?'over':c.next_action_due===td?'today':''}">${c.next_action_due?fmtD(c.next_action_due):''}</span>`:''}</div>
-    <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    ${c.next_action?`<div style="flex:1;font-weight:600">${esc(c.next_action)}</div><button class="btn sm" onclick="doneNextAction('${c.id}')">✓ Done — set next</button>`:`<input id="naText" placeholder="Every account deserves a next step — what is it?" style="flex:2;min-width:180px"><input type="date" id="naDue" style="width:140px"><button class="btn sm" onclick="setNextAction('${c.id}')">Set</button>`}</div></div>
-  ${c.cadence?`<div class="card" style="border-left:4px solid ${supplyLapsed(c)?'var(--red)':supplyDue(c)?'var(--amb)':'var(--grn)'}"><div class="ch"><span>Supply — ${esc(c.cadence)}</span>${c.last_order?`<span class="due ${supplyLapsed(c)?'over':''}">last order ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d ago</span>`:'<span class="pill a">no order logged</span>'}</div>
+  nextActionCard(c)+
+  `${c.cadence?`<div class="card" style="border-left:4px solid ${supplyLapsed(c)?'var(--red)':supplyDue(c)?'var(--amb)':'var(--grn)'}"><div class="ch"><span>Supply — ${esc(c.cadence)}</span>${c.last_order?`<span class="due ${supplyLapsed(c)?'over':''}">last order ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d ago</span>`:'<span class="pill a">no order logged</span>'}</div>
     <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;font-size:12.5px;color:var(--t2)">${esc(c.supply_note||'')}${supplyLapsed(c)?' <b style="color:var(--red)">— overdue to reorder</b>':supplyDue(c)?' <b style="color:var(--amb)">— due to reorder</b>':''}</div><button class="btn sm" onclick="logOrderToday('${c.id}')">Log order today</button></div></div>`:''}
   <div class="grid31"><div>
     ${dls.length?seccard('Deals',dls.length,`<table class="t"><tr><th>Deal</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${dls.map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d.name)}</td><td><span class="pill ${d.stage==='Won'?'g':d.stage==='Lost'?'r':'b'}">${d.stage}</span></td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${fmtD(d.close_date)}</td></tr>`).join('')}</table>`,''):''}
@@ -1204,19 +1285,62 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     ${meets.length?seccard('Upcoming meetings',meets.length,meets.map(mrowHtml).join(''),''):''}
     ${c.notes?`<div class="card"><div class="ch">Notes</div><div class="cb" style="font-size:12.5px;color:var(--t2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
   </div><div>
-    <div class="card"><div class="ch"><span>Activity</span><span style="display:flex;gap:5px"><button class="btn gh2 xs" onclick="logQuick('call','${c.id}')">Log call</button><button class="btn gh2 xs" onclick="logQuick('note','${c.id}')">Log note</button></span></div>
-    <div class="cb"><div class="atl">${acts.map(a=>`<div class="atl-it k-${a.kind}"><div class="at-t">${esc(a.text)}</div><div class="at-m">${a.kind} · ${fmtDT(a.at)}</div></div>`).join('')||'<div style="color:var(--t4);font-size:12px">No activity logged yet. Completed calls and meetings land here automatically.</div>'}</div></div></div>
+    <div class="card"><div class="ch"><span>Notes & calls</span></div>
+    <div class="cb" style="border-bottom:1px solid var(--bdr)">
+    <div class="rte-tb"><button type="button" title="Bold" onclick="rteCmd('bold')"><b>B</b></button><button type="button" title="Italic" onclick="rteCmd('italic')"><i>I</i></button><button type="button" title="Bulleted list — each point can become a task" onclick="rteCmd('insertUnorderedList')">• List</button><button type="button" title="Numbered list" onclick="rteCmd('insertOrderedList')">1.</button><button type="button" title="Link" onclick="rteLink()">🔗</button></div>
+    <div id="npText" class="rte" contenteditable="true" data-ph="Write notes as points — save, then turn any point into a task…"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${c.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${c.id}')">Log as call</button></div></div>
+    <div class="cb"><div class="atl">${acts.map(a=>actItem(a,c.id,null)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet. Completed calls and meetings also land here.</div>'}</div></div></div>
   </div></div>`;}
+/* Account next action = a real task tagged to the account (is_next_action), so it flows to Home, planner, commitments. */
+function acctNextTask(cid){return T().filter(t=>t.customer_id===cid&&t.is_next_action&&t.status!=='done').sort((a,b)=>(a.due||'')<(b.due||'')?-1:1)[0]||null;}
+function nextActionCard(c){const td=today();const nt=acctNextTask(c.id);
+  const head='<div class="card" style="border-left:4px solid var(--blue)"><div class="ch"><span>Next action</span>'+(nt&&nt.due?'<span class="due '+(nt.due<td?'over':nt.due===td?'today':'')+'">'+fmtD(nt.due)+'</span>':'')+'</div><div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  const body=nt
+    ?'<div style="flex:1;font-weight:600">'+esc(nt.title)+(nt.owner&&nt.owner!=='me'?' · '+personLink(nt.owner):'')+'</div><button class="btn gh2 sm" onclick="openTask(\''+nt.id+'\')">Edit</button><button class="btn sm" onclick="doneNextAction(\''+c.id+'\')">✓ Done — set next</button>'
+    :'<input id="naText" placeholder="Every account deserves a next step — becomes a task" style="flex:2;min-width:180px"><input type="date" id="naDue" style="width:140px" value="'+addDays(today(),3)+'"><button class="btn sm" onclick="setNextAction(\''+c.id+'\')">Set</button>';
+  return head+body+'</div></div>';}
 function setNextAction(cid){const c=customers.find(x=>x.id===cid);const t=g('naText').value.trim();if(!c||!t){toast('Describe the next action.');return;}
-  c.next_action=t;c.next_action_due=g('naDue').value||addDays(today(),3);c.updated_at=now();persist();renderView();}
-async function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)return;
-  logActivity('note','Done: '+c.next_action,cid,null);
+  const n=now();const due=g('naDue').value||addDays(today(),3);const owner=c.kam_id||'me';
+  tasks.push({id:uid(),type:'task',title:t,owner,is_next_action:true,customer_id:cid,dept:c.dept||'',due,original_due:due,at:null,estimate_min:5,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'',created_at:n,updated_at:n});
+  c.updated_at=now();persist();renderView();toast('Next action set — it is now a task.');}
+async function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)return;const cur=acctNextTask(cid);
+  if(cur){cur.status='done';cur.updated_at=now();logActivity('note','Done: '+cur.title,cid,null);}
   const nxt=await askText('Done ✓ logged. Next action for '+c.name+'?',{title:'Next action',placeholder:'Leave blank to skip',ok:'Set'});
-  if(nxt&&nxt.trim()){c.next_action=nxt.trim();const d=await askText('Due date for this next action:',{title:'Due date',type:'date',value:addDays(today(),3),ok:'Set'});c.next_action_due=(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))?d:addDays(today(),3);}
-  else{c.next_action=null;c.next_action_due=null;}
+  if(nxt&&nxt.trim()){const d=await askText('Due date for this next action:',{title:'Due date',type:'date',value:addDays(today(),3),ok:'Set'});const due=(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))?d:addDays(today(),3);const n=now();const owner=c.kam_id||'me';
+    tasks.push({id:uid(),type:'task',title:nxt.trim(),owner,is_next_action:true,customer_id:cid,dept:c.dept||'',due,original_due:due,at:null,estimate_min:5,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'',created_at:n,updated_at:n});}
   c.updated_at=now();persist();renderView();toast('Updated.');}
 async function logQuick(kind,cid,did){const t=await askText(kind==='call'?'Call summary — who, what was said, outcome:':'Note:',{title:kind==='call'?'Log call':'Log note',ok:'Save'});if(!t||!t.trim())return;
   logActivity(kind,t.trim(),cid||null,did||null);persist();renderView();toast(kind==='call'?'Call logged.':'Note logged.');}
+/* rich-text notes */
+function rteCmd(cmd){document.execCommand(cmd,false,null);const el=g('npText')||g('dpText');if(el)el.focus();}
+async function rteLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',type:'url',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
+const RTE_OK=new Set(['B','STRONG','I','EM','U','A','UL','OL','LI','BR','DIV','P','SPAN']);
+function sanitizeHtml(html){const d=document.createElement('div');d.innerHTML=html;
+  (function walk(node){[...node.childNodes].forEach(ch=>{
+    if(ch.nodeType===1){
+      if(!RTE_OK.has(ch.tagName)){const t=document.createTextNode(ch.textContent);ch.replaceWith(t);return;}
+      [...ch.attributes].forEach(a=>{if(!(ch.tagName==='A'&&a.name==='href'))ch.removeAttribute(a.name);});
+      if(ch.tagName==='A'){ch.setAttribute('target','_blank');ch.setAttribute('rel','noopener');}
+      walk(ch);
+    }else if(ch.nodeType===8){ch.remove();}
+  });})(d);
+  return d.innerHTML;}
+function htmlToText(html){const d=document.createElement('div');d.innerHTML=html;return (d.textContent||'').replace(/\n{2,}/g,'\n').trim();}
+function capLog(kind,cid,did){const el=g('npText')||g('dpText');if(!el)return;const html=sanitizeHtml(el.innerHTML);const text=htmlToText(html);
+  if(!text){toast('Type something first.');return;}
+  const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,at:n,created_at:n,updated_at:n});
+  persist();renderView();toast(kind==='call'?'Call logged.':'Note saved.');}
+/* render one activity; note list-items get a per-line +task */
+function actItem(a,cid,did){const meta='<div class="at-m">'+a.kind+' · '+fmtDT(a.at)+'</div>';
+  if(a.html){const d=document.createElement('div');d.innerHTML=a.html;
+    d.querySelectorAll('li').forEach((li,i)=>{const txt=(li.textContent||'').trim();if(!txt)return;
+      li.setAttribute('class','at-li');
+      li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\')">+ task</button>';});
+    return '<div class="atl-it k-'+a.kind+'"><div class="at-t">'+d.innerHTML+'</div>'+meta+'</div>';}
+  return '<div class="atl-it k-'+a.kind+'"><div class="at-t" style="white-space:pre-wrap">'+esc(a.text)+'</div>'+meta+'</div>';}
+function lineToTask(btn,cid,did){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
+  openTask(null,null,null,cid||null,'task',did||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
 async function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&await askConfirm('Remove '+x.name+'?',{ok:'Remove',danger:true})){x.deleted=true;x.updated_at=now();persist();renderView();toast('Removed.');}}
@@ -1254,13 +1378,13 @@ async function moveDealStage(d,st){if(d.stage===st)return;
   logActivity('note','Stage → '+st+': '+d.name,d.customer_id,d.id);
   d.stage=st;d.updated_at=now();persist();renderView();toast(d.name+' → '+st);}
 function vDeal(){const d=DL().find(x=>x.id===viewArg);if(!d)return vPipeline();
-  const td=today();const acts=AC().filter(a=>a.deal_id===d.id||(d.customer_id&&a.customer_id===d.customer_id)).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,20);
+  const td=today();const dcid=d.customer_id||'';const acts=AC().filter(a=>a.deal_id===d.id||(d.customer_id&&a.customer_id===d.customer_id)).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,20);
   const items=T().filter(t=>t.deal_id===d.id&&t.status!=='done');
   const co=CO().find(x=>x.id===d.contact_id);
   const path=STAGES.map(st=>{const di=STAGES.indexOf(d.stage),si=STAGES.indexOf(st);
     return`<li class="${st===d.stage?'cur':''} ${si<di&&d.stage!=='Lost'?'done':''} ${st==='Lost'?'lostli':''}" onclick="moveDealStageById('${d.id}','${st}')">${st}</li>`;}).join('');
   return`<span class="backlink" onclick="nav('pipeline')">← Pipeline</span>`+
-  pagehead('DEAL',esc(d.name),`${cname(d.customer_id)||'No account'} · <b class="num">${fmtMoney(d.value)}</b> · ${STAGE_P[d.stage]||0}% probability${d.close_date?' · close '+fmtD(d.close_date)+(d.close_date<td&&d.stage!=='Won'&&d.stage!=='Lost'?' <span class="age">(slipped)</span>':''):''}`,
+  pagehead('DEAL',esc(d.name),`${d.customer_id?custLink(d.customer_id,'pill p'):'No account'} · <b class="num">${fmtMoney(d.value)}</b> · ${STAGE_P[d.stage]||0}% probability${d.close_date?' · close '+fmtD(d.close_date)+(d.close_date<td&&d.stage!=='Won'&&d.stage!=='Lost'?' <span class="age">(slipped)</span>':''):''}`,
     `<button class="btn gh2 sm" onclick="openDeal('${d.id}')">Edit</button><button class="btn gh2 sm" onclick="logQuick('call',${d.customer_id?`'${d.customer_id}'`:'null'},'${d.id}')">Log call</button><button class="btn sm" onclick="openTask(null,null,null,${d.customer_id?`'${d.customer_id}'`:'null'},'task','${d.id}')">+ Task</button>`)+
   `<div class="card"><div class="cb"><ul class="path">${path}</ul></div></div>
   <div class="grid31"><div>
@@ -1276,8 +1400,12 @@ function vDeal(){const d=DL().find(x=>x.id===viewArg);if(!d)return vPipeline();
     ${(d.lines&&d.lines.length)?seccard('Line items',d.lines.length,`<table class="t"><tr><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr>${d.lines.map(l=>`<tr><td>${esc(l.product||'—')}</td><td class="r num">${l.qty||0}</td><td class="r num">${fmtMoney(l.rate||0)}</td><td class="r num">${fmtMoney((+l.qty||0)*(+l.rate||0))}</td></tr>`).join('')}<tr><td style="font-weight:800">Total</td><td></td><td></td><td class="r num" style="font-weight:800">${fmtMoney(d.lines.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0))}</td></tr></table>`,''):''}
     ${seccard('Open items on this deal',items.length,items.map(t=>trow(t,{star:false})).join(''),'No tasks linked. Add one from the header.')}
   </div><div>
-    <div class="card"><div class="ch"><span>Activity</span><button class="btn gh2 xs" onclick="logQuick('note',${d.customer_id?`'${d.customer_id}'`:'null'},'${d.id}')">Log note</button></div>
-    <div class="cb"><div class="atl">${acts.map(a=>`<div class="atl-it k-${a.kind}"><div class="at-t">${esc(a.text)}</div><div class="at-m">${a.kind} · ${fmtDT(a.at)}</div></div>`).join('')||'<div style="color:var(--t4);font-size:12px">No activity yet.</div>'}</div></div></div>
+    <div class="card"><div class="ch"><span>Notes & calls</span></div>
+    <div class="cb" style="border-bottom:1px solid var(--bdr)">
+    <div class="rte-tb"><button type="button" title="Bold" onclick="rteCmd('bold')"><b>B</b></button><button type="button" title="Italic" onclick="rteCmd('italic')"><i>I</i></button><button type="button" title="Bulleted list — each point can become a task" onclick="rteCmd('insertUnorderedList')">• List</button><button type="button" title="Numbered list" onclick="rteCmd('insertOrderedList')">1.</button><button type="button" title="Link" onclick="rteLink()">🔗</button></div>
+    <div id="dpText" class="rte" contenteditable="true" data-ph="Notes as points — save, then turn any point into a task…"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${dcid}','${d.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${dcid}','${d.id}')">Log as call</button></div></div>
+    <div class="cb"><div class="atl">${acts.map(a=>actItem(a,dcid,d.id)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet.</div>'}</div></div></div>
   </div></div>`;}
 function moveDealStageById(id,st){const d=deals.find(x=>x.id===id);if(d)moveDealStage(d,st);}
 function moveDealStep(id,dir){const d=deals.find(x=>x.id===id);if(!d)return;const i=STAGES.indexOf(d.stage);const ni=Math.min(STAGES.length-1,Math.max(0,i+dir));if(ni!==i)moveDealStage(d,STAGES[ni]);}
@@ -1425,8 +1553,8 @@ function vDash(){const td=today();
     <div class="grid2">
     <div class="card"><div class="ch">Throughput — 8 weeks</div><div class="cb"><canvas id="trendCv" style="width:100%;height:220px"></canvas></div></div>
     <div class="card"><div class="ch">Overdue by department</div><div class="cb"><canvas id="deptCv" style="width:100%;height:220px"></canvas></div></div>
-    ${seccard('Department scorecard',Object.keys(byDept).length,`<table class="t"><tr><th>Department</th><th class="r">Open</th><th class="r">Overdue</th><th class="r">Oldest slip</th></tr>${Object.entries(byDept).sort((a,b)=>b[1].over-a[1].over).map(([d,v])=>`<tr><td>${esc(d)}</td><td class="r num">${v.open}</td><td class="r num" style="${v.over?'color:var(--red);font-weight:700':''}">${v.over}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'No open items.')}
-    ${seccard('Delegation health',Object.keys(byP).length,`<table class="t"><tr><th>Person</th><th class="r">Waiting</th><th class="r">Past f/u</th><th class="r">Oldest</th></tr>${Object.entries(byP).sort((a,b)=>b[1].past-a[1].past).map(([pid,v])=>`<tr><td>${esc(pname(pid))}</td><td class="r num">${v.n}</td><td class="r num" style="${v.past?'color:var(--amb);font-weight:700':''}">${v.past}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'Nothing delegated.')}
+    ${seccard('Department scorecard',Object.keys(byDept).length,`<table class="t"><tr><th>Department</th><th class="r">Open</th><th class="r">Overdue</th><th class="r">Oldest slip</th></tr>${Object.entries(byDept).sort((a,b)=>b[1].over-a[1].over).map(([d,v])=>`<tr class="click" onclick="deptFilter('${jss(d)}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d)}</td><td class="r num">${v.open}</td><td class="r num" style="${v.over?'color:var(--red);font-weight:700':''}">${v.over}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'No open items.')}
+    ${seccard('Delegation health',Object.keys(byP).length,`<table class="t"><tr><th>Person</th><th class="r">Waiting</th><th class="r">Past f/u</th><th class="r">Oldest</th></tr>${Object.entries(byP).sort((a,b)=>b[1].past-a[1].past).map(([pid,v])=>`<tr class="click" onclick="nav('people','${pid}')"><td style="font-weight:600;color:var(--blue-d)">${esc(pname(pid))}</td><td class="r num">${v.n}</td><td class="r num" style="${v.past?'color:var(--amb);font-weight:700':''}">${v.past}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'Nothing delegated.')}
     </div>`;
   }else{
     const open=openDeals();const total=open.reduce((a,d)=>a+(+d.value||0),0);
@@ -1436,19 +1564,19 @@ function vDash(){const td=today();
     const wonV=won.reduce((a,d)=>a+(+d.value||0),0);
     const lastAct=did=>{const a=AC().filter(x=>x.deal_id===did).sort((x,y)=>(y.at||'').localeCompare(x.at||''))[0];return a?a.at.slice(0,10):null;};
     const stale=open.filter(d=>ageDays(lastAct(d.id)||d.updated_at.slice(0,10))>14);
-    const naDue=CU().filter(c=>c.next_action&&c.next_action_due&&c.next_action_due<=td);
+    const naDue=CU().map(c=>({c,t:acctNextTask(c.id)})).filter(x=>x.t&&x.t.due&&x.t.due<=td);
     const slipped=open.filter(d=>d.close_date&&d.close_date<td);
     body=`<div class="kpis">
-      <div class="kpi blue"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(total)}</div><div class="kl">Open pipeline</div></div>
-      <div class="kpi blue"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(fc)}</div><div class="kl">Weighted forecast</div></div>
-      <div class="kpi good"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(wonV)}</div><div class="kl">Won this qtr</div></div>
-      <div class="kpi ${stale.length?'warn':''}"><div class="kv num">${stale.length}</div><div class="kl">Stale deals</div></div>
-      <div class="kpi ${naDue.length?'warn':''}"><div class="kv num">${naDue.length}</div><div class="kl">Next actions due</div></div></div>
+      <div class="kpi blue" onclick="nav('pipeline')"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(total)}</div><div class="kl">Open pipeline</div></div>
+      <div class="kpi blue" onclick="nav('pipeline')"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(fc)}</div><div class="kl">Weighted forecast</div></div>
+      <div class="kpi good" onclick="nav('pipeline')"><div class="kv num" style="font-size:18px;padding-top:3px">${fmtMoney(wonV)}</div><div class="kl">Won this qtr</div></div>
+      <div class="kpi ${stale.length?'warn':''}" onclick="document.getElementById('staleSec')&&document.getElementById('staleSec').scrollIntoView({behavior:'smooth'})"><div class="kv num">${stale.length}</div><div class="kl">Stale deals</div></div>
+      <div class="kpi ${naDue.length?'warn':''}" onclick="nav('accounts')"><div class="kv num">${naDue.length}</div><div class="kl">Next actions due</div></div></div>
     <div class="grid2">
     <div class="card"><div class="ch">Pipeline value by stage</div><div class="cb"><canvas id="stageCv" style="width:100%;height:220px"></canvas></div></div>
-    ${seccard('Stale deals — no activity 14+ days',stale.length,stale.map(d=>`<div class="row" style="cursor:pointer" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(d.name)}</div><div class="meta"><span>${esc(cname(d.customer_id))}</span><b class="num">${fmtMoney(d.value)}</b><span class="pill b">${d.stage}</span></div></div></div>`).join(''),'Every open deal has recent activity. Good.')}
+    ${'<span id="staleSec"></span>'}${seccard('Stale deals — no activity 14+ days',stale.length,stale.map(d=>`<div class="row" style="cursor:pointer" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(d.name)}</div><div class="meta">${custLink(d.customer_id)}<b class="num">${fmtMoney(d.value)}</b><span class="pill b">${d.stage}</span></div></div></div>`).join(''),'Every open deal has recent activity. Good.')}
     ${seccard('Close dates slipped',slipped.length,slipped.map(d=>`<div class="row" style="cursor:pointer" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(d.name)}</div><div class="meta"><span class="due over">${fmtD(d.close_date)} (${ageDays(d.close_date)}d ago)</span><b class="num">${fmtMoney(d.value)}</b></div></div></div>`).join(''),'No slipped close dates.')}
-    ${seccard('Account next actions due',naDue.length,naDue.map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action)}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),'Nothing due.')}
+    ${seccard('Account next actions due',naDue.length,naDue.map(({c,t})=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(t.title)}</span><span class="due ${t.due<td?'over':'today'}">${fmtD(t.due)}</span></div></div></div>`).join(''),'Nothing due.')}
     ${(()=>{const lap=CU().filter(supplyLapsed).sort((a,b)=>(a.last_order||'').localeCompare(b.last_order||''));const due=CU().filter(c=>supplyDue(c)&&!supplyLapsed(c));const all=[...lap,...due];return seccard('Supply — reorder watch',all.length,all.map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span class="pill ${supplyLapsed(c)?'r':'a'}">${supplyLapsed(c)?'overdue':'due'}</span><span>${esc(c.cadence)}${c.supply_note?' · '+esc(c.supply_note):''}</span><span class="due ${supplyLapsed(c)?'over':''}">last ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d</span></div></div><button class="btn gh2 xs" onclick="event.stopPropagation();logOrderToday('${c.id}')">Log order</button></div>`).join(''),'No recurring accounts overdue to reorder.');})()}
     </div>`;
   }
@@ -1461,7 +1589,7 @@ function vReview(){const td=today(),wk=addDays(td,-7);
   const overdue=T().filter(t=>t.status!=='done'&&((t.type==='call'?(t.when||'').slice(0,10):t.due)||'')<td&&(t.type==='call'?t.when:t.due));
   const stuck=waiting().filter(t=>t.follow_up&&t.follow_up<td);
   const drev=DC().filter(d=>d.review_date&&d.review_date<=td);
-  const naDue=CU().filter(c=>c.next_action&&c.next_action_due&&c.next_action_due<=td);
+  const naDue=CU().map(c=>({c,t:acctNextTask(c.id)})).filter(x=>x.t&&x.t.due&&x.t.due<=td);
   const wkGoals=planItems('week',weekKey(td));
   const oldest5=overdue.filter(t=>t.type!=='call').sort((a,b)=>((a.original_due||a.due)+'').localeCompare((b.original_due||b.due)+'')).slice(0,5);
   const wonW=DL().filter(d=>d.stage==='Won'&&(d.won_at||d.updated_at||'').slice(0,10)>=wk);
@@ -1475,7 +1603,7 @@ function vReview(){const td=today(),wk=addDays(td,-7);
     <div class="kpi ${drev.length?'warn':''}"><div class="kv num">${drev.length}</div><div class="kl">Decisions to review</div></div></div>
   ${wkGoals.length?seccard("This week's priorities — scorecard",wkGoals.length,wkGoals.map(i=>`<div class="row"><span class="pill ${i.done?'g':'n'}">${i.done?'✓ Done':'Open'}</span><div class="bd" style="font-weight:500">${esc(i.text)}</div></div>`).join(''),''):''}
   ${oldest5.length?seccard('Oldest slips — original commitment dates',oldest5.length,oldest5.map(t=>trow(t,{star:false})).join(''),''):''}
-  ${naDue.length?seccard('Account follow-ups due',naDue.length,naDue.map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action)}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),''):''}
+  ${naDue.length?seccard('Account follow-ups due',naDue.length,naDue.map(({c,t})=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(t.title)}</span><span class="due ${t.due<td?'over':'today'}">${fmtD(t.due)}</span></div></div></div>`).join(''),''):''}
   ${drev.length?seccard('Decisions due for review',drev.length,drev.map(d=>`<div class="row"><div class="bd"><div class="tt" style="font-weight:500">${esc(d.what)}</div><div class="meta">decided ${fmtD(d.date)} · ${esc((d.rationale||'').slice(0,80))}</div></div><div class="rowacts"><button class="iconb" onclick="openDecision('${d.id}')">✎</button></div></div>`).join(''),''):''}
   <div class="card"><div class="ch">Set next week</div><div class="cb" style="font-size:12.5px;color:var(--t3)">Open the planner and write next week's three priorities while this review is fresh. <button class="btn sm" style="margin-left:8px" onclick="plTab='week';plAnchor=addDays(today(),7);nav('planner')">Plan next week →</button></div></div>`;}
 function exportReview(){const td=today();const lines=['# Weekly Review — '+td,''];
@@ -1485,7 +1613,7 @@ function exportReview(){const td=today();const lines=['# Weekly Review — '+td,
   lines.push('','## Waiting on people');
   waiting().forEach(t=>lines.push('- '+pname(t.owner)+': '+t.title+(t.follow_up?' — follow up '+t.follow_up:'')));
   lines.push('','## Account next actions due');
-  CU().filter(c=>c.next_action&&c.next_action_due&&c.next_action_due<=td).forEach(c=>lines.push('- '+c.name+': '+c.next_action+' — '+c.next_action_due));
+  CU().forEach(c=>{const t=acctNextTask(c.id);if(t&&t.due&&t.due<=td)lines.push('- '+c.name+': '+t.title+' — '+t.due);});
   lines.push('','## Decisions pending review');
   DC().filter(d=>d.review_date&&d.review_date<=td).forEach(d=>lines.push('- '+d.what+' (decided '+d.date+')'));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/markdown'}));a.download='weekly-review-'+td+'.md';a.click();}
@@ -1703,12 +1831,15 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   fillOwner('tOwner',t?t.owner:presetOwner||'me');fillDept('tDept',t?.dept||(presetOwner?(P().find(p=>p.id===presetOwner)||{}).dept:'')||'');
   fillCust('tCust',t?.customer_id||presetCust||'');
   fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
-  g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||'';g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||'';g('tRepeat').value=t?.repeat||'';
-  g('tFup').value=t?.follow_up||'';
+  g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||(t?'':today());g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||(t?'':'5');g('tRepeat').value=t?.repeat||'';
+  g('tFup').value=t?.follow_up||(t?'':(g('tDue').value?addDays(g('tDue').value,-1):''));g('tFup').dataset.auto=t?.follow_up?'0':'1';
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
   window._presetDeal=presetDeal||t?.deal_id||null;
   taskTypeUI();g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
+function dueChanged(){const due=g('tDue').value;const fup=g('tFup');if(!fup||!due)return;
+  const cur=fup.value;const auto=fup.dataset.auto==='1';
+  if(!cur||auto){fup.value=addDays(due,-1);fup.dataset.auto='1';}}
 function ownerAutofill(){const oid=g('tOwner').value;if(oid&&oid!=='me'){const p=P().find(x=>x.id===oid);if(p&&p.dept&&!g('tDept').value)fillDept('tDept',p.dept);}taskTypeUI();}
 function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner').value!=='me';
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
@@ -1717,7 +1848,7 @@ function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner
   if(!editT)g('tStatus').value=deleg&&!call?'waiting':'open';}
 function saveTask(){const title=g('tTitle').value.trim();if(!title){toast('Title required.');return;}const n=now();
   const d={title,type:g('tType').value,owner:g('tOwner').value,priority:g('tPri').value,dept:g('tDept').value,customer_id:g('tCust').value||null,contact_id:g('tContact').value||null,deal_id:window._presetDeal||null,
-    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||30,repeat:g('tRepeat').value||'',follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
+    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||5,repeat:g('tRepeat').value||'',follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
     status:g('tStatus').value,notes:g('tNotes').value.trim(),updated_at:n};
   if(editT){if(!editT.original_due&&d.due)d.original_due=d.due;Object.assign(editT,d);}
   else tasks.push(Object.assign({id:uid(),created_at:n,original_due:d.due},d));
@@ -1833,6 +1964,10 @@ function saveOpp(){const t=g('oTitle').value.trim();if(!t){toast('Title required
   closeM();persist();renderView();}
 async function delOpp(){if(editO&&await askConfirm('Delete opportunity?',{ok:'Delete',danger:true})){editO.deleted=true;editO.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
 
+async function quickNewContact(sel){const cid=g('tCust').value;if(!cid){toast('Pick an account first.');return;}
+  const nm=((await askText('New contact name (person at this account):',{title:'New contact'}))||'').trim();if(!nm)return;
+  const n=now();const id=uid();contacts.push({id,customer_id:cid,name:nm,role:'',phone:'',email:'',created_at:n,updated_at:n});
+  persist();fillContact(sel,cid,id);toast('Contact added.');}
 async function quickNew(kind,sel){const n=now();
   if(kind==='dept'){const v=((await askText('New department:',{title:'New department'}))||'').trim();if(!v)return;
     if(!depts.includes(v))depts.push(v);persist();fillDept(sel||'tDept',v);return;}
@@ -1849,6 +1984,7 @@ async function quickNew(kind,sel){const n=now();
     if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}}
 function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   if(g('csvPick'))csvPickUI();
+  if(g('faqQ')&&window._faqQ)faqSearch(window._faqQ);
   const ai=g('agInput');if(ai)ai.onkeydown=e=>{if(e.key==='Enter')ai.nextElementSibling.click();};
   const mo=g('mActO');if(mo)fillOwner('mActO','me');
   wireKanban();
