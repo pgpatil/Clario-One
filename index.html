@@ -395,10 +395,12 @@ canvas{display:block;max-width:100%}
     <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue"></div>
     <div class="fld" id="fAt"><label>Time (for day plan)</label><input type="time" id="tAt"></div>
     <div class="fld" id="fEst"><label>Estimate (min)</label><input type="number" id="tEst" min="5" step="5" placeholder="30"></div>
+    <div class="fld" id="fRepeat"><label>Repeat</label><select id="tRepeat"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
     <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="date" id="tFup"></div>
     <div class="fld" id="fWhen" style="display:none"><label>Call by</label><input type="datetime-local" id="tWhen"></div>
     <div class="fld" id="fPhone" style="display:none"><label>Phone</label><input id="tPhone" placeholder="+91…"></div>
-    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="tCust" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust')">+</button></div></div>
+    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="tCust" style="flex:1" onchange="fillContact('tContact',this.value||null,'')"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust')">+</button></div></div>
+    <div class="fld" id="fTContact"><label>Account contact</label><select id="tContact"></select></div>
     <div class="fld"><label>Status</label><select id="tStatus"><option value="open">Open</option><option value="waiting">Waiting on owner</option><option value="done">Done</option></select></div>
   </div>
   <div class="fld"><label>Notes</label><textarea id="tNotes"></textarea></div>
@@ -412,7 +414,7 @@ canvas{display:block;max-width:100%}
   <h3 id="mPersonTitle">New Person<button class="mx" type="button" onclick="closeM()">✕</button></h3>
   <div class="mbody"><div class="g2">
     <div class="fld"><label>Name <span class="req">*</span></label><input id="pName"></div>
-    <div class="fld"><label>Department</label><select id="pDept"></select></div>
+    <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="pDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','pDept')">+</button></div></div>
     <div class="fld"><label>Role</label><input id="pRole"></div>
     <div class="fld"><label>Phone</label><input id="pPhone"></div>
   </div></div>
@@ -428,10 +430,15 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Account name <span class="req">*</span></label><input id="cName"></div>
     <div class="fld"><label>Segment</label><input id="cSeg" placeholder="QSR / Hotel / Retail…"></div>
     <div class="fld"><label>City</label><input id="cCity"></div>
-    <div class="fld"><label>Department</label><select id="cDept"></select></div>
+    <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="cDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','cDept')">+</button></div></div>
     <div class="fld"><label>Key account manager</label><div style="display:flex;gap:6px"><select id="cKam" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNewKam()">+</button></div></div>
   </div>
   <div class="fld"><label>Address</label><textarea id="cAddr" style="min-height:40px"></textarea></div>
+  <div class="g2">
+    <div class="fld"><label>Supply cadence</label><select id="cCadence"><option value="">One-off / none</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select></div>
+    <div class="fld"><label>Last order date</label><input type="date" id="cLastOrder"></div>
+  </div>
+  <div class="fld"><label>Typical order (note — SKUs, volume, run-rate)</label><input id="cSupplyNote" placeholder="e.g. 4 t/mo batters + sauces"></div>
   <div class="fld"><label>Notes</label><textarea id="cNotes"></textarea></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="cDel" style="display:none" onclick="delCust()">Delete</button>
@@ -444,13 +451,14 @@ canvas{display:block;max-width:100%}
   <div class="mbody">
   <div class="fld"><label>Deal name <span class="req">*</span></label><input id="dlName"></div>
   <div class="g2">
-    <div class="fld"><label>Account</label><select id="dlCust"></select></div>
+    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="dlCust" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','dlCust')">+</button></div></div>
     <div class="fld"><label>Stage</label><select id="dlStage"></select></div>
     <div class="fld"><label>Value (₹)</label><input type="number" id="dlValue" min="0" step="1000"></div>
     <div class="fld"><label>Expected close</label><input type="date" id="dlClose"></div>
     <div class="fld"><label>Contact</label><select id="dlContact"></select></div>
-    <div class="fld"><label>Product / service</label><select id="dlProd"></select></div>
+    <div class="fld"><label>Product / service</label><div style="display:flex;gap:6px"><select id="dlProd" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New product / service" onclick="quickNew('prod','dlProd')">+</button></div></div>
   </div>
+  <div class="fld"><label>Line items — product · qty · rate</label><div id="dlLines"></div><button class="btn gh2 xs" type="button" style="margin-top:4px" onclick="dlAddLine()">+ Add line</button><div id="dlLineTot" class="note" style="margin-top:5px"></div></div>
   <div class="fld"><label>Notes</label><textarea id="dlNotes"></textarea></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="dlDel" style="display:none" onclick="delDeal()">Delete</button>
@@ -466,8 +474,8 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Date</label><input type="date" id="mDate"></div>
     <div class="fld"><label>Time</label><input type="time" id="mTime"></div>
     <div class="fld"><label>Duration (min)</label><input type="number" id="mDur" min="15" step="15" placeholder="60"></div>
-    <div class="fld"><label>Department</label><select id="mDept"></select></div>
-    <div class="fld"><label>Account</label><select id="mCustSel"></select></div>
+    <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="mDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','mDept')">+</button></div></div>
+    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="mCustSel" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','mCustSel')">+</button></div></div>
   </div>
   <div class="fld"><label>Attendees</label><div class="attlist" id="mAtt"></div></div>
   </div>
@@ -485,7 +493,7 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Date</label><input type="date" id="dDate"></div>
     <div class="fld"><label>Review on</label><input type="date" id="dReview"></div>
   </div>
-  <div class="fld"><label>Department</label><select id="dDept"></select></div>
+  <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="dDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','dDept')">+</button></div></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="dDel" style="display:none" onclick="delDecision()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveDecision()">Save</button></div></div>
@@ -499,13 +507,23 @@ canvas{display:block;max-width:100%}
   <div class="g2">
     <div class="fld"><label>Impact (1–5)</label><select id="oImpact"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
     <div class="fld"><label>Effort (1–5)</label><select id="oEffort"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
-    <div class="fld"><label>Department</label><select id="oDept"></select></div>
+    <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="oDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','oDept')">+</button></div></div>
     <div class="fld"><label>Status</label><select id="oStatus"><option value="open">Open</option><option value="doing">In progress</option><option value="done">Done</option></select></div>
   </div>
   <div class="fld"><label>Notes</label><textarea id="oNotes"></textarea></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="oDel" style="display:none" onclick="delOpp()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveOpp()">Save</button></div></div>
+</div></div>
+
+<!-- Generic ask/confirm dialog -->
+<div class="ovl" id="mAsk"><div class="modal" style="max-width:420px">
+  <h3 id="askTitle">Confirm</h3>
+  <div class="mbody"><div id="askMsg" style="font-size:13px;color:var(--t2);line-height:1.55;margin-bottom:10px"></div>
+  <div class="fld" id="askField" style="display:none"><input id="askInput"></div>
+  <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
+  <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
+  <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -571,13 +589,13 @@ const b64=b=>{let s='';const u=new Uint8Array(b);for(let i=0;i<u.length;i+=8192)
 const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 async function deriveKey(pass,saltB64){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:ub64(saltB64),iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
 async function encJson(json){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},_encKey,new TextEncoder().encode(json));return JSON.stringify({clarioEnc:1,salt:_encMeta.salt,iv:b64(iv),ct:b64(ct)});}
-async function decEnvelope(env){if(!_encKey){const pass=prompt('This file is encrypted. Enter passphrase:');if(!pass)throw new Error('Passphrase required');_encKey=await deriveKey(pass,env.salt);if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
+async function decEnvelope(env){if(!_encKey){const pass=await askText('This file is encrypted. Enter passphrase:',{title:'Passphrase',type:'password',ok:'Unlock'});if(!pass)throw new Error('Passphrase required');_encKey=await deriveKey(pass,env.salt);if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(env.iv)},_encKey,ub64(env.ct));return JSON.parse(new TextDecoder().decode(pt));}
 async function parseDb(text){const j=JSON.parse(text);if(j&&j.clarioEnc){try{return await decEnvelope(j);}catch(e){_encKey=null;toast('Wrong passphrase or corrupted file.');throw e;}}return j;}
-async function serializeDb(){const json=JSON.stringify(getState(),null,2);if(_encMeta&&_encMeta.on){if(!_encKey){const pass=prompt('Enter encryption passphrase to save:');if(!pass)throw new Error('no pass');_encKey=await deriveKey(pass,_encMeta.salt);}return encJson(json);}return json;}
-async function enableEnc(){const p1=prompt('Choose an encryption passphrase (losing it means losing the synced file):');if(!p1)return;const p2=prompt('Repeat passphrase:');if(p1!==p2){toast('Passphrases do not match.');return;}
+async function serializeDb(){const json=JSON.stringify(getState(),null,2);if(_encMeta&&_encMeta.on){if(!_encKey){const pass=await askText('Enter encryption passphrase to save:',{title:'Passphrase',type:'password',ok:'Save'});if(!pass)throw new Error('no pass');_encKey=await deriveKey(pass,_encMeta.salt);}return encJson(json);}return json;}
+async function enableEnc(){const p1=await askText('Choose an encryption passphrase (losing it means losing the synced file):',{title:'Encrypt db.json',type:'password',ok:'Next'});if(!p1)return;const p2=await askText('Repeat passphrase:',{title:'Confirm passphrase',type:'password',ok:'Encrypt'});if(p1!==p2){toast('Passphrases do not match.');return;}
   _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(p1,_encMeta.salt);localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));persist();if(_fsDir)await saveToFile();toast('db.json is now AES-256 encrypted.');renderView();}
-async function disableEnc(){if(!confirm('Turn off encryption? db.json will be written as plain text.'))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
+async function disableEnc(){if(!await askConfirm('Turn off encryption? db.json will be written as plain text.',{title:'Disable encryption',ok:'Turn off',danger:true}))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
 
 /* ═══ ONEDRIVE SYNC ═══ */
 let _fsDir=null,_fsSaving=false,_fsQ=false,_fsTimer=null,_fsLastM=0,_fsWatch=null;
@@ -595,7 +613,7 @@ function schedSave(){clearTimeout(_fsTimer);_fsTimer=setTimeout(saveToFile,800);
 async function saveToFile(){if(!_fsDir)return;if(_fsSaving){_fsQ=true;return;}_fsSaving=true;syncUI('busy');
   try{
     const m=await fMtime();
-    if(m&&_fsLastM&&m>_fsLastM){try{const fh=await _fsDir.getFileHandle(DB_FILE);mergeRemote(await parseDb(await(await fh.getFile()).text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));renderView();}catch(e){}}
+    if(m&&_fsLastM&&m>_fsLastM){try{const fh=await _fsDir.getFileHandle(DB_FILE);mergeRemote(await parseDb(await(await fh.getFile()).text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();}catch(e){}}
     const out=await serializeDb();
     const tmp=await _fsDir.getFileHandle(DB_TMP,{create:true});const w1=await tmp.createWritable();await w1.write(out);await w1.close();
     const db=await _fsDir.getFileHandle(DB_FILE,{create:true});const w2=await db.createWritable();await w2.write(out);await w2.close();
@@ -605,7 +623,7 @@ async function saveToFile(){if(!_fsDir)return;if(_fsSaving){_fsQ=true;return;}_f
   finally{_fsSaving=false;if(_fsQ){_fsQ=false;saveToFile();}}}
 async function pullDisk(silent){if(!_fsDir)return;try{const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=f.lastModified;localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent)toast('Pulled latest.');renderView();}catch(e){if(e.name!=='NotFoundError'&&!silent)toast('Pull failed: '+e.message);}}
 async function syncNow(){if(!_fsDir){toast('No folder linked.');return;}await pullDisk(true);await saveToFile();toast('Synced ⇅');}
-async function checkDisk(){if(!_fsDir||_fsSaving)return;try{const m=await fMtime();if(m&&m>_fsLastM){const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=m;localStorage.setItem(LS_KEY,JSON.stringify(getState()));renderView();syncUI('ok',_fsDir.name+' · updated');}}catch(e){}}
+async function checkDisk(){if(!_fsDir||_fsSaving)return;try{const m=await fMtime();if(m&&m>_fsLastM){const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=m;localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();syncUI('ok',_fsDir.name+' · updated');}}catch(e){}}
 function startWatch(){stopWatch();_fsWatch=setInterval(checkDisk,20000);}
 function stopWatch(){clearInterval(_fsWatch);_fsWatch=null;}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&_fsDir)setTimeout(checkDisk,500);});
@@ -629,6 +647,7 @@ function renderNav(){const td=today();
   try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
 function nav(v,arg){view=v;viewArg=arg??null;renderView();}
 function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -638,7 +657,10 @@ function globalSearch(q){q=q.toLowerCase();const out=[];
   DL().filter(d=>d.name.toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
   P().filter(p=>p.name.toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push({k:'P',label:p.name,sub:p.role||'Person',go:()=>nav('people',p.id)}));
   M().filter(m=>m.title.toLowerCase().includes(q)).slice(0,3).forEach(m=>out.push({k:'M',label:m.title,sub:fmtD(m.date),go:()=>nav('meeting',m.id)}));
-  return out.slice(0,14);}
+  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>nav('accounts',c.customer_id)}));
+  OP().filter(o=>o.title.toLowerCase().includes(q)).slice(0,2).forEach(o=>out.push({k:'D',label:o.title,sub:'Improvement',go:()=>{dTool='impact';nav('decide');}}));
+  DC().filter(d=>d.what.toLowerCase().includes(q)).slice(0,2).forEach(d=>out.push({k:'D',label:d.what,sub:'Decision · '+fmtD(d.date),go:()=>{dTool=null;nav('decide');}}));
+  return out.slice(0,16);}
 let _srchIdx=[];
 g('ghSearch').addEventListener('input',e=>{const q=e.target.value.trim();const box=g('srchres');
   if(q.length<2){box.classList.remove('on');return;}
@@ -656,12 +678,17 @@ function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
   const orig=ov&&t.original_due&&t.original_due!==t.due?` <span class="age">(orig ${fmtD(t.original_due)})</span>`:'';
   const dueH=t.type==='call'?(t.when?`<span class="due ${t.when.slice(0,10)<td?'over':t.when.slice(0,10)===td?'today':''}">${fmtDT(t.when)}</span>`:''):(t.due?`<span class="due ${ov?'over':t.due===td?'today':''}">${ov?'Overdue '+ageDays(t.due)+'d · was ':''}${fmtD(t.due)}</span>${orig}`:'');
   const tel=t.type==='call'&&t.phone?`<a class="telbtn" href="tel:${esc(t.phone)}">✆ ${esc(t.phone)}</a>`:'';
+  const rep=t.repeat?`<span class="pill b" title="Repeats ${esc(t.repeat)}">↻ ${esc(t.repeat)}</span>`:'';
   return`<div class="row ${t.status==='done'?'done':''}">
+    ${opts.bulk?`<input type="checkbox" class="bchk" ${_bulkSel&&_bulkSel.has(t.id)?'checked':''} onclick="event.stopPropagation();bulkTog('${t.id}',this)" style="margin-right:2px">`:''}
     <span class="pri ${t.priority||'medium'}"></span>
     <button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')">${t.status==='done'?'✓':''}</button>
     <div class="bd"><div class="tt">${t.type==='call'?'Call: ':''}${esc(t.title)}</div>
-    <div class="meta">${dueH}${tel}${t.at?`<span class="pill n num">${t.at}</span>`:''}${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}${cu}${ow}${wt}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
-    <div class="rowacts">${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" onclick="openTask('${t.id}')">✎</button></div></div>`;}
+    <div class="meta">${dueH}${tel}${t.at?`<span class="pill n num">${t.at}</span>`:''}${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}${cu}${ow}${wt}${rep}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
+    <div class="rowacts">${opts.snooze&&t.status==='waiting'?`<button class="iconb" title="Push follow-up +1 day" onclick="snoozeFollow('${t.id}')">⏲</button>`:''}${t.type!=='call'&&t.status!=='done'?`<button class="iconb" title="Reschedule to tomorrow" onclick="bumpDue('${t.id}')">→</button>`:''}${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" onclick="openTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="rowDelTask('${t.id}')">✕</button></div></div>`;}
+async function rowDelTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();toast('Deleted.');}}
+function bumpDue(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();persist();reRender();toast('Moved to '+fmtD(t.due)+'.');}
+function snoozeFollow(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.follow_up&&t.follow_up>=today()?t.follow_up:today();t.follow_up=addDays(base,1);t.updated_at=now();persist();reRender();toast('Follow-up '+fmtD(t.follow_up)+'.');}
 function seccard(title,n,inner,emptyMsg,extra){return`<div class="card"><div class="ch"><span>${title} ${n?`<span class="n num">(${n})</span>`:''}</span>${extra||''}</div>${n?inner:`<div class="empty">${emptyMsg}</div>`}</div>`;}
 function dayItems(ds){
   const mt=M().filter(m=>m.date===ds).map(m=>({k:'m',s:(m.time||'')+' '+m.title,o:m,sort:'0'+(m.time||'')}));
@@ -767,12 +794,12 @@ async function gPull(silent){if(!gActive())return;
     if(r.status===404){if(!silent)toast('No db.json in OneDrive yet — it will be created on first save.');return;}
     if(!r.ok)throw new Error('pull '+r.status);
     mergeRemote(await parseDb(await r.text()));_gLastM=await gMeta()||'';
-    localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent){toast('Pulled from OneDrive.');}renderView();}
+    localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent){toast('Pulled from OneDrive.');}reRender();}
   catch(e){if(!silent)toast('Pull failed: '+(e.message||e));}}
 async function gSave(){if(!gActive())return;if(_gSaving){_gQ=true;return;}_gSaving=true;syncUI('busy');
   try{const m=await gMeta();
     if(m&&_gLastM&&m>_gLastM){const t0=await gToken();const r0=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t0}});
-      if(r0.ok){mergeRemote(await parseDb(await r0.text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));renderView();}}
+      if(r0.ok){mergeRemote(await parseDb(await r0.text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();}}
     const out=await serializeDb();const t=await gToken();
     const r=await fetch(GRAPH_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:out});
     if(!r.ok)throw new Error('save '+r.status);
@@ -800,7 +827,13 @@ function vHome(){const td=today();
   const fc=openDeals().reduce((a,d)=>a+(+d.value||0)*(STAGE_P[d.stage]||0)/100,0);
   const meets=M().filter(m=>m.date===td&&m.status!=='done').sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   const focus=T().filter(t=>t.focus&&t.status!=='done').slice(0,3);
-  const dt=new Date();
+  const dt=new Date();const hr=dt.getHours();
+  const openToday=openMine().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=td).length;
+  const banner=hr<11
+    ?`<div class="card" style="border-left:4px solid var(--blue)"><div class="cb" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Good morning.</b> ${openToday} item${openToday===1?'':'s'} on today. Set your Top 3 before the day runs you.</div><button class="btn sm" onclick="plTab='day';plAnchor=today();nav('planner')">Plan the day</button></div></div>`
+    :hr>=17
+    ?`<div class="card" style="border-left:4px solid var(--amb)"><div class="cb" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Evening.</b> ${openToday} item${openToday===1?'':'s'} still open. Run shutdown to carry them and keep ageing honest.</div><button class="btn sm" onclick="plTab='day';plAnchor=today();nav('planner')">Run shutdown</button></div></div>`
+    :'';
   return pagehead(dt.toLocaleDateString('en-IN',{weekday:'long'}).toUpperCase(),dt.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}),'Your day at a glance',
     `<button class="btn gh2 sm" onclick="plTab='day';plAnchor=today();nav('planner')">Plan my day</button><button class="btn sm" onclick="openTask()">+ New</button>`)+
   `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1" placeholder="Capture anything — 'call Rajesh tomorrow 3pm' · '@Priya MIS by friday' · 'review capex today !high'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
@@ -896,9 +929,9 @@ function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t
 function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
   tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
-function shutdownDay(ds){const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
+async function shutdownDay(ds){const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
   if(!open.length){toast('Nothing open. Clean close — well done.');return;}
-  if(!confirm(open.length+' unfinished item(s). Carry to tomorrow? Original due dates are kept for ageing.'))return;
+  if(!await askConfirm(open.length+' unfinished item(s). Carry to tomorrow? Original due dates are kept for ageing.',{title:'Run shutdown',ok:'Carry over'}))return;
   const tm=addDays(ds,1);open.forEach(t=>{if(!t.original_due)t.original_due=t.due;t.due=tm;t.at=null;t.rolled=true;t.updated_at=now();});
   persist();renderView();toast(open.length+' carried to '+fmtD(tm)+'. Original dates preserved.');}
 
@@ -995,10 +1028,13 @@ function vCommit(){const td=today();
   const filt=l=>dv?l.filter(t=>t.dept===dv):l;
   const groups={};filt(chase).forEach(t=>{(groups[t.owner]=groups[t.owner]||[]).push(t);});
   const chaseHtml=Object.entries(groups).map(([pid,list])=>seccard('Waiting on '+esc(pname(pid)),list.length,list.map(t=>trow(t)).join(''),'')).join('')||'<div class="card"><div class="empty">Nothing delegated and open. Delegate with @name in quick capture.</div></div>';
-  const body=cTab==='chase'?chaseHtml
-    :cTab==='mine'?seccard('On my plate',filt(mine).length,filt(mine).map(t=>trow(t)).join(''),'Clear.')
+  const bulk=(cTab==='chase'||cTab==='mine');
+  const chaseHtmlB=Object.entries(groups).map(([pid,list])=>seccard('Waiting on '+esc(pname(pid)),list.length,list.map(t=>trow(t,{bulk:true,snooze:true})).join(''),'')).join('')||'<div class="card"><div class="empty">Nothing delegated and open. Delegate with @name in quick capture.</div></div>';
+  const body=cTab==='chase'?chaseHtmlB
+    :cTab==='mine'?seccard('On my plate',filt(mine).length,filt(mine).map(t=>trow(t,{bulk:true})).join(''),'Clear.')
     :cTab==='calls'?seccard('Calls',filt(calls).length,filt(calls).map(t=>trow(t)).join(''),'No pending calls.')
     :seccard('Recently completed',done.length,done.map(t=>trow(t,{star:false})).join(''),'Nothing completed yet.');
+  const bulkbar=bulk?`<div id="bulkbar" class="card" style="display:none;position:sticky;top:56px;z-index:5"><div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b id="bulkn">0 selected</b><button class="btn gh2 sm" onclick="bulkBump()">Reschedule +1d</button>${cTab==='chase'?'<button class="btn gh2 sm" onclick="bulkSnooze()">Snooze f/u +1d</button><button class="btn gh2 sm" onclick="bulkReassign()">Reassign…</button>':''}<button class="btn gh2 sm" onclick="bulkDone()">Mark done</button><button class="btn gh2 sm" onclick="bulkClear()">Clear</button></div></div>`:'';
   return pagehead('COMMITMENTS','Commitments','Both directions — what you owe, what others owe you',`<button class="btn gh2 sm" onclick="openTask(null,null,null,null,'call')">+ Call</button><button class="btn sm" onclick="openTask()">+ Task</button>`)+
   `<div class="tabs">
     <button class="tab ${cTab==='chase'?'on':''}" onclick="cTab='chase';renderView()">To chase <span class="num">(${chase.length})</span></button>
@@ -1006,7 +1042,15 @@ function vCommit(){const td=today();
     <button class="tab ${cTab==='calls'?'on':''}" onclick="cTab='calls';renderView()">Calls <span class="num">(${calls.length})</span></button>
     <button class="tab ${cTab==='done'?'on':''}" onclick="cTab='done';renderView()">Done</button></div>
   <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select></div>
-  ${body}`;}
+  ${bulkbar}${body}`;}
+var _bulkSel=new Set();
+function bulkTog(id,el){if(el&&el.checked)_bulkSel.add(id);else _bulkSel.delete(id);const b=g('bulkbar'),n=g('bulkn');if(b){b.style.display=_bulkSel.size?'':'none';if(n)n.textContent=_bulkSel.size+' selected';}}
+function _bulkList(){return [..._bulkSel].map(id=>tasks.find(t=>t.id===id)).filter(Boolean);}
+function bulkClear(){_bulkSel.clear();reRender();}
+function bulkBump(){_bulkList().forEach(t=>{const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Rescheduled.');}
+function bulkSnooze(){_bulkList().forEach(t=>{const base=t.follow_up&&t.follow_up>=today()?t.follow_up:today();t.follow_up=addDays(base,1);t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Follow-ups pushed.');}
+function bulkDone(){_bulkList().forEach(t=>{t.status='done';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Marked done.');}
+async function bulkReassign(){const who=await askChoice('Reassign selected to:',P().map(p=>({label:p.name,value:p.id})),{title:'Reassign'});if(!who)return;_bulkList().forEach(t=>{t.owner=who;t.status='waiting';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Reassigned.');}
 
 /* ═══ PEOPLE ═══ */
 function vPeople(){
@@ -1078,6 +1122,9 @@ function vHelp(){
   ${faqItem('My plate vs To chase','My plate is what you owe others — your own open tasks by due date. To chase is the mirror: what others owe you. The Home KPIs "Due today" and "To chase" track both directions.')}
   ${faqItem('Calls','Calls are first-class items with a scheduled time and a phone number — the ✆ number dials directly on a phone. Completing a call linked to an account writes it into that account’s activity history automatically.')}
   ${faqItem('Overdue and original dates','When a task slips, Clario shows both the current due date and the original one, with the age in days. Rollovers never erase history — the Review page surfaces your oldest slips by original commitment.')}
+  ${faqItem('Row actions — reschedule, snooze, delete','Every task row carries quick buttons: → moves it to tomorrow without opening it; ⏲ (on waiting items) pushes the follow-up a day after you nudge someone; ✎ opens it; ✕ deletes it after a confirm. No need to open the record for the common moves.')}
+  ${faqItem('Bulk actions on Commitments','On To chase and My plate, tick the checkboxes to select several items, then use the bar that appears to reschedule, push follow-ups, reassign to another person, or mark done — all at once. Useful after a review meeting when several things move together.')}
+  ${faqItem('Recurring tasks','Give any task a Repeat (daily, weekly, fortnightly, monthly). When you complete it, Clario schedules the next occurrence automatically from its due date — for standing work like weekly MIS or a monthly review, you enter it once. A ↻ badge marks repeating items.')}
   </div>
   <div class="card faq"><div class="ch">People</div>
   ${faqItem('Person pages and 1:1 agendas','Each person has a card: items parked to raise at your next meeting, everything you’re waiting on from them, and their recent deliveries. A person can face several accounts — link them from the account page (Our team on this account), and every account they cover shows on their page.')}
@@ -1087,6 +1134,8 @@ function vHelp(){
   ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action with a date. Do it, press ✓ Done — it’s logged to the activity history and Clario immediately asks for the next one. Accounts with actions due today or overdue appear on Home and the Sales dashboard. This single habit keeps accounts from going quiet.')}
   ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
   ${faqItem('Stale deals and slipped closes','A deal with no logged activity for 14+ days is flagged stale (amber stripe). Deals whose expected close date has passed show ⚠ and appear on the Sales dashboard. Both are your prompt to act or kill the deal. Marking Lost asks for a reason so patterns become visible; marking Won stamps the quarter.')}
+  ${faqItem('Line items on a deal','Inside a deal, add line items — product, quantity and rate. Clario totals them (qty × rate) and, when any line exists, that total becomes the deal value automatically, overriding the plain Value field. The deal page then shows a full line-item table with per-line amounts and a grand total. Products typed here are remembered for next time.')}
+  ${faqItem('Recurring supply and reorder watch','On the account, set a supply cadence (weekly, fortnightly, monthly, quarterly), the last order date, and a short note on typical volume or SKUs. Clario watches the gap: once an order is overdue past 1.5× the cadence it flags red, and as it approaches it flags amber. The account shows a supply card with a one-tap "Log order today", and the Sales dashboard carries a "reorder watch" list of every account due or overdue — the supply-side mirror of stale deals. This is single-user tracking, not automated ordering.')}
   </div>
   <div class="card faq"><div class="ch">Decide — tools & log</div>
   ${faqItem('Decision log','Record every significant decision with its rationale and a review date. When the review date arrives, the decision resurfaces on the Decide page and Weekly Review — so you actually check whether it worked. Decisions recorded in a meeting link to it and its attendees.')}
@@ -1111,6 +1160,10 @@ function vHelp(){
   ${faqItem('Install as an app','Desktop Edge/Chrome: menu → Apps → Install. Android Chrome: menu → Install app. iPhone/iPad Safari: Share → Add to Home Screen. The installed app works offline; sync resumes when online.')}
   </div>`;}
 /* ═══ ACCOUNTS (CRM) ═══ */
+const CADENCE_DAYS={weekly:7,fortnightly:14,monthly:30,quarterly:92};
+function supplyLapsed(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])return false;return ageDays(c.last_order)>Math.round(CADENCE_DAYS[c.cadence]*1.5);}
+function supplyDue(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])return false;const d=CADENCE_DAYS[c.cadence],a=ageDays(c.last_order);return a>=d&&a<=Math.round(d*1.5);}
+function logOrderToday(cid){const c=customers.find(x=>x.id===cid);if(!c)return;c.last_order=today();c.updated_at=now();logActivity('note','Order logged',cid,null);persist();renderView();toast('Order dated today.');}
 function vAccounts(){
   if(viewArg){const c=CU().find(x=>x.id===viewArg);if(c)return acctPage(c);}
   const q=(window._cq||'').toLowerCase();const td=today();
@@ -1136,6 +1189,8 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   `<div class="card" style="border-left:4px solid var(--blue)"><div class="ch"><span>Next action</span>${c.next_action?`<span class="due ${c.next_action_due&&c.next_action_due<td?'over':c.next_action_due===td?'today':''}">${c.next_action_due?fmtD(c.next_action_due):''}</span>`:''}</div>
     <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     ${c.next_action?`<div style="flex:1;font-weight:600">${esc(c.next_action)}</div><button class="btn sm" onclick="doneNextAction('${c.id}')">✓ Done — set next</button>`:`<input id="naText" placeholder="Every account deserves a next step — what is it?" style="flex:2;min-width:180px"><input type="date" id="naDue" style="width:140px"><button class="btn sm" onclick="setNextAction('${c.id}')">Set</button>`}</div></div>
+  ${c.cadence?`<div class="card" style="border-left:4px solid ${supplyLapsed(c)?'var(--red)':supplyDue(c)?'var(--amb)':'var(--grn)'}"><div class="ch"><span>Supply — ${esc(c.cadence)}</span>${c.last_order?`<span class="due ${supplyLapsed(c)?'over':''}">last order ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d ago</span>`:'<span class="pill a">no order logged</span>'}</div>
+    <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;font-size:12.5px;color:var(--t2)">${esc(c.supply_note||'')}${supplyLapsed(c)?' <b style="color:var(--red)">— overdue to reorder</b>':supplyDue(c)?' <b style="color:var(--amb)">— due to reorder</b>':''}</div><button class="btn sm" onclick="logOrderToday('${c.id}')">Log order today</button></div></div>`:''}
   <div class="grid31"><div>
     ${dls.length?seccard('Deals',dls.length,`<table class="t"><tr><th>Deal</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${dls.map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d.name)}</td><td><span class="pill ${d.stage==='Won'?'g':d.stage==='Lost'?'r':'b'}">${d.stage}</span></td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${fmtD(d.close_date)}</td></tr>`).join('')}</table>`,''):''}
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
@@ -1154,17 +1209,17 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   </div></div>`;}
 function setNextAction(cid){const c=customers.find(x=>x.id===cid);const t=g('naText').value.trim();if(!c||!t){toast('Describe the next action.');return;}
   c.next_action=t;c.next_action_due=g('naDue').value||addDays(today(),3);c.updated_at=now();persist();renderView();}
-function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)return;
+async function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)return;
   logActivity('note','Done: '+c.next_action,cid,null);
-  const nxt=prompt('Done ✓ — logged. What is the NEXT action for '+c.name+'? (Leave blank to skip — but every account deserves one.)');
-  if(nxt&&nxt.trim()){c.next_action=nxt.trim();const d=prompt('Due date (YYYY-MM-DD), blank = +3 days:');c.next_action_due=(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))?d:addDays(today(),3);}
+  const nxt=await askText('Done ✓ logged. Next action for '+c.name+'?',{title:'Next action',placeholder:'Leave blank to skip',ok:'Set'});
+  if(nxt&&nxt.trim()){c.next_action=nxt.trim();const d=await askText('Due date for this next action:',{title:'Due date',type:'date',value:addDays(today(),3),ok:'Set'});c.next_action_due=(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))?d:addDays(today(),3);}
   else{c.next_action=null;c.next_action_due=null;}
-  c.updated_at=now();persist();renderView();}
-function logQuick(kind,cid,did){const t=prompt(kind==='call'?'Call summary — who, what was said, outcome:':'Note:');if(!t||!t.trim())return;
+  c.updated_at=now();persist();renderView();toast('Updated.');}
+async function logQuick(kind,cid,did){const t=await askText(kind==='call'?'Call summary — who, what was said, outcome:':'Note:',{title:kind==='call'?'Log call':'Log note',ok:'Save'});if(!t||!t.trim())return;
   logActivity(kind,t.trim(),cid||null,did||null);persist();renderView();toast(kind==='call'?'Call logged.':'Note logged.');}
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
-function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&confirm('Remove '+x.name+'?')){x.deleted=true;x.updated_at=now();persist();renderView();}}
+async function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&await askConfirm('Remove '+x.name+'?',{ok:'Remove',danger:true})){x.deleted=true;x.updated_at=now();persist();renderView();toast('Removed.');}}
 function acctLinkPerson(cid){const sel=g('acctPersonSel');const pid=sel?sel.value:'';if(!pid)return;const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
 function acctUnlinkPerson(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=(c.people_ids||[]).filter(x=>x!==pid);if(c.kam_id===pid)c.kam_id=null;c.updated_at=now();persist();renderView();}
 function setKam(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.kam_id=pid;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
@@ -1193,8 +1248,8 @@ function wireKanban(){const wrap=g('kwrap');if(!wrap)return;
     col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('dragover');
       const id=e.dataTransfer.getData('text/plain');const d=deals.find(x=>x.id===id);if(!d)return;
       moveDealStage(d,col.dataset.stage);});});}
-function moveDealStage(d,st){if(d.stage===st)return;
-  if(st==='Lost'){const r=prompt('Lost reason (price, competitor, timing, no decision…):');if(r===null)return;d.lost_reason=(r||'').trim();}
+async function moveDealStage(d,st){if(d.stage===st)return;
+  if(st==='Lost'){const r=await askText('Why was this lost? (price, competitor, timing, no decision…)',{title:'Lost reason',ok:'Mark lost'});if(r===null)return;d.lost_reason=(r||'').trim();}
   if(st==='Won'){logActivity('note','Deal WON: '+d.name+' ('+fmtMoney(d.value)+')',d.customer_id,d.id);d.won_at=now();}
   logActivity('note','Stage → '+st+': '+d.name,d.customer_id,d.id);
   d.stage=st;d.updated_at=now();persist();renderView();toast(d.name+' → '+st);}
@@ -1218,6 +1273,7 @@ function vDeal(){const d=DL().find(x=>x.id===viewArg);if(!d)return vPipeline();
       <dt>Expected close</dt><dd class="num">${fmtD(d.close_date)||'—'}</dd>
       ${d.stage==='Lost'?`<dt>Lost reason</dt><dd>${esc(d.lost_reason||'—')}</dd>`:''}
       <dt>Notes</dt><dd style="white-space:pre-wrap">${esc(d.notes||'—')}</dd></dl></div>
+    ${(d.lines&&d.lines.length)?seccard('Line items',d.lines.length,`<table class="t"><tr><th>Product</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr>${d.lines.map(l=>`<tr><td>${esc(l.product||'—')}</td><td class="r num">${l.qty||0}</td><td class="r num">${fmtMoney(l.rate||0)}</td><td class="r num">${fmtMoney((+l.qty||0)*(+l.rate||0))}</td></tr>`).join('')}<tr><td style="font-weight:800">Total</td><td></td><td></td><td class="r num" style="font-weight:800">${fmtMoney(d.lines.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0))}</td></tr></table>`,''):''}
     ${seccard('Open items on this deal',items.length,items.map(t=>trow(t,{star:false})).join(''),'No tasks linked. Add one from the header.')}
   </div><div>
     <div class="card"><div class="ch"><span>Activity</span><button class="btn gh2 xs" onclick="logQuick('note',${d.customer_id?`'${d.customer_id}'`:'null'},'${d.id}')">Log note</button></div>
@@ -1249,7 +1305,7 @@ function vDecide(){
   ${seccard('Decision log',log.length,`<table class="t"><tr><th>Decision</th><th>Date</th><th>Review</th><th>Dept</th></tr>${log.map(d=>`<tr class="click" onclick="openDecision('${d.id}')"><td style="font-weight:600">${esc(d.what)}</td><td class="num">${fmtD(d.date)}</td><td class="num">${d.review_date?fmtD(d.review_date):'—'}</td><td>${esc(d.dept||'—')}</td></tr>`).join('')}</table>`,'No decisions recorded yet. Record them — with rationale — and future-you will thank you.')}
   ${seccard('Saved exercises',runs.length,runs.map(r=>`<div class="row"><div class="bd"><div class="tt" style="font-weight:500">${esc(r.title)}</div><div class="meta"><span class="pill n">${r.kind}</span><span>${fmtD((r.updated_at||'').slice(0,10))}</span></div></div><div class="rowacts"><button class="iconb" onclick="dTool='${r.kind}';window._trId='${r.id}';renderView()">↗</button><button class="iconb" onclick="trDel('${r.id}')">✕</button></div></div>`).join(''),'Run a tool above — every exercise saves here.')}
   </div>`;}
-function trDel(id){const r=toolruns.find(x=>x.id===id);if(r&&confirm('Delete this exercise?')){r.deleted=true;r.updated_at=now();persist();renderView();}}
+async function trDel(id){const r=toolruns.find(x=>x.id===id);if(r&&await askConfirm('Delete this exercise?',{ok:'Delete',danger:true})){r.deleted=true;r.updated_at=now();persist();renderView();toast('Deleted.');}}
 function trGet(kind){const id=window._trId;if(id){const r=TR().find(x=>x.id===id&&x.kind===kind);if(r)return r;}return null;}
 function trSave(kind,title,data){const ex=trGet(kind);const n=now();
   if(ex){ex.title=title;ex.data=data;ex.updated_at=n;}else{const r={id:uid(),kind,title,data,created_at:n,updated_at:n};toolruns.push(r);window._trId=r.id;}
@@ -1362,10 +1418,10 @@ function vDash(){const td=today();
     const byP={};waiting().forEach(t=>{const k=t.owner;byP[k]=byP[k]||{n:0,past:0,oldest:0};byP[k].n++;if(t.follow_up&&t.follow_up<td){byP[k].past++;byP[k].oldest=Math.max(byP[k].oldest,ageDays(t.follow_up));}});
     const overdue=T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td);
     body=`<div class="kpis">
-      <div class="kpi ${overdue.length?'bad':''}"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
-      <div class="kpi ${waiting().length?'warn':''}"><div class="kv num">${waiting().length}</div><div class="kl">Delegated open</div></div>
-      <div class="kpi"><div class="kv num">${T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=addDays(td,-7)).length}</div><div class="kl">Done · 7d</div></div>
-      <div class="kpi"><div class="kv num">${OP().filter(o=>o.status!=='done').length}</div><div class="kl">Improvements open</div></div></div>
+      <div class="kpi ${overdue.length?'bad':''}" onclick="cTab='mine';nav('commit')"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
+      <div class="kpi ${waiting().length?'warn':''}" onclick="cTab='chase';nav('commit')"><div class="kv num">${waiting().length}</div><div class="kl">Delegated open</div></div>
+      <div class="kpi" onclick="cTab='done';nav('commit')"><div class="kv num">${T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=addDays(td,-7)).length}</div><div class="kl">Done · 7d</div></div>
+      <div class="kpi" onclick="dTool='impact';nav('decide')"><div class="kv num">${OP().filter(o=>o.status!=='done').length}</div><div class="kl">Improvements open</div></div></div>
     <div class="grid2">
     <div class="card"><div class="ch">Throughput — 8 weeks</div><div class="cb"><canvas id="trendCv" style="width:100%;height:220px"></canvas></div></div>
     <div class="card"><div class="ch">Overdue by department</div><div class="cb"><canvas id="deptCv" style="width:100%;height:220px"></canvas></div></div>
@@ -1393,6 +1449,7 @@ function vDash(){const td=today();
     ${seccard('Stale deals — no activity 14+ days',stale.length,stale.map(d=>`<div class="row" style="cursor:pointer" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(d.name)}</div><div class="meta"><span>${esc(cname(d.customer_id))}</span><b class="num">${fmtMoney(d.value)}</b><span class="pill b">${d.stage}</span></div></div></div>`).join(''),'Every open deal has recent activity. Good.')}
     ${seccard('Close dates slipped',slipped.length,slipped.map(d=>`<div class="row" style="cursor:pointer" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(d.name)}</div><div class="meta"><span class="due over">${fmtD(d.close_date)} (${ageDays(d.close_date)}d ago)</span><b class="num">${fmtMoney(d.value)}</b></div></div></div>`).join(''),'No slipped close dates.')}
     ${seccard('Account next actions due',naDue.length,naDue.map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(c.next_action)}</span><span class="due ${c.next_action_due<td?'over':'today'}">${fmtD(c.next_action_due)}</span></div></div></div>`).join(''),'Nothing due.')}
+    ${(()=>{const lap=CU().filter(supplyLapsed).sort((a,b)=>(a.last_order||'').localeCompare(b.last_order||''));const due=CU().filter(c=>supplyDue(c)&&!supplyLapsed(c));const all=[...lap,...due];return seccard('Supply — reorder watch',all.length,all.map(c=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span class="pill ${supplyLapsed(c)?'r':'a'}">${supplyLapsed(c)?'overdue':'due'}</span><span>${esc(c.cadence)}${c.supply_note?' · '+esc(c.supply_note):''}</span><span class="due ${supplyLapsed(c)?'over':''}">last ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d</span></div></div><button class="btn gh2 xs" onclick="event.stopPropagation();logOrderToday('${c.id}')">Log order</button></div>`).join(''),'No recurring accounts overdue to reorder.');})()}
     </div>`;
   }
   return pagehead('ANALYTICS','Dashboards','',`<button class="btn gh2 sm" onclick="window.print()">Print</button>`)+tabs+body;}
@@ -1468,7 +1525,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
   </div></div>`;}
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
-function wipeAll(){if(prompt('Type WIPE to erase everything on this device:')!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
+async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
 /* ═══ BULK DATA — EXCEL/CSV TEMPLATES ═══ */
 function csvEsc(v){v=v==null?'':String(v);return/[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function toCsv(rows){return'\uFEFF'+rows.map(r=>r.map(csvEsc).join(',')).join('\r\n');}
@@ -1535,14 +1592,16 @@ contacts:{label:'Contacts',cols:['account','name','role','phone','email'],exampl
     const ex=CO().find(x=>x.customer_id===cid&&x.name.toLowerCase()===o.name.toLowerCase());
     if(ex){if(o.role)ex.role=o.role;if(o.phone)ex.phone=o.phone;if(o.email)ex.email=o.email;ex.updated_at=n;return'updated';}
     contacts.push({id:uid(),customer_id:cid,name:o.name,role:o.role||'',phone:o.phone||'',email:o.email||'',created_at:n,updated_at:n});return null;}},
-deals:{label:'Deals (pipeline)',cols:['name','account','stage','value','close_date','contact','product','notes'],
-  example:['LuLu private label — batters','LuLu Mall','Proposal','2500000','2026-08-15','Rajesh Nair','Private label','Trial batch approved'],
-  rows(){return DL().map(d=>[d.name,cname(d.customer_id),d.stage,d.value||0,d.close_date||'',(CO().find(c=>c.id===d.contact_id)||{}).name||'',d.product||'',d.notes||'']);},
+deals:{label:'Deals (pipeline)',cols:['name','account','stage','value','close_date','contact','product','line_items','notes'],
+  example:['LuLu private label — batters','LuLu Mall','Proposal','2500000','2026-08-15','Rajesh Nair','Private label','Batter×10@5000; Sauce×4@8000','Trial batch approved'],
+  rows(){return DL().map(d=>[d.name,cname(d.customer_id),d.stage,d.value||0,d.close_date||'',(CO().find(c=>c.id===d.contact_id)||{}).name||'',d.product||'',(d.lines||[]).map(l=>`${l.product||'?'}×${l.qty||0}@${l.rate||0}`).join('; '),d.notes||'']);},
   imp(o){if(!o.name)return'no name';const n=now();const cid=o.account?getOrCreateAccount(o.account):null;
     const stage=STAGES.find(s=>s.toLowerCase()===String(o.stage||'').toLowerCase())||'Prospect';
     let contact_id=null;if(o.contact&&cid){const co=CO().find(x=>x.customer_id===cid&&x.name.toLowerCase()===o.contact.toLowerCase());if(co)contact_id=co.id;}
     if(o.product&&!products.includes(o.product))products.push(o.product);
-    deals.push({id:uid(),name:o.name,customer_id:cid,stage,value:+String(o.value).replace(/[^\d.]/g,'')||0,close_date:normD(o.close_date),contact_id,product:o.product||'',notes:o.notes||'',created_at:n,updated_at:n});
+    let lines=[];if(o.line_items){lines=String(o.line_items).split(';').map(x=>x.trim()).filter(Boolean).map(seg=>{const m=seg.match(/^(.*?)\s*[×x]\s*([\d.]+)\s*@\s*([\d.]+)$/);return m?{product:m[1].trim(),qty:+m[2],rate:+m[3]}:null;}).filter(Boolean);lines.forEach(l=>{if(l.product&&!products.includes(l.product))products.push(l.product);});}
+    const lineVal=lines.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0);
+    deals.push({id:uid(),name:o.name,customer_id:cid,stage,value:lineVal>0?lineVal:(+String(o.value).replace(/[^\d.]/g,'')||0),close_date:normD(o.close_date),contact_id,product:o.product||'',lines,notes:o.notes||'',created_at:n,updated_at:n});
     if(cid)logActivity('note','Deal imported: '+o.name,cid,null);return null;}},
 decisions:{label:'Decisions',cols:['decision','rationale','date','review_date','department'],
   example:['Move west dispatch to 3PL','Cost per drop 12% lower, frees two supervisors','2026-07-01','2026-10-01','Supply Chain'],
@@ -1569,6 +1628,30 @@ function bulkCard(){return`<div class="setcard"><h4>Bulk data — Excel template
     <td class="r"><button class="btn gh2 xs" onclick="dlData('${k}')">Data ⭳</button></td>
     <td class="r"><button class="btn xs" onclick="importCsvFor('${k}')">Import ⭱</button></td></tr>`).join('')}</table>
   <p class="note">Templates open directly in Excel. Fill rows, <b>File → Save As → CSV</b>, then Import. Names do the linking — owners, accounts and contacts are matched by name and created if missing. People, accounts and contacts match existing records by name and update them; tasks, deals and decisions always add new rows, so avoid importing the same task sheet twice. Dates: YYYY-MM-DD or DD/MM/YYYY.</p></div>`;}
+/* ═══ DIALOG ENGINE (replaces prompt/confirm — reliable in iOS PWA) ═══ */
+let _askCb=null,_askKind='confirm';
+function askResolve(v){const o=g('mAsk');if(o)o.classList.remove('open');const cb=_askCb;_askCb=null;if(cb)cb(v);}
+function askOk(){if(_askKind==='text'){askResolve(g('askInput').value);}else askResolve(true);}
+function askConfirm(msg,opts={}){return new Promise(res=>{_askKind='confirm';_askCb=res;
+  g('askTitle').textContent=opts.title||'Confirm';g('askMsg').textContent=msg;
+  g('askField').style.display='none';g('askChoices').style.display='none';g('askOk').style.display='';
+  g('askOk').textContent=opts.ok||'Confirm';g('askOk').className='btn'+(opts.danger?' dg':'');g('askCancel').style.display='';
+  g('mAsk').classList.add('open');});}
+function askText(msg,opts={}){return new Promise(res=>{_askKind='text';_askCb=res;
+  g('askTitle').textContent=opts.title||'Enter';g('askMsg').textContent=msg;
+  g('askField').style.display='';g('askChoices').style.display='none';g('askOk').style.display='';
+  const inp=g('askInput');inp.value=opts.value||'';inp.placeholder=opts.placeholder||'';inp.type=opts.type||'text';
+  g('askOk').textContent=opts.ok||'Save';g('askOk').className='btn';g('askCancel').style.display='';
+  g('mAsk').classList.add('open');setTimeout(()=>inp.focus(),60);
+  inp.onkeydown=e=>{if(e.key==='Enter')askOk();};});}
+function askChoice(msg,choices,opts={}){return new Promise(res=>{_askKind='choice';_askCb=res;
+  g('askTitle').textContent=opts.title||'Choose';g('askMsg').textContent=msg;
+  g('askField').style.display='none';const box=g('askChoices');box.style.display='flex';
+  box.innerHTML=choices.map((c,i)=>`<button class="btn gh2" style="justify-content:flex-start;text-align:left" onclick="askResolve('${c.value}')">${esc(c.label)}</button>`).join('');
+  g('askOk').style.display='none';g('askCancel').style.display='';
+  g('mAsk').classList.add('open');});}
+function _resetAskOk(){g('askOk').style.display='';}
+
 /* ═══ MODALS ═══ */
 function closeM(){document.querySelectorAll('.ovl').forEach(o=>o.classList.remove('open'));}
 document.querySelectorAll('.ovl').forEach(o=>o.addEventListener('mousedown',e=>{if(e.target===o)closeM();}));
@@ -1585,7 +1668,8 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   g('tTitle').value=t?.title||'';g('tType').value=t?.type||presetType||'task';
   fillOwner('tOwner',t?t.owner:presetOwner||'me');fillDept('tDept',t?.dept||(presetOwner?(P().find(p=>p.id===presetOwner)||{}).dept:'')||'');
   fillCust('tCust',t?.customer_id||presetCust||'');
-  g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||'';g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||'';
+  fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
+  g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||'';g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||'';g('tRepeat').value=t?.repeat||'';
   g('tFup').value=t?.follow_up||'';
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
@@ -1598,17 +1682,21 @@ function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner
   g('fFup').style.display=(!call&&deleg)?'':'none';
   if(!editT)g('tStatus').value=deleg&&!call?'waiting':'open';}
 function saveTask(){const title=g('tTitle').value.trim();if(!title){toast('Title required.');return;}const n=now();
-  const d={title,type:g('tType').value,owner:g('tOwner').value,priority:g('tPri').value,dept:g('tDept').value,customer_id:g('tCust').value||null,deal_id:window._presetDeal||null,
-    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||30,follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
+  const d={title,type:g('tType').value,owner:g('tOwner').value,priority:g('tPri').value,dept:g('tDept').value,customer_id:g('tCust').value||null,contact_id:g('tContact').value||null,deal_id:window._presetDeal||null,
+    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||30,repeat:g('tRepeat').value||'',follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
     status:g('tStatus').value,notes:g('tNotes').value.trim(),updated_at:n};
   if(editT){if(!editT.original_due&&d.due)d.original_due=d.due;Object.assign(editT,d);}
   else tasks.push(Object.assign({id:uid(),created_at:n,original_due:d.due},d));
   closeM();persist();renderView();}
-function delTask(){if(editT&&confirm('Delete this item?')){editT.deleted=true;editT.updated_at=now();closeM();persist();renderView();}}
+async function delTask(){if(editT&&await askConfirm('Delete this item? This cannot be undone.',{ok:'Delete',danger:true})){editT.deleted=true;editT.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
+const REPEAT_DAYS={daily:1,weekly:7,fortnightly:14,monthly:30};
 function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
   const wasOpen=t.status!=='done';
   t.status=t.status==='done'?(t.owner!=='me'?'waiting':'open'):'done';t.updated_at=now();
   if(wasOpen&&t.status==='done'&&t.type==='call'&&t.customer_id)logActivity('call','Call done: '+t.title,t.customer_id,t.deal_id||null);
+  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();const nd=addDays(base,REPEAT_DAYS[t.repeat]);const n2=now();
+    tasks.push({id:uid(),type:t.type,title:t.title,owner:t.owner,priority:t.priority,dept:t.dept,customer_id:t.customer_id,contact_id:t.contact_id,deal_id:t.deal_id,due:nd,original_due:nd,at:t.at,estimate_min:t.estimate_min,repeat:t.repeat,phone:t.phone,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
+    toast('Next occurrence scheduled '+fmtD(nd)+'.');}
   persist();renderView();}
 function toggleFocus(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(!t.focus&&T().filter(x=>x.focus&&x.status!=='done').length>=3){toast('Three focus slots — unstar one first.');return;}t.focus=!t.focus;t.updated_at=now();persist();renderView();}
 
@@ -1621,22 +1709,22 @@ function savePerson(){const name=g('pName').value.trim();if(!name){toast('Name r
   const d={name,dept:g('pDept').value,role:g('pRole').value.trim(),phone:g('pPhone').value.trim(),updated_at:n};
   if(editP)Object.assign(editP,d);else people.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();}
-function delPerson(){if(editP&&confirm('Delete '+editP.name+'? Their items stay.')){editP.deleted=true;editP.updated_at=now();closeM();nav('people');}}
+async function delPerson(){if(editP&&await askConfirm('Delete '+editP.name+'? Their items stay.',{ok:'Delete',danger:true})){editP.deleted=true;editP.updated_at=now();closeM();nav('people');toast('Deleted.');}}
 
 let editC=null;
 function openCust(id){editC=id?customers.find(x=>x.id===id):null;
   g('mCustTitle').textContent=editC?'Edit Account':'New Account';
   g('cName').value=editC?.name||'';g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
-  fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');g('cAddr').value=editC?.address||'';g('cNotes').value=editC?.notes||'';
+  fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');g('cAddr').value=editC?.address||'';g('cCadence').value=editC?.cadence||'';g('cLastOrder').value=editC?.last_order||'';g('cSupplyNote').value=editC?.supply_note||'';g('cNotes').value=editC?.notes||'';
   g('cDel').style.display=editC?'':'none';g('mCust').classList.add('open');setTimeout(()=>g('cName').focus(),50);}
 function saveCust(){const nm=g('cName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
+  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,cadence:g('cCadence').value||'',last_order:g('cLastOrder').value||null,supply_note:g('cSupplyNote').value.trim(),address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
   if(editC)Object.assign(editC,d);else editC2push(d,n);
   if(d.kam_id){const cc=editC||customers[customers.length-1];cc.people_ids=cc.people_ids||[];if(!cc.people_ids.includes(d.kam_id))cc.people_ids.push(d.kam_id);}
   closeM();persist();renderView();}
 function editC2push(d,n){customers.push(Object.assign({id:uid(),created_at:n,next_action:null,next_action_due:null,people_ids:[]},d));}
-function quickNewKam(){const v=(prompt('New person name:')||'').trim();if(!v)return;const n=now();const ex=P().find(p=>p.name.toLowerCase()===v.toLowerCase());const id=ex?ex.id:(people.push({id:uid(),name:v,dept:g('cDept').value||'',role:'',phone:'',created_at:n,updated_at:n}),people[people.length-1].id);persist();fillOwner('cKam',id);}
-function delCust(){if(editC&&confirm('Delete '+editC.name+'? Linked items stay.')){editC.deleted=true;editC.updated_at=now();closeM();nav('accounts');}}
+async function quickNewKam(){const v=((await askText('New person name:',{title:'New person'}))||'').trim();if(!v)return;const n=now();const ex=P().find(p=>p.name.toLowerCase()===v.toLowerCase());const id=ex?ex.id:(people.push({id:uid(),name:v,dept:g('cDept').value||'',role:'',phone:'',created_at:n,updated_at:n}),people[people.length-1].id);persist();fillOwner('cKam',id);}
+async function delCust(){if(editC&&await askConfirm('Delete '+editC.name+'? Linked items stay.',{ok:'Delete',danger:true})){editC.deleted=true;editC.updated_at=now();closeM();nav('accounts');toast('Deleted.');}}
 
 let editDl=null;
 function openDeal(id,presetCust){editDl=id?deals.find(x=>x.id===id):null;const d=editDl;
@@ -1647,16 +1735,28 @@ function openDeal(id,presetCust){editDl=id?deals.find(x=>x.id===id):null;const d
   g('dlValue').value=d?.value||'';g('dlClose').value=d?.close_date||'';
   fillContact('dlContact',d?.customer_id||presetCust||null,d?.contact_id||'');
   fillProd('dlProd',d?.product||'');
+  window._dlLines=JSON.parse(JSON.stringify(d?.lines||[]));renderDlLines();
   g('dlNotes').value=d?.notes||'';g('dlDel').style.display=d?'':'none';
   g('dlCust').onchange=()=>fillContact('dlContact',g('dlCust').value||null,'');
   g('mDeal').classList.add('open');setTimeout(()=>g('dlName').focus(),50);}
-function saveDeal(){const nm=g('dlName').value.trim();if(!nm){toast('Deal name required.');return;}const n=now();
+function renderDlLines(){const box=g('dlLines');if(!box)return;const L=window._dlLines||[];
+  box.innerHTML=L.map((l,i)=>`<div style="display:flex;gap:5px;margin-bottom:5px;align-items:center">
+    <input list="prodList" value="${esc(l.product||'')}" placeholder="Product" style="flex:2" onchange="_dlLines[${i}].product=this.value">
+    <input type="number" min="0" value="${l.qty??''}" placeholder="Qty" style="flex:1;min-width:52px" onchange="_dlLines[${i}].qty=this.value;renderDlLineTot()">
+    <input type="number" min="0" value="${l.rate??''}" placeholder="Rate" style="flex:1;min-width:60px" onchange="_dlLines[${i}].rate=this.value;renderDlLineTot()">
+    <button class="iconb" type="button" title="Remove" onclick="_dlLines.splice(${i},1);renderDlLines()">✕</button></div>`).join('')
+    +`<datalist id="prodList">${products.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>`;
+  renderDlLineTot();}
+function renderDlLineTot(){const t=g('dlLineTot');if(!t)return;const L=window._dlLines||[];const tot=L.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0);
+  t.innerHTML=tot>0?`Line total: <b>${fmtMoney(tot)}</b> — this overrides the Value field on save.`:'No line items — the Value field is used.';}
+function dlAddLine(){window._dlLines=window._dlLines||[];window._dlLines.push({product:'',qty:'',rate:''});renderDlLines();}
+async function saveDeal(){const nm=g('dlName').value.trim();if(!nm){toast('Deal name required.');return;}const n=now();
   const st=g('dlStage').value;
-  const d={name:nm,customer_id:g('dlCust').value||null,stage:st,value:+g('dlValue').value||0,close_date:g('dlClose').value||null,contact_id:g('dlContact').value||null,product:g('dlProd').value||'',notes:g('dlNotes').value.trim(),updated_at:n};
-  if(editDl){if(st==='Lost'&&editDl.stage!=='Lost'){const r=prompt('Lost reason:');d.lost_reason=(r||'').trim();}if(st==='Won'&&editDl.stage!=='Won')d.won_at=n;Object.assign(editDl,d);}
+  const lines=(window._dlLines||[]).filter(l=>l.product||+l.qty||+l.rate);const lineVal=lines.reduce((a,l)=>a+(+l.qty||0)*(+l.rate||0),0);const d={name:nm,customer_id:g('dlCust').value||null,stage:st,value:lineVal>0?lineVal:(+g('dlValue').value||0),close_date:g('dlClose').value||null,contact_id:g('dlContact').value||null,product:g('dlProd').value||'',lines,notes:g('dlNotes').value.trim(),updated_at:n};
+  if(editDl){if(st==='Lost'&&editDl.stage!=='Lost'){const r=await askText('Why was this lost? (price, competitor, timing, no decision…)',{title:'Lost reason',ok:'Save'});d.lost_reason=(r||'').trim();}if(st==='Won'&&editDl.stage!=='Won')d.won_at=n;Object.assign(editDl,d);}
   else{deals.push(Object.assign({id:uid(),created_at:n},d));if(d.customer_id)logActivity('note','Deal created: '+nm+' ('+fmtMoney(d.value)+')',d.customer_id,null);}
   closeM();persist();renderView();}
-function delDeal(){if(editDl&&confirm('Delete deal '+editDl.name+'?')){editDl.deleted=true;editDl.updated_at=now();closeM();nav('pipeline');}}
+async function delDeal(){if(editDl&&await askConfirm('Delete deal '+editDl.name+'?',{ok:'Delete',danger:true})){editDl.deleted=true;editDl.updated_at=now();closeM();nav('pipeline');toast('Deleted.');}}
 
 let editM=null;
 function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
@@ -1671,7 +1771,7 @@ function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('T
   const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,updated_at:n};
   if(editM)Object.assign(editM,d);else meetings.push(Object.assign({id:uid(),status:'open',created_at:n},d));
   closeM();persist();renderView();}
-function delMeeting(){if(editM&&confirm('Delete meeting?')){editM.deleted=true;editM.updated_at=now();closeM();plTab='meet';nav('planner');}}
+async function delMeeting(){if(editM&&await askConfirm('Delete meeting?',{ok:'Delete',danger:true})){editM.deleted=true;editM.updated_at=now();closeM();plTab='meet';nav('planner');toast('Deleted.');}}
 
 let editD=null,decMid=null;
 function openDecision(id,mid){editD=id?decisions.find(x=>x.id===id):null;decMid=mid||editD?.meeting_id||null;
@@ -1685,7 +1785,7 @@ function saveDecision(){const what=g('dWhat').value.trim();if(!what){toast('Deci
   const d={what,rationale:g('dWhy').value.trim(),date:g('dDate').value||today(),review_date:g('dReview').value||null,dept:g('dDept').value,meeting_id:decMid,people_ids:m?m.attendee_ids:(editD?.people_ids||[]),updated_at:n};
   if(editD)Object.assign(editD,d);else decisions.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();}
-function delDecision(){if(editD&&confirm('Delete decision?')){editD.deleted=true;editD.updated_at=now();closeM();persist();renderView();}}
+async function delDecision(){if(editD&&await askConfirm('Delete decision?',{ok:'Delete',danger:true})){editD.deleted=true;editD.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
 
 let editO=null;
 function openOpp(id){editO=id?opps.find(x=>x.id===id):null;
@@ -1697,19 +1797,22 @@ function saveOpp(){const t=g('oTitle').value.trim();if(!t){toast('Title required
   const d={title:t,impact:+g('oImpact').value,effort:+g('oEffort').value,dept:g('oDept').value,status:g('oStatus').value,notes:g('oNotes').value.trim(),updated_at:n};
   if(editO)Object.assign(editO,d);else opps.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();}
-function delOpp(){if(editO&&confirm('Delete opportunity?')){editO.deleted=true;editO.updated_at=now();closeM();persist();renderView();}}
+async function delOpp(){if(editO&&await askConfirm('Delete opportunity?',{ok:'Delete',danger:true})){editO.deleted=true;editO.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
 
-function quickNew(kind){const n=now();
-  if(kind==='dept'){const v=(prompt('New department:')||'').trim();if(!v)return;
-    if(!depts.includes(v))depts.push(v);persist();fillDept('tDept',v);return;}
-  if(kind==='person'){const v=(prompt('New person name:')||'').trim();if(!v)return;
+async function quickNew(kind,sel){const n=now();
+  if(kind==='dept'){const v=((await askText('New department:',{title:'New department'}))||'').trim();if(!v)return;
+    if(!depts.includes(v))depts.push(v);persist();fillDept(sel||'tDept',v);return;}
+  if(kind==='person'){const v=((await askText('New person name:',{title:'New person'}))||'').trim();if(!v)return;
+    const deptSel=sel==='tOwner'?'tDept':null;
     const ex=P().find(p=>p.name.toLowerCase()===v.toLowerCase());
-    const id=ex?ex.id:(people.push({id:uid(),name:v,dept:g('tDept').value||'',role:'',phone:'',created_at:n,updated_at:n}),people[people.length-1].id);
-    persist();fillOwner('tOwner',id);taskTypeUI();return;}
-  if(kind==='cust'){const v=(prompt('New account name:')||'').trim();if(!v)return;
-    const id=getOrCreateAccount(v);persist();fillCust('tCust',id);}}
-
-/* ═══ WIRE (post-render) ═══ */
+    const id=ex?ex.id:(people.push({id:uid(),name:v,dept:deptSel?(g(deptSel).value||''):'',role:'',phone:'',created_at:n,updated_at:n}),people[people.length-1].id);
+    persist();fillOwner(sel||'tOwner',id);if(sel==='tOwner')taskTypeUI();return;}
+  if(kind==='cust'){const v=((await askText('New account name:',{title:'New account'}))||'').trim();if(!v)return;
+    const id=getOrCreateAccount(v);persist();fillCust(sel||'tCust',id);
+    if((sel||'tCust')==='dlCust'&&g('dlContact'))fillContact('dlContact',id,'');
+    if((sel||'tCust')==='tCust'&&g('tContact'))fillContact('tContact',id,'');return;}
+  if(kind==='prod'){const v=((await askText('New product / service:',{title:'New product'}))||'').trim();if(!v)return;
+    if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}}
 function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   const ai=g('agInput');if(ai)ai.onkeydown=e=>{if(e.key==='Enter')ai.nextElementSibling.click();};
   const mo=g('mActO');if(mo)fillOwner('mActO','me');
