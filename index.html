@@ -1155,7 +1155,7 @@ function vHelp(){
   ${faqItem('Where does my data live?','On each device (browser storage) and in one file — db.json — in your OneDrive. No server, no login to Clario itself. The app file and your data are fully separate.')}
   ${faqItem('OneDrive account sync (all devices)','Settings → paste your Azure client ID → Sign in with Microsoft. Clario then reads/writes Apps/Clario/db.json in your OneDrive directly — works on iPhone, iPad, Android and desktop. It pulls before every save and checks for other-device changes every 20 seconds; edits merge record-by-record with the newer change winning.')}
   ${faqItem('OneDrive folder sync (desktop fallback)','Edge/Chrome on desktop can instead link a local OneDrive folder from Settings. Same file, same merging; the link persists across launches.')}
-  ${faqItem('Excel import & export','Settings → Bulk data. Download a template per dataset (tasks, people, accounts, contacts, deals, decisions), fill it in Excel, save as CSV, import. Names do the linking — unknown people and accounts are created automatically. People, accounts and contacts update existing records by name; tasks, deals and decisions always add new rows, so don’t import the same task sheet twice. Export buttons dump current data in the same format.')}
+  ${faqItem('Excel import & export','Settings → Bulk data. Pick a data set from the dropdown, then Template, Export or Import — no long list of buttons. Importable sets: tasks, people, accounts, contacts, deals, decisions, meetings, improvement ideas, departments and products. Names do the linking — unknown people and accounts are created automatically. People, accounts, contacts, departments and products update existing records by name; tasks, deals, meetings, decisions and ideas always add new rows, so don’t import the same sheet twice. Logs — the activity history, 1:1 agenda items, planner goals, decision exercises and shutdown journal — are export-only: you can download them for reference, but they can’t be imported, since editing a record of what happened would fabricate it.')}
   ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Every device asks for the passphrase once. Losing the passphrase means losing the synced file — there is no recovery.')}
   ${faqItem('Install as an app','Desktop Edge/Chrome: menu → Apps → Install. Android Chrome: menu → Install app. iPhone/iPad Safari: Share → Add to Home Screen. The installed app works offline; sync resumes when online.')}
   </div>`;}
@@ -1607,11 +1607,38 @@ decisions:{label:'Decisions',cols:['decision','rationale','date','review_date','
   example:['Move west dispatch to 3PL','Cost per drop 12% lower, frees two supervisors','2026-07-01','2026-10-01','Supply Chain'],
   rows(){return DC().map(d=>[d.what,d.rationale||'',d.date||'',d.review_date||'',d.dept||'']);},
   imp(o){if(!o.decision)return'no decision';const n=now();
-    decisions.push({id:uid(),what:o.decision,rationale:o.rationale||'',date:normD(o.date)||today(),review_date:normD(o.review_date),dept:ensureDept(o.department),people_ids:[],meeting_id:null,created_at:n,updated_at:n});return null;}}
+    decisions.push({id:uid(),what:o.decision,rationale:o.rationale||'',date:normD(o.date)||today(),review_date:normD(o.review_date),dept:ensureDept(o.department),people_ids:[],meeting_id:null,created_at:n,updated_at:n});return null;}},
+meetings:{label:'Meetings',cols:['title','date','time','duration','department','account','attendees','notes'],
+  example:['Monthly review — LuLu','2026-07-09','11:00','60','Sales','LuLu Mall','Priya Sharma; Rajesh Nair',''],
+  rows(){return M().map(m=>[m.title,m.date||'',m.time||'',m.duration||60,m.dept||'',cname(m.customer_id),(m.attendee_ids||[]).map(pname).join('; '),m.notes||'']);},
+  imp(o){if(!o.title)return'no title';const n=now();
+    const att=String(o.attendees||'').split(';').map(x=>x.trim()).filter(Boolean).map(nm=>getOrCreatePerson(nm,ensureDept(o.department))).filter(id=>id&&id!=='me');
+    meetings.push({id:uid(),title:o.title,date:normD(o.date)||today(),time:normT(o.time),duration:+o.duration||60,dept:ensureDept(o.department),customer_id:o.account?getOrCreateAccount(o.account):null,attendee_ids:att,status:'open',notes:o.notes||'',created_at:n,updated_at:n});return null;}},
+opps:{label:'Improvement ideas',cols:['title','impact','effort','department','status','notes'],
+  example:['Cut batter changeover time','5','2','Operations','open','Line 2 setup runs long'],
+  rows(){return OP().map(o=>[o.title,o.impact||3,o.effort||3,o.dept||'',o.status||'open',o.notes||'']);},
+  imp(o){if(!o.title)return'no title';const n=now();
+    opps.push({id:uid(),title:o.title,impact:Math.min(5,Math.max(1,+o.impact||3)),effort:Math.min(5,Math.max(1,+o.effort||3)),dept:ensureDept(o.department),status:/done/i.test(o.status)?'done':'open',notes:o.notes||'',created_at:n,updated_at:n});return null;}},
+depts:{label:'Departments',cols:['department'],example:['Operations'],
+  rows(){return depts.map(d=>[d]);},
+  imp(o){const v=(o.department||'').trim();if(!v)return'blank';if(depts.includes(v))return'updated';depts.push(v);return null;}},
+products:{label:'Products / services',cols:['product'],example:['Ingredients supply'],
+  rows(){return products.map(p=>[p]);},
+  imp(o){const v=(o.product||'').trim();if(!v)return'blank';if(products.includes(v))return'updated';products.push(v);return null;}},
+agenda:{label:'1:1 agenda items',cols:['person','item','status','notes'],example:['Priya Sharma','Discuss Q3 targets','open',''],readonly:true,
+  rows(){return AG().map(a=>[pname(a.person_id),a.text||a.title||'',a.status||'open',a.notes||'']);}},
+plans:{label:'Planner goals',cols:['scope','period','text','done'],example:['week','2026-W28','Close LuLu private label','no'],readonly:true,
+  rows(){return (plans||[]).filter(p=>!p.deleted).map(p=>[p.scope||'',p.key||'',p.text||'',p.done?'yes':'no']);}},
+toolruns:{label:'Decision exercises',cols:['tool','title','updated'],example:['premortem','LuLu rollout risk','2026-07-01'],readonly:true,
+  rows(){return (toolruns||[]).filter(t=>!t.deleted).map(t=>[t.tool||'',(t.data&&t.data.title)||'',(t.updated_at||'').slice(0,10)]);}},
+journals:{label:'Shutdown journal',cols:['date','text'],example:['2026-07-01','Cleared inbox; two carryovers'],readonly:true,
+  rows(){return (journals||[]).filter(j=>!j.deleted).map(j=>[j.date||(j.created_at||'').slice(0,10),j.text||'']);}},
+activities:{label:'Activity log',cols:['date','kind','account','deal','text'],example:['2026-07-01','note','LuLu Mall','','Rate card shared'],readonly:true,
+  rows(){return AC().map(a=>[(a.at||'').slice(0,10),a.kind||'',cname(a.customer_id),(DL().find(d=>d.id===a.deal_id)||{}).name||'',a.text||'']);}}
 };
-function dlTemplate(k){const d=CSVDEFS[k];const rows=[d.cols,d.example];if(d.example2)rows.push(d.example2);dlCsv('clario-template-'+k+'.csv',rows);toast('Template downloaded — fill in Excel, save as CSV, import back.');}
+function dlTemplate(k){const d=CSVDEFS[k];if(!d.imp){toast('This data is export-only.');return;}const rows=[d.cols,d.example];if(d.example2)rows.push(d.example2);dlCsv('clario-template-'+k+'.csv',rows);toast('Template downloaded — fill in Excel, save as CSV, import back.');}
 function dlData(k){const d=CSVDEFS[k];dlCsv('clario-'+k+'-'+today()+'.csv',[d.cols,...d.rows()]);}
-function importCsvFor(k){const inp=document.createElement('input');inp.type='file';inp.accept='.csv,text/csv';
+function importCsvFor(k){if(!CSVDEFS[k].imp){toast('This data is export-only — it can’t be imported.');return;}const inp=document.createElement('input');inp.type='file';inp.accept='.csv,text/csv';
   inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;
     try{const objs=csvObjects(await f.text());if(!objs.length){toast('No data rows found. Save the sheet as CSV and keep the header row.');return;}
       let added=0,updated=0;const skipped=[];
@@ -1622,12 +1649,19 @@ function importCsvFor(k){const inp=document.createElement('input');inp.type='fil
     }catch(err){toast('Import failed: '+err.message);}};
   inp.click();}
 function bulkCard(){return`<div class="setcard"><h4>Bulk data — Excel templates</h4>
-  <table class="t" style="margin-top:4px"><tr><th>Data</th><th class="r">Template</th><th class="r">Export</th><th class="r">Import</th></tr>
-  ${Object.entries(CSVDEFS).map(([k,d])=>`<tr><td style="font-weight:600">${d.label}</td>
-    <td class="r"><button class="btn gh2 xs" onclick="dlTemplate('${k}')">Template ⭳</button></td>
-    <td class="r"><button class="btn gh2 xs" onclick="dlData('${k}')">Data ⭳</button></td>
-    <td class="r"><button class="btn xs" onclick="importCsvFor('${k}')">Import ⭱</button></td></tr>`).join('')}</table>
-  <p class="note">Templates open directly in Excel. Fill rows, <b>File → Save As → CSV</b>, then Import. Names do the linking — owners, accounts and contacts are matched by name and created if missing. People, accounts and contacts match existing records by name and update them; tasks, deals and decisions always add new rows, so avoid importing the same task sheet twice. Dates: YYYY-MM-DD or DD/MM/YYYY.</p></div>`;}
+  <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:6px">
+    <div class="fld" style="flex:1;min-width:180px;margin:0"><label>Data set</label><select id="csvPick" onchange="csvPickUI()">${Object.entries(CSVDEFS).map(([k,d])=>`<option value="${k}">${esc(d.label)}</option>`).join('')}</select></div>
+    <button class="btn gh2 sm" onclick="dlTemplate(g('csvPick').value)" id="csvTpl">Template ⭳</button>
+    <button class="btn gh2 sm" onclick="dlData(g('csvPick').value)">Export ⭳</button>
+    <button class="btn sm" onclick="importCsvFor(g('csvPick').value)" id="csvImp">Import ⭱</button>
+  </div>
+  <p class="note" id="csvNote"></p></div>`;}
+function csvPickUI(){const k=g('csvPick')&&g('csvPick').value;if(!k)return;const ro=!CSVDEFS[k].imp;const imp=g('csvImp'),tpl=g('csvTpl');
+  if(imp){imp.disabled=ro;imp.style.opacity=ro?'.4':'';imp.title=ro?'This data is a record of activity — export only':'';}
+  if(tpl){tpl.disabled=ro;tpl.style.opacity=ro?'.4':'';}
+  g('csvNote').innerHTML=ro
+    ?'This is a log of things that happened — export it for reference, but it can’t be imported. Editing history by hand would fabricate it.'
+    :'Pick a data set, then download its template, export current data, or import a filled CSV. Templates open in Excel — fill rows, <b>File → Save As → CSV</b>, then Import. Names do the linking: owners, accounts and contacts are matched by name and created if missing. People, accounts, contacts, departments and products match existing records and update; tasks, deals, meetings, decisions and ideas always add new rows. Dates: YYYY-MM-DD or DD/MM/YYYY.';}
 /* ═══ DIALOG ENGINE (replaces prompt/confirm — reliable in iOS PWA) ═══ */
 let _askCb=null,_askKind='confirm';
 function askResolve(v){const o=g('mAsk');if(o)o.classList.remove('open');const cb=_askCb;_askCb=null;if(cb)cb(v);}
@@ -1814,6 +1848,7 @@ async function quickNew(kind,sel){const n=now();
   if(kind==='prod'){const v=((await askText('New product / service:',{title:'New product'}))||'').trim();if(!v)return;
     if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}}
 function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
+  if(g('csvPick'))csvPickUI();
   const ai=g('agInput');if(ai)ai.onkeydown=e=>{if(e.key==='Enter')ai.nextElementSibling.click();};
   const mo=g('mActO');if(mo)fillOwner('mActO','me');
   wireKanban();
