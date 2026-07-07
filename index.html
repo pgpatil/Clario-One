@@ -61,7 +61,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 /* ═══ nav tabs ═══ */
 #navbar{background:#fff;border-bottom:1px solid var(--bdr);display:flex;align-items:stretch;padding:0 10px;overflow-x:auto;position:sticky;top:calc(50px + env(safe-area-inset-top,0px));z-index:39;-webkit-overflow-scrolling:touch}
 .ngrp{display:none}
-#moremenu{position:absolute;right:0;top:100%;background:#fff;border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 8px 24px rgba(24,24,24,.14);display:none;min-width:180px;z-index:65;padding:5px}
+#moremenu{position:fixed;right:8px;top:calc(50px + env(safe-area-inset-top,0px) + 44px);background:#fff;border:1px solid var(--bdr);border-radius:var(--r);box-shadow:0 8px 24px rgba(24,24,24,.14);display:none;min-width:200px;max-height:70vh;overflow-y:auto;z-index:120;padding:5px}
 #moremenu.on{display:block}
 .nm-h{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);padding:6px 12px 2px}
 .nm-i.sel{background:var(--blue-l);color:var(--blue-d);font-weight:700}
@@ -409,6 +409,7 @@ canvas{display:block;max-width:100%}
   </div>
 </header>
 <nav id="navbar"></nav>
+<div id="moremenu"></div>
 <main id="main"></main>
 
 <!-- Task / call modal -->
@@ -725,9 +726,13 @@ function renderNav(){const td=today();
   const inMore=MOREIDS.includes(view)||(view==='meeting');
   const tabs=NAVS.map(([id,lbl])=>`<button class="nt ${view===id||(view==='deal'&&id==='pipeline')?'on':''}" onclick="nav('${id}')">${lbl}${bdg[id]?`<span class="bdg ${id==='home'?'hot':''}">${bdg[id]}</span>`:''}</button>`).join('');
   const menu=NAVMORE.map(([grp,items])=>`<div class="nm-h">${grp}</div>`+items.map(([id,lbl])=>`<button class="nm-i ${view===id||(view==='meeting'&&id==='meetings')?'sel':''}" onclick="nav('${id}');toggleMore()">${lbl}</button>`).join('')).join('');
-  const nb=g('navbar');nb.innerHTML=tabs+`<div style="position:relative;display:flex"><button class="nt ${inMore?'on':''}" onclick="toggleMore(event)">More ▾</button><div id="moremenu">${menu}</div></div>`;
+  const nb=g('navbar');nb.innerHTML=tabs+`<button id="moreBtn" class="nt ${inMore?'on':''}" onclick="toggleMore(event)">More ▾</button>`;
+  const mm=g('moremenu');if(mm)mm.innerHTML=menu;
   try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
-function toggleMore(e){if(e)e.stopPropagation();const m=g('moremenu');if(m)m.classList.toggle('on');}
+function toggleMore(e){if(e)e.stopPropagation();const m=g('moremenu');if(!m)return;
+  const willOpen=!m.classList.contains('on');
+  if(willOpen){const b=g('moreBtn');if(b&&b.getBoundingClientRect){const r=b.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';m.style.right=Math.max(6,window.innerWidth-r.right)+'px';m.style.left='auto';}}
+  m.classList.toggle('on');}
 function nav(v,arg){view=v;viewArg=arg??null;renderView();}
 function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
 function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
@@ -1314,7 +1319,8 @@ function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)re
   <button class="nm-i" onclick="openDecision()">Decision</button>
   <button class="nm-i" onclick="openOpp()">Improvement idea</button>`;
   m.classList.add('on');}
-document.addEventListener('click',()=>{const m=g('newmenu');if(m)m.classList.remove('on');const mm=g('moremenu');if(mm)mm.classList.remove('on');});
+document.addEventListener('click',e=>{const m=g('newmenu');if(m&&!(e.target.closest&&e.target.closest('#newmenu')))m.classList.remove('on');
+  const mm=g('moremenu');if(mm&&!(e.target.closest&&(e.target.closest('#moremenu')||e.target.closest('#moreBtn'))))mm.classList.remove('on');});
 function newDump(){openTask();const t=g('tTitle');if(t)t.placeholder='Park an idea — leave the date empty';toast('No date = stays in Brain dump until you schedule it.');}
 
 /* ═══ HELP / FAQ ═══ */
