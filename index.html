@@ -261,6 +261,9 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .atl-it.k-meeting::before{border-color:var(--pur)}
 .atl-it .at-t{font-size:12.5px;font-weight:600}
 .atl-it .at-m{font-size:11px;color:var(--t3)}
+.atl-it .at-acts{position:absolute;top:0;right:0;display:flex;gap:3px;opacity:0}
+.atl-it:hover .at-acts{opacity:1}
+.at-acts .lit{font-size:11px;padding:1px 6px;border:1px solid var(--bdr);border-radius:4px;background:#fff}
 
 /* ═══ decide tools ═══ */
 .toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
@@ -464,6 +467,18 @@ canvas{display:block;max-width:100%}
   </div>
   <div class="macts"><button class="btn dg sm" id="cDel" style="display:none" onclick="delCust()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveCust()">Save</button></div></div>
+</div></div>
+
+<!-- Activity entry edit modal -->
+<div class="ovl" id="mActEdit"><div class="modal" style="max-width:480px">
+  <h3><span>Edit log entry</span><button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Type</label><select id="acEKind"><option value="note">Note</option><option value="call">Call</option><option value="meeting">Meeting</option></select></div>
+  <div class="fld"><label>Entry</label>
+    <div class="rte-tb"><button type="button" onclick="acEcmd('bold')"><b>B</b></button><button type="button" onclick="acEcmd('italic')"><i>I</i></button><button type="button" onclick="acEcmd('insertUnorderedList')">• List</button><button type="button" onclick="acEcmd('insertOrderedList')">1.</button></div>
+    <div id="acEText" class="rte" contenteditable="true" data-ph="Edit the note or call summary…"></div></div>
+  </div>
+  <div class="macts"><div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveActEdit()">Save</button></div></div>
 </div></div>
 
 <!-- Contact modal -->
@@ -688,7 +703,7 @@ g('jsonFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{cons
 
 /* ═══ NAV ═══ */
 var view='home',viewArg=null;
-const NAVS=[['home','Home'],['planner','Planner'],['commit','Commitments'],['people','People'],['accounts','Accounts'],['contacts','Contacts'],['pipeline','Pipeline'],['decide','Decide'],['dash','Dashboards'],['review','Review'],['settings','Settings']];
+const NAVS=[['home','Home'],['planner','Planner'],['commit','Commitments'],['tasks','Tasks'],['people','People'],['accounts','Accounts'],['contacts','Contacts'],['pipeline','Pipeline'],['decide','Decide'],['dash','Dashboards'],['review','Review'],['settings','Settings']];
 function renderNav(){const td=today();
   const nHome=openMine().filter(t=>t.type!=='call'&&t.due&&t.due<=td).length;
   const nChase=waiting().length;
@@ -696,8 +711,8 @@ function renderNav(){const td=today();
   const nb=g('navbar');nb.innerHTML=NAVS.map(([id,lbl])=>`<button class="nt ${view===id||(view==='meeting'&&id==='planner')||(view==='deal'&&id==='pipeline')?'on':''}" onclick="nav('${id}')">${lbl}${bdg[id]?`<span class="bdg ${id==='home'?'hot':''}">${bdg[id]}</span>`:''}</button>`).join('');
   try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
 function nav(v,arg){view=v;viewArg=arg??null;renderView();}
-function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
-function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
+function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -1043,7 +1058,7 @@ function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';retu
   const ag=meetingAgenda(m);const acts=T().filter(t=>t.meeting_id===m.id);const decs=DC().filter(d=>d.meeting_id===m.id);
   return`<span class="backlink" onclick="plTab='meet';nav('planner')">← Meetings</span>`+
   pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
-    `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button>${m.status!=='done'?`<button class="btn sm" onclick="completeMeeting('${m.id}')">Complete meeting</button>`:'<span class="pill g">Completed</span>'}`)+
+    `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button><button class="btn gh2 sm" onclick="meetingSummary('${m.id}')">Summary</button>${STPILL(m)}`)+
   `<div class="grid2">
     <div class="card"><div class="ch"><span>Agenda</span><span class="n num">${ag.length}</span></div>
       ${ag.map(a=>`<div class="row"><button class="chk" onclick="agendaDone('${a.id}')"></button><div class="bd"><div class="tt" style="font-weight:500">${esc(a.text)}</div><div class="meta">${a.person_id?pname(a.person_id):'ad hoc'}</div></div></div>`).join('')||'<div class="empty">No parked items for these attendees.</div>'}
@@ -1054,16 +1069,30 @@ function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';retu
       <div class="card"><div class="ch"><span>Actions</span><span class="n num">${acts.length}</span></div>
         ${acts.map(t=>trow(t,{star:false})).join('')||'<div class="empty">No actions yet.</div>'}
         <div class="addline"><input id="mActT" placeholder="Action" style="flex:2"><select id="mActO" style="flex:1"></select><input type="date" id="mActD" style="flex:1"><button class="btn sm" onclick="mActionAdd('${m.id}')">Add</button></div></div>
-    </div></div>`;}
+    </div></div>
+    <div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
+    <div class="cb"><div class="rte-tb"><button type="button" onclick="mnCmd('bold')"><b>B</b></button><button type="button" onclick="mnCmd('italic')"><i>I</i></button><button type="button" onclick="mnCmd('insertUnorderedList')">• List</button><button type="button" onclick="mnCmd('insertOrderedList')">1.</button><button type="button" onclick="mnLink()">🔗</button></div>
+    <div id="mnText" class="rte" contenteditable="true" data-ph="Capture the discussion — decisions, points raised, next steps…">${m.notes_html||''}</div></div></div>`;}
+function mnCmd(c){document.execCommand(c,false,null);const e=g('mnText');if(e)e.focus();}
+async function mnLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
+function saveMinutes(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;const el=g('mnText');if(!el)return;m.notes_html=sanitizeHtml(el.innerHTML);m.notes=htmlToText(m.notes_html);m.updated_at=now();persist();toast('Minutes saved.');}
+function STPILL(m){return m.status==='done'?'<span class="pill g">Held</span>':m.status==='rescheduled'?'<span class="pill a">Rescheduled</span>':m.status==='noshow'?'<span class="pill r">Not attended</span>':`<button class="btn sm" onclick="closeMeeting('${m.id}')">Close out</button>`;}
+async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;
+  const out=await askChoice('How did this meeting go?',[{label:'Held — mark done',value:'held'},{label:'Rescheduled — set new date',value:'resched'},{label:'Not attended',value:'noshow'}],{title:'Close out meeting'});
+  if(!out)return;const n=now();
+  if(out==='held'){meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=n;});m.status='done';m.updated_at=n;if(m.customer_id)logActivity('meeting','Meeting held: '+m.title,m.customer_id,null);persist();renderView();toast('Marked held. Agenda items raised.');}
+  else if(out==='noshow'){m.status='noshow';m.updated_at=n;persist();renderView();toast('Marked not attended.');}
+  else{const nd=await askText('New date:',{title:'Reschedule',type:'date',value:addDays(m.date||today(),7),ok:'Reschedule'});if(!nd)return;
+    m.status='rescheduled';m.updated_at=n;
+    const nm={id:uid(),title:m.title,date:nd,time:m.time||'',duration:m.duration||60,dept:m.dept||'',customer_id:m.customer_id||null,attendee_ids:[...(m.attendee_ids||[])],status:'open',rescheduled_from:m.id,created_at:n,updated_at:n};
+    meetings.push(nm);
+    agenda.filter(a=>a.meeting_id===m.id&&a.status==='open').forEach(a=>{a.meeting_id=nm.id;a.updated_at=n;});
+    persist();nav('meeting',nm.id);toast('Rescheduled to '+fmtD(nd)+'. Agenda carried over.');}}
 function mAgendaAdd(mid){const i=g('mAgInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:null,meeting_id:mid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function mActionAdd(mid){const t=g('mActT').value.trim();if(!t)return;const o=g('mActO').value,d=g('mActD').value||null,n=now();const m=M().find(x=>x.id===mid);
   tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?(d||addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Action delegated to '+pname(o):'Action added');}
-function completeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;
-  meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=now();});
-  m.status='done';m.updated_at=now();
-  if(m.customer_id)logActivity('meeting','Meeting: '+m.title,m.customer_id,null);
-  persist();renderView();toast('Meeting completed. Agenda items marked raised.');}
+
 g('icsFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const txt=await f.text();let n=0;
   txt.split('BEGIN:VEVENT').slice(1).forEach(ev=>{const sm=ev.match(/SUMMARY(?:;[^:\n]*)?:(.*)/);const ds=ev.match(/DTSTART(?:;[^:\n]*)?:(\d{8})(?:T(\d{4}))?/);
     if(sm&&ds){const date=ds[1].slice(0,4)+'-'+ds[1].slice(4,6)+'-'+ds[1].slice(6,8);const time=ds[2]?ds[2].slice(0,2)+':'+ds[2].slice(2,4):'';
@@ -1150,6 +1179,62 @@ function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='o
 function agendaAdd(pid){const i=g('agInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:pid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised';a.updated_at=now();persist();renderView();}}
 function agendaDel(id){const a=agenda.find(x=>x.id===id);if(a){a.deleted=true;a.updated_at=now();persist();renderView();}}
+
+function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const own=window._tOwn||'';const st=window._tSt||'open';const dp=window._tDp||'';
+  let list=T().filter(t=>{
+    if(st==='open'&&t.status==='done')return false;
+    if(st==='overdue'&&!(t.status!=='done'&&(t.type==='call'?(t.when||'').slice(0,10):t.due)&&((t.type==='call'?(t.when||'').slice(0,10):t.due)<td)))return false;
+    if(st==='done'&&t.status!=='done')return false;
+    if(own==='me'&&!(t.owner==='me'||!t.owner))return false;
+    if(own&&own!=='me'&&t.owner!==own)return false;
+    if(dp&&(t.dept||'')!==dp)return false;
+    if(q&&!((t.title+' '+(cname(t.customer_id))+' '+pname(t.owner)+' '+(t.dept||'')).toLowerCase().includes(q)))return false;
+    return true;});
+  const dd=t=>t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
+  const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status};
+  list=applySort('tasks',list,getters);if(!_sort.tasks)list=list.sort((a,b)=>(dd(a)||'9999').localeCompare(dd(b)||'9999'));
+  const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))];
+  const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
+  const filters=`<div class="filters"><input placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
+    <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
+    <select onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
+    <select onchange="window._tDp=this.value;renderView()"><option value="">All departments</option>${depts2.map(d=>`<option${dp===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
+    ${(q||own||dp||st!=='open')?`<button class="btn gh2 sm" onclick="window._tq='';window._tOwn='';window._tDp='';window._tSt='open';renderView()">Clear</button>`:''}</div>`;
+  const rows=list.map(t=>{const d=dd(t);const over=t.status!=='done'&&d&&d<td;
+    return`<tr class="click" onclick="openTask('${t.id}')"><td><span class="pri ${t.priority||'medium'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${esc(t.title)}</td><td>${t.type==='call'?'<span class="pill b">Call</span>':''}${t.owner&&t.owner!=='me'?esc(pname(t.owner)):'<span style="color:var(--t4)">Me</span>'}</td><td>${t.customer_id?esc(cname(t.customer_id)):''}</td><td>${esc(t.dept||'')}</td><td>${d?`<span class="due ${over?'over':d===td?'today':''}">${fmtD(d)}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${t.status==='done'?'<span class="pill g">done</span>':t.status==='waiting'?'<span class="pill a">waiting</span>':'<span class="pill b">open</span>'}</td></tr>`;}).join('');
+  const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
+  return pagehead('WORK','Tasks',list.length+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body;}
+
+function buildMeetingSummary(m){const att=(m.attendee_ids||[]).map(pname).join(', ')||'—';
+  const ag=AG().filter(a=>a.meeting_id===m.id||((m.attendee_ids||[]).includes(a.person_id)));
+  const decs=DC().filter(d=>d.meeting_id===m.id);
+  const acts=T().filter(t=>t.meeting_id===m.id);
+  const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let h='<h2>'+esc2(m.title)+'</h2>';
+  h+='<p><b>Date:</b> '+fmtD(m.date)+(m.time?' at '+m.time:'')+' &nbsp; <b>Status:</b> '+(m.status==='done'?'Held':m.status==='rescheduled'?'Rescheduled':m.status==='noshow'?'Not attended':'Open')+'</p>';
+  h+='<p><b>Attendees:</b> '+esc2(att)+'</p>';
+  if(m.customer_id)h+='<p><b>Account:</b> '+esc2(cname(m.customer_id))+'</p>';
+  h+='<h3>Agenda</h3>'+(ag.length?'<ul>'+ag.map(a=>'<li>'+esc2(a.text)+'</li>').join('')+'</ul>':'<p>—</p>');
+  h+='<h3>Decisions</h3>'+(decs.length?'<ul>'+decs.map(d=>'<li>'+esc2(d.what)+(d.rationale?' — '+esc2(d.rationale):'')+(d.review_date?' (review '+fmtD(d.review_date)+')':'')+'</li>').join('')+'</ul>':'<p>—</p>');
+  h+='<h3>Action items</h3>'+(acts.length?'<ul>'+acts.map(t=>'<li>'+esc2(t.title)+' — <b>'+esc2(pname(t.owner))+'</b>'+(t.due?', due '+fmtD(t.due):'')+'</li>').join('')+'</ul>':'<p>—</p>');
+  h+='<h3>Discussion notes</h3>'+(m.notes_html||(m.notes?'<p>'+esc2(m.notes).replace(/\n/g,'<br>')+'</p>':'<p>—</p>'));
+  return h;}
+function meetingSummaryText(m){const att=(m.attendee_ids||[]).map(pname).join(', ')||'-';
+  const ag=AG().filter(a=>a.meeting_id===m.id||((m.attendee_ids||[]).includes(a.person_id)));
+  const decs=DC().filter(d=>d.meeting_id===m.id);const acts=T().filter(t=>t.meeting_id===m.id);
+  let L=[m.title.toUpperCase(),fmtD(m.date)+(m.time?' at '+m.time:''),'Attendees: '+att,''];
+  L.push('AGENDA');ag.length?ag.forEach(a=>L.push(' - '+a.text)):L.push(' -');
+  L.push('','DECISIONS');decs.length?decs.forEach(d=>L.push(' - '+d.what+(d.rationale?' — '+d.rationale:''))):L.push(' -');
+  L.push('','ACTION ITEMS');acts.length?acts.forEach(t=>L.push(' - '+t.title+' ('+pname(t.owner)+(t.due?', due '+fmtD(t.due):'')+')')):L.push(' -');
+  if(m.notes){L.push('','NOTES',m.notes);}
+  return L.join('\n');}
+function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
+  const html=buildMeetingSummary(m);
+  const mailto='mailto:?subject='+encodeURIComponent(m.title+' — summary')+'&body='+encodeURIComponent(meetingSummaryText(m));
+  const style='body{font-family:system-ui,Segoe UI,Arial;max-width:720px;margin:24px auto;padding:0 18px;color:#181818;line-height:1.5}h2{margin:0 0 4px}h3{margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}ul{margin:4px 0 4px 18px}li{margin:2px 0}button{padding:6px 12px;margin-right:8px}@media print{.noprint{display:none}}';
+  const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(m.title)+' — summary</title><style>'+style+'</style></head><body><div class="noprint" style="margin-bottom:14px"><button onclick="window.print()">Print</button><a href="'+mailto.replace(/"/g,'&quot;')+'"><button>Email</button></a></div>'+html+'</body></html>';
+  const w=window.open('','_blank');
+  if(w){w.document.open();w.document.write(doc);w.document.close();}else{toast('Allow pop-ups to open the summary.');}}
 /* ═══ + NEW MENU ═══ */
 function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)return;
   if(m.classList.contains('on')){m.classList.remove('on');return;}
@@ -1186,7 +1271,7 @@ function vHelp(){
   ${faqItem('Top 3 / focus stars','Two ways to force priority. Top 3 in the Day view: the three outcomes the day is for. The ★ star on any task marks it as focus (max three) and pins it to Today’s focus on Home.')}
   ${faqItem('Shutdown ritual','At day end, press Run shutdown in the Day view. Every unfinished item rolls to tomorrow, but its original due date is kept — so slips stay visible and honest instead of resetting each night. The journal box saves your notes and reflections per day.')}
   ${faqItem('Week and Month','Week shows seven columns with everything scheduled, plus weekly priorities on top — add items straight into any day with its Add box. Month shows the grid with monthly goals above it; tap a date to see and add to that day. ‹ › arrows move through time; Today jumps back.')}
-  ${faqItem('Meetings','Each meeting pulls the parked agenda items of its attendees automatically. During the meeting, record decisions and actions — actions assigned to others become chase items instantly. Complete meeting stamps the account’s activity log and marks raised agenda items. Import/export Outlook .ics files from the Meetings tab.')}
+  ${faqItem('Meetings','Each meeting pulls the parked agenda items of its attendees automatically. Record decisions and actions during the meeting — actions assigned to others become chase items instantly — and capture rich-text minutes in the Minutes / discussion notes box. Close out asks the outcome: Held (marks done, raises agenda items, stamps the account log), Rescheduled (set a new date; a fresh meeting is created and the open agenda carries over), or Not attended. Summary opens a consolidated, printable page — title, attendees, agenda, decisions, actions and notes — with Print and Email buttons. Import/export Outlook .ics files from the Meetings tab.')}
   </div>
   <div class="card faq"><div class="ch">Commitments & chasing</div>
   ${faqItem('What is "Chase" / "waiting on others"?','Every task you assign to someone else (via @name, the Owner field, or a meeting action) becomes a <b>waiting</b> item: they owe it to you. The Chase card on Home shows the four most urgent by follow-up date; Commitments → To chase shows all of them grouped by person. Tap an item to update it, mark it done when delivered, or push the follow-up date after you’ve nudged them. If a delegated item is overdue on its follow-up, it shows red.')}
@@ -1202,7 +1287,9 @@ function vHelp(){
   </div>
   <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
   ${faqItem('Accounts — list, sort, filter, cards','The accounts list sorts by any column — click a header to sort, click again to reverse. Filter by KAM or segment, or search name, city and segment. Toggle between List and Cards (top right). Each account opens its own page: details, contacts (tap ✆ to dial), open items, meetings, deals, the rich Notes & calls panel, and a stamped activity timeline.')}
-  ${faqItem('Contacts (FPRs)','Add a contact from any account page — name, role, phone, email, notes. Click a contact to edit it, or the ✕ to remove. The Contacts button on the Accounts page opens a full list of every contact across all accounts, searchable and sortable by name, role, account, phone or email, with an account filter. You can also create a contact from + New, and the global search finds contacts by name.')}
+  ${faqItem('Tasks tab','The Tasks tab is a flat, filterable list of every task in one place — separate from Commitments, which is the chase workflow. Filter by status (open, overdue, done), owner or department, search by title/account/owner, and sort any column. Click any row to open and edit it.')}
+  ${faqItem('Editing log entries','Notes and calls in an activity trail can be edited — hover an entry and use ✎ to change its text or type, or ✕ to delete. Edited entries are marked. This applies on account and deal pages wherever the Notes & calls trail appears.')}
+  ${faqItem('Contacts (FPRs)','Add a contact from any account page — name, role, phone, email, notes. Click a contact to edit it, or the ✕ to remove. The Contacts tab lists every contact across all accounts, searchable and sortable by name, role, account, phone or email, with an account filter. You can also create a contact from + New, and the global search finds contacts by name.')}
   ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action. That next action is now a <b>real task</b> tagged to the account and owned by the KAM (or you), so it appears on Home, in the planner and in Commitments with everything else — not in a separate silo. Press ✓ Done and it’s completed and logged, and Clario immediately asks for the next one. Actions due today or overdue also surface on the Sales dashboard. This single habit keeps accounts from going quiet.')}
   ${faqItem('Notes & calls','On an account or a deal, the Notes & calls box takes rich text — bold, italic, bulleted or numbered lists, and links, via the small toolbar. <b>Save note</b> or <b>Log as call</b> timestamps it into the activity trail. Write your notes as a list of points, and each saved point shows a <b>+ task</b> on hover — one click turns that line into a task tagged to the account or deal. Completed calls and meetings also land in the trail automatically. Names shown anywhere — account, person, department — are clickable and jump straight to that record.')}
   ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
@@ -1351,13 +1438,24 @@ function capLog(kind,cid,did){const el=g('npText')||g('dpText');if(!el)return;co
   const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,at:n,created_at:n,updated_at:n});
   persist();renderView();toast(kind==='call'?'Call logged.':'Note saved.');}
 /* render one activity; note list-items get a per-line +task */
-function actItem(a,cid,did){const meta='<div class="at-m">'+a.kind+' · '+fmtDT(a.at)+'</div>';
+function actItem(a,cid,did){const acts='<div class="at-acts"><button class="lit" title="Edit" onclick="editAct(\''+a.id+'\')">✎</button><button class="lit" title="Delete" onclick="delAct(\''+a.id+'\')">✕</button></div>';
+  const meta='<div class="at-m">'+a.kind+' · '+fmtDT(a.at)+(a.edited?' · edited':'')+'</div>';
   if(a.html){const d=document.createElement('div');d.innerHTML=a.html;
     d.querySelectorAll('li').forEach((li,i)=>{const txt=(li.textContent||'').trim();if(!txt)return;
       li.setAttribute('class','at-li');
       li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\')">+ task</button>';});
-    return '<div class="atl-it k-'+a.kind+'"><div class="at-t">'+d.innerHTML+'</div>'+meta+'</div>';}
-  return '<div class="atl-it k-'+a.kind+'"><div class="at-t" style="white-space:pre-wrap">'+esc(a.text)+'</div>'+meta+'</div>';}
+    return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t">'+d.innerHTML+'</div>'+meta+'</div>';}
+  return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t" style="white-space:pre-wrap">'+esc(a.text)+'</div>'+meta+'</div>';}
+let editAc=null;
+function editAct(id){editAc=activities.find(a=>a.id===id);if(!editAc)return;
+  g('acEKind').value=editAc.kind;const ed=g('acEText');ed.innerHTML=editAc.html||esc(editAc.text||'').replace(/\n/g,'<br>');
+  g('mActEdit').classList.add('open');setTimeout(()=>ed.focus(),60);}
+function saveActEdit(){if(!editAc)return;const ed=g('acEText');const html=sanitizeHtml(ed.innerHTML);const text=htmlToText(html);
+  if(!text){toast('Empty — delete instead.');return;}
+  editAc.kind=g('acEKind').value;editAc.html=html;editAc.text=text;editAc.edited=true;editAc.updated_at=now();
+  closeM();persist();renderView();toast('Entry updated.');}
+async function delAct(id){const a=activities.find(x=>x.id===id);if(a&&await askConfirm('Delete this log entry?',{ok:'Delete',danger:true})){a.deleted=true;a.updated_at=now();persist();renderView();toast('Deleted.');}}
+function acEcmd(c){document.execCommand(c,false,null);const e=g('acEText');if(e)e.focus();}
 function lineToTask(btn,cid,did){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
   openTask(null,null,null,cid||null,'task',did||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
