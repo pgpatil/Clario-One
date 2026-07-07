@@ -466,6 +466,23 @@ canvas{display:block;max-width:100%}
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveCust()">Save</button></div></div>
 </div></div>
 
+<!-- Contact modal -->
+<div class="ovl" id="mContact"><div class="modal" style="max-width:460px">
+  <h3><span id="mContactTitle">New Contact</span><button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="coCust" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','coCust')">+</button></div></div>
+  <div class="g2">
+    <div class="fld"><label>Name <span class="req">*</span></label><input id="coEName"></div>
+    <div class="fld"><label>Role</label><input id="coERole" placeholder="Head of purchasing…"></div>
+    <div class="fld"><label>Phone</label><input id="coEPhone" type="tel"></div>
+    <div class="fld"><label>Email</label><input id="coEEmail" type="email"></div>
+  </div>
+  <div class="fld"><label>Notes</label><textarea id="coENotes" style="min-height:40px"></textarea></div>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="coDel" style="display:none" onclick="delContact()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveContact()">Save</button></div></div>
+</div></div>
+
 <!-- Deal modal -->
 <div class="ovl" id="mDeal"><div class="modal">
   <h3 id="mDealTitle">New Deal<button class="mx" type="button" onclick="closeM()">✕</button></h3>
@@ -671,7 +688,7 @@ g('jsonFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{cons
 
 /* ═══ NAV ═══ */
 var view='home',viewArg=null;
-const NAVS=[['home','Home'],['planner','Planner'],['commit','Commitments'],['people','People'],['accounts','Accounts'],['pipeline','Pipeline'],['decide','Decide'],['dash','Dashboards'],['review','Review'],['settings','Settings']];
+const NAVS=[['home','Home'],['planner','Planner'],['commit','Commitments'],['people','People'],['accounts','Accounts'],['contacts','Contacts'],['pipeline','Pipeline'],['decide','Decide'],['dash','Dashboards'],['review','Review'],['settings','Settings']];
 function renderNav(){const td=today();
   const nHome=openMine().filter(t=>t.type!=='call'&&t.due&&t.due<=td).length;
   const nChase=waiting().length;
@@ -679,8 +696,8 @@ function renderNav(){const td=today();
   const nb=g('navbar');nb.innerHTML=NAVS.map(([id,lbl])=>`<button class="nt ${view===id||(view==='meeting'&&id==='planner')||(view==='deal'&&id==='pipeline')?'on':''}" onclick="nav('${id}')">${lbl}${bdg[id]?`<span class="bdg ${id==='home'?'hot':''}">${bdg[id]}</span>`:''}</button>`).join('');
   try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
 function nav(v,arg){view=v;viewArg=arg??null;renderView();}
-function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
-function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
+function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -690,7 +707,7 @@ function globalSearch(q){q=q.toLowerCase();const out=[];
   DL().filter(d=>d.name.toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
   P().filter(p=>p.name.toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push({k:'P',label:p.name,sub:p.role||'Person',go:()=>nav('people',p.id)}));
   M().filter(m=>m.title.toLowerCase().includes(q)).slice(0,3).forEach(m=>out.push({k:'M',label:m.title,sub:fmtD(m.date),go:()=>nav('meeting',m.id)}));
-  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>nav('accounts',c.customer_id)}));
+  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>openContact(c.id)}));
   OP().filter(o=>o.title.toLowerCase().includes(q)).slice(0,2).forEach(o=>out.push({k:'D',label:o.title,sub:'Improvement',go:()=>{dTool='impact';nav('decide');}}));
   DC().filter(d=>d.what.toLowerCase().includes(q)).slice(0,2).forEach(d=>out.push({k:'D',label:d.what,sub:'Decision · '+fmtD(d.date),go:()=>{dTool=null;nav('decide');}}));
   return out.slice(0,16);}
@@ -1144,6 +1161,7 @@ function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)re
   <div class="nm-sep"></div><div class="nm-h">CRM</div>
   <button class="nm-i" onclick="openCust()">Account</button>
   <button class="nm-i" onclick="openDeal()">Deal</button>
+  <button class="nm-i" onclick="openContact()">Contact</button>
   <div class="nm-sep"></div><div class="nm-h">Other</div>
   <button class="nm-i" onclick="openPerson()">Person</button>
   <button class="nm-i" onclick="openDecision()">Decision</button>
@@ -1184,6 +1202,7 @@ function vHelp(){
   </div>
   <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
   ${faqItem('Accounts — list, sort, filter, cards','The accounts list sorts by any column — click a header to sort, click again to reverse. Filter by KAM or segment, or search name, city and segment. Toggle between List and Cards (top right). Each account opens its own page: details, contacts (tap ✆ to dial), open items, meetings, deals, the rich Notes & calls panel, and a stamped activity timeline.')}
+  ${faqItem('Contacts (FPRs)','Add a contact from any account page — name, role, phone, email, notes. Click a contact to edit it, or the ✕ to remove. The Contacts button on the Accounts page opens a full list of every contact across all accounts, searchable and sortable by name, role, account, phone or email, with an account filter. You can also create a contact from + New, and the global search finds contacts by name.')}
   ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action. That next action is now a <b>real task</b> tagged to the account and owned by the KAM (or you), so it appears on Home, in the planner and in Commitments with everything else — not in a separate silo. Press ✓ Done and it’s completed and logged, and Clario immediately asks for the next one. Actions due today or overdue also surface on the Sales dashboard. This single habit keeps accounts from going quiet.')}
   ${faqItem('Notes & calls','On an account or a deal, the Notes & calls box takes rich text — bold, italic, bulleted or numbered lists, and links, via the small toolbar. <b>Save note</b> or <b>Log as call</b> timestamps it into the activity trail. Write your notes as a list of points, and each saved point shows a <b>+ task</b> on hover — one click turns that line into a task tagged to the account or deal. Completed calls and meetings also land in the trail automatically. Names shown anywhere — account, person, department — are clickable and jump straight to that record.')}
   ${faqItem('Pipeline stages and forecast','Deals move Prospect → Qualified → Proposal → Negotiation → Won/Lost. Each stage carries a win probability (10/30/55/75%), so the weighted forecast = value × probability summed across open deals — a more honest number than the raw total. Move deals by dragging (desktop), the ‹ › buttons on each card (touch), or tapping the stage path on the deal page.')}
@@ -1275,7 +1294,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   <div class="grid31"><div>
     ${dls.length?seccard('Deals',dls.length,`<table class="t"><tr><th>Deal</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${dls.map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d.name)}</td><td><span class="pill ${d.stage==='Won'?'g':d.stage==='Lost'?'r':'b'}">${d.stage}</span></td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${fmtD(d.close_date)}</td></tr>`).join('')}</table>`,''):''}
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
-    ${cos.map(x=>`<div class="row"><div class="bd"><div class="tt">${esc(x.name)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
+    ${cos.map(x=>`<div class="row"><div class="bd" style="cursor:pointer" onclick="openContact('${x.id}')"><div class="tt">${esc(x.name)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" title="Edit" onclick="openContact('${x.id}')">✎</button><button class="iconb" title="Remove" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
     <div class="addline"><input id="coName" placeholder="Name" style="flex:1.2"><input id="coRole" placeholder="Role" style="flex:1"><input id="coPhone" placeholder="Phone" style="flex:1"><input id="coEmail" placeholder="Email" style="flex:1.2"><button class="btn sm" onclick="contactAdd('${c.id}')">Add</button></div></div>
     ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id));const avail=P().filter(x=>!ids.includes(x.id));
       return `<div class="card"><div class="ch"><span>Our team on this account</span><span class="n num">${ppl.length}</span></div>
@@ -1344,6 +1363,17 @@ function lineToTask(btn,cid,did){const span=btn.parentElement.querySelector('.mk
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
 async function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&await askConfirm('Remove '+x.name+'?',{ok:'Remove',danger:true})){x.deleted=true;x.updated_at=now();persist();renderView();toast('Removed.');}}
+let editCo=null;
+function openContact(id,presetCust){editCo=id?contacts.find(x=>x.id===id):null;const x=editCo;
+  g('mContactTitle').textContent=x?'Edit Contact':'New Contact';
+  fillCust('coCust',x?.customer_id||presetCust||'');
+  g('coEName').value=x?.name||'';g('coERole').value=x?.role||'';g('coEPhone').value=x?.phone||'';g('coEEmail').value=x?.email||'';g('coENotes').value=x?.notes||'';
+  g('coDel').style.display=x?'':'none';g('mContact').classList.add('open');setTimeout(()=>g('coEName').focus(),60);}
+function saveContact(){const nm=g('coEName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
+  const d={customer_id:g('coCust').value||null,name:nm,role:g('coERole').value.trim(),phone:g('coEPhone').value.trim(),email:g('coEEmail').value.trim(),notes:g('coENotes').value.trim(),updated_at:n};
+  if(editCo)Object.assign(editCo,d);else contacts.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();renderView();toast('Contact saved.');}
+async function delContact(){if(editCo&&await askConfirm('Delete '+editCo.name+'?',{ok:'Delete',danger:true})){editCo.deleted=true;editCo.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
 function acctLinkPerson(cid){const sel=g('acctPersonSel');const pid=sel?sel.value:'';if(!pid)return;const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
 function acctUnlinkPerson(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.people_ids=(c.people_ids||[]).filter(x=>x!==pid);if(c.kam_id===pid)c.kam_id=null;c.updated_at=now();persist();renderView();}
 function setKam(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.kam_id=pid;c.people_ids=c.people_ids||[];if(!c.people_ids.includes(pid))c.people_ids.push(pid);c.updated_at=now();persist();renderView();}
@@ -1654,6 +1684,18 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
+
+function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._coAcct||'';
+  let list=CO().filter(x=>(!q||(x.name+' '+(x.role||'')+' '+(x.phone||'')+' '+(x.email||'')+' '+cname(x.customer_id)).toLowerCase().includes(q))&&(!af||x.customer_id===af));
+  const getters={name:x=>x.name,role:x=>x.role||'',account:x=>cname(x.customer_id),phone:x=>x.phone||'',email:x=>x.email||''};
+  list=applySort('contacts',list,getters);if(!_sort.contacts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  const accts=[...new Set(CO().map(x=>x.customer_id).filter(Boolean))].map(id=>({id,name:cname(id)})).sort((a,b)=>a.name.localeCompare(b.name));
+  const filters=`<div class="filters"><input placeholder="Search name, role, phone, email, account" value="${esc(window._coq||'')}" oninput="window._coq=this.value;clearTimeout(window._cot);window._cot=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px">
+    <select onchange="window._coAcct=this.value;renderView()"><option value="">All accounts</option>${accts.map(a=>`<option value="${a.id}"${af===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}</select>
+    ${(q||af)?`<button class="btn gh2 sm" onclick="window._coq='';window._coAcct='';renderView()">Clear</button>`:''}</div>`;
+  const rows=list.map(x=>`<tr class="click" onclick="openContact('${x.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(x.name)}</td><td>${esc(x.role||'')}</td><td>${x.customer_id?`<span class="lnk" onclick="event.stopPropagation();nav('accounts','${x.customer_id}')">${esc(cname(x.customer_id))}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${x.phone?`<a href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">${esc(x.phone)}</a>`:''}</td><td>${x.email?`<a href="mailto:${esc(x.email)}" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</td></tr>`).join('');
+  const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('contacts','name','Name')}${sortHead('contacts','role','Role')}${sortHead('contacts','account','Account')}${sortHead('contacts','phone','Phone')}${sortHead('contacts','email','Email')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No contacts match. Add one from any account, or via + New.</div></div>';
+  return pagehead('CRM','Contacts',CO().length+' contact persons',`<button class="btn sm" onclick="openContact()">+ Contact</button>`)+filters+body;}
 /* ═══ BULK DATA — EXCEL/CSV TEMPLATES ═══ */
 function csvEsc(v){v=v==null?'':String(v);return/[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function toCsv(rows){return'\uFEFF'+rows.map(r=>r.map(csvEsc).join(',')).join('\r\n');}
