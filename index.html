@@ -136,12 +136,22 @@ table.t td.r,table.t th.r{text-align:right}
 .telbtn{color:var(--grn);font-weight:700;font-size:11.5px}
 .addline{display:flex;gap:6px;padding:9px 12px;border-top:1px solid var(--bdr);flex-wrap:wrap;background:var(--sub)}
 .rte{min-height:64px;border:1px solid var(--bdr);border-radius:6px;padding:8px 10px;font-size:12.5px;background:#fff;outline:none;line-height:1.5}
+.rte ul,.rte ol{margin:4px 0;padding-left:22px}.rte li{margin:2px 0}
+.rte ul{list-style:disc}.rte ol{list-style:decimal}
 .rte:focus{border-color:var(--blue)}
 .rte:empty::before{content:attr(data-ph);color:var(--t4)}
-.rte-tb{display:flex;gap:4px;margin-bottom:6px}
-.rte-tb button{border:1px solid var(--bdr);border-radius:5px;padding:3px 9px;font-size:12px;background:#fff;min-width:30px}
+.rte-tb{display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap;align-items:center}
+.rte-tb button{border:1px solid var(--bdr);border-radius:5px;padding:3px 8px;font-size:12px;background:#fff;min-width:28px;line-height:1.2}
 .rte-tb button:hover{background:var(--bg)}
-.at-t ul,.at-t ol{margin:3px 0 3px 18px}.at-t li{margin:1px 0}
+.rte-sep{width:1px;align-self:stretch;background:var(--bdr);margin:2px 3px}
+.rte-dd{position:relative;display:inline-flex}
+.rte-pop{position:absolute;top:100%;left:0;margin-top:3px;background:#fff;border:1px solid var(--bdr);border-radius:6px;box-shadow:0 6px 18px rgba(24,24,24,.16);padding:6px;z-index:75;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;width:132px}
+.rte-pop .sw{width:24px;height:24px;min-width:0;padding:0;border:1px solid var(--bdr);border-radius:5px;cursor:pointer}
+.rte ul,.rte ol{margin:4px 0;padding-left:22px}.rte li{margin:2px 0}
+.rte ul{list-style:disc}.rte ul ul{list-style:circle}.rte ul ul ul{list-style:square}
+.rte ol{list-style:decimal}.rte ol ol{list-style:lower-alpha}.rte ol ol ol{list-style:lower-roman}
+.rte blockquote{margin:4px 0 4px 16px;padding-left:10px;border-left:3px solid var(--bdr)}
+.at-t ul,.at-t ol{margin:3px 0;padding-left:20px}.at-t li{margin:1px 0}.at-t ul{list-style:disc}.at-t ul ul{list-style:circle}.at-t ol{list-style:decimal}.at-t ol ol{list-style:lower-alpha}
 .at-li{display:flex;align-items:flex-start;gap:6px}
 .at-li .mk{flex:1}
 .at-li .lit{opacity:0;font-size:11px;padding:0 5px;border:1px solid var(--bdr);border-radius:4px;white-space:nowrap;align-self:center}
@@ -483,7 +493,7 @@ canvas{display:block;max-width:100%}
   <div class="mbody">
   <div class="fld"><label>Type</label><select id="acEKind"><option value="note">Note</option><option value="call">Call</option><option value="meeting">Meeting</option></select></div>
   <div class="fld"><label>Entry</label>
-    <div class="rte-tb"><button type="button" onclick="acEcmd('bold')"><b>B</b></button><button type="button" onclick="acEcmd('italic')"><i>I</i></button><button type="button" onclick="acEcmd('insertUnorderedList')">• List</button><button type="button" onclick="acEcmd('insertOrderedList')">1.</button></div>
+    <div id="acEBar"></div>
     <div id="acEText" class="rte" contenteditable="true" data-ph="Edit the note or call summary…"></div></div>
   </div>
   <div class="macts"><div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveActEdit()">Save</button></div></div>
@@ -653,7 +663,7 @@ function deptFilter(d){window._cd=d;cTab='mine';nav('commit');}
 const openMine=()=>T().filter(t=>t.status==='open'&&(t.owner==='me'||!t.owner));
 const waiting=()=>T().filter(t=>t.status==='waiting');
 const openDeals=()=>DL().filter(d=>d.stage!=='Won'&&d.stage!=='Lost');
-function logActivity(kind,text,customer_id,deal_id,contact_id){const n=now();activities.push({id:uid(),kind,text,customer_id:customer_id||null,deal_id:deal_id||null,contact_id:contact_id||null,at:n,created_at:n,updated_at:n});}
+function logActivity(kind,text,customer_id,deal_id,contact_id,html){const n=now();activities.push({id:uid(),kind,text,html:html||null,customer_id:customer_id||null,deal_id:deal_id||null,contact_id:contact_id||null,at:n,created_at:n,updated_at:n});}
 
 /* ═══ ENCRYPTION (optional AES-GCM on db.json) ═══ */
 let _encKey=null,_encMeta=null;
@@ -733,7 +743,14 @@ function toggleMore(e){if(e)e.stopPropagation();const m=g('moremenu');if(!m)retu
   const willOpen=!m.classList.contains('on');
   if(willOpen){const b=g('moreBtn');if(b&&b.getBoundingClientRect){const r=b.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';m.style.right=Math.max(6,window.innerWidth-r.right)+'px';m.style.left='auto';}}
   m.classList.toggle('on');}
-function nav(v,arg){view=v;viewArg=arg??null;renderView();}
+async function nav(v,arg){
+  if(view==='task'&&viewArg&&(v!=='task')&&typeof taskNotesDirty==='function'&&taskNotesDirty(viewArg)){
+    const kind=(tasks.find(x=>x.id===viewArg)||{}).type==='call'?'call':'task';
+    const c=await askChoice('You have unsaved notes on this '+kind+'.',[{label:'Save & leave',value:'save'},{label:'Leave without saving',value:'go'}],{title:'Unsaved notes'});
+    if(c===null)return;
+    if(c==='save'){captureTaskNotes(viewArg);const t=tasks.find(x=>x.id===viewArg);if(t&&t.customer_id)logActivity(t.type==='call'?'call':'note','Notes on: '+t.title,t.customer_id,t.deal_id||null,t.contact_id||null);persist();}
+  }
+  view=v;viewArg=arg??null;renderView();}
 function renderView(){renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
 function reRender(){const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
@@ -1094,16 +1111,19 @@ function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';retu
         <div class="addline"><input id="mActT" placeholder="Action" style="flex:2"><select id="mActO" style="flex:1"></select><input type="date" id="mActD" style="flex:1"><button class="btn sm" onclick="mActionAdd('${m.id}')">Add</button></div></div>
     </div></div>
     <div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
-    <div class="cb"><div class="rte-tb"><button type="button" onclick="mnCmd('bold')"><b>B</b></button><button type="button" onclick="mnCmd('italic')"><i>I</i></button><button type="button" onclick="mnCmd('insertUnorderedList')">• List</button><button type="button" onclick="mnCmd('insertOrderedList')">1.</button><button type="button" onclick="mnLink()">🔗</button></div>
+    <div class="cb">${rteBar('mnText')}
     <div id="mnText" class="rte" contenteditable="true" data-ph="Capture the discussion — decisions, points raised, next steps…">${m.notes_html||''}</div></div></div>`;}
 function mnCmd(c){document.execCommand(c,false,null);const e=g('mnText');if(e)e.focus();}
 async function mnLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
-function saveMinutes(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;const el=g('mnText');if(!el)return;m.notes_html=sanitizeHtml(el.innerHTML);m.notes=htmlToText(m.notes_html);m.updated_at=now();persist();toast('Minutes saved.');}
+function logMeetingNotes(m){if(!m||!m.customer_id||!m.notes_html)return;const label='Meeting notes: '+m.title;let a=activities.find(x=>x.meeting_id===m.id&&!x.deleted);const n=now();
+  if(a){a.text=label;a.html=m.notes_html;a.updated_at=n;}
+  else activities.push({id:uid(),kind:'meeting',text:label,html:m.notes_html,meeting_id:m.id,customer_id:m.customer_id,at:n,created_at:n,updated_at:n});}
+function saveMinutes(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;const el=g('mnText');if(!el)return;m.notes_html=sanitizeHtml(el.innerHTML);m.notes=htmlToText(m.notes_html);m.updated_at=now();logMeetingNotes(m);persist();toast('Minutes saved'+(m.customer_id?' and logged to account.':'.'));}
 function STPILL(m){return m.status==='done'?'<span class="pill g">Held</span>':m.status==='rescheduled'?'<span class="pill a">Rescheduled</span>':m.status==='noshow'?'<span class="pill r">Not attended</span>':`<button class="btn sm" onclick="closeMeeting('${m.id}')">Close out</button>`;}
 async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;
   const out=await askChoice('How did this meeting go?',[{label:'Held — mark done',value:'held'},{label:'Rescheduled — set new date',value:'resched'},{label:'Not attended',value:'noshow'}],{title:'Close out meeting'});
   if(!out)return;const n=now();
-  if(out==='held'){meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=n;});m.status='done';m.updated_at=n;if(m.customer_id)logActivity('meeting','Meeting held: '+m.title,m.customer_id,null);persist();renderView();toast('Marked held. Agenda items raised.');}
+  if(out==='held'){meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=n;});m.status='done';m.updated_at=n;if(m.customer_id){if(m.notes_html)logMeetingNotes(m);else logActivity('meeting','Meeting held: '+m.title,m.customer_id,null);}persist();renderView();toast('Marked held. Agenda items raised.');}
   else if(out==='noshow'){m.status='noshow';m.updated_at=n;persist();renderView();toast('Marked not attended.');}
   else{const nd=await askText('New date:',{title:'Reschedule',type:'date',value:addDays(m.date||today(),7),ok:'Reschedule'});if(!nd)return;
     m.status='rescheduled';m.updated_at=n;
@@ -1282,10 +1302,10 @@ function vTask(){const t=T().find(x=>x.id===viewArg)||tasks.find(x=>x.id===viewA
   return`<span class="backlink" onclick="nav('tasks')">← Tasks</span>`+
   pagehead(t.type==='call'?'CALL':'TASK',esc(t.title),
     `${dd?fmtD(dd):'No date'}${t.owner&&t.owner!=='me'?' · '+personLink(t.owner,'pill b'):''}${t.customer_id?' · '+custLink(t.customer_id):''}${t.contact_id?' · '+esc((CO().find(c=>c.id===t.contact_id)||{}).name||''):''}${t.dept?' · '+deptLink(t.dept):''}`,
-    `${stpill}<button class="btn gh2 sm" onclick="openTask('${t.id}')">Edit</button>${t.status!=='done'?`<button class="btn sm" onclick="toggleTask('${t.id}');nav('task','${t.id}')">✓ Complete</button>`:''}`)+
+    `${stpill}<button class="btn gh2 sm" onclick="openTask('${t.id}')">Edit</button><button class="btn gh2 sm" onclick="captureTaskNotes('${t.id}');taskSummary('${t.id}')">Summary</button>${t.status!=='done'?`<button class="btn sm" onclick="captureTaskNotes('${t.id}');toggleTask('${t.id}');reRender()">✓ Complete</button>`:''}`)+
   `<div class="grid2"><div>
     <div class="card"><div class="ch"><span>${t.type==='call'?'Call notes':'Notes / discussion'}</span><button class="btn xs" onclick="saveTaskNotes('${t.id}')">Save notes</button></div>
-    <div class="cb"><div class="rte-tb"><button type="button" onclick="tnCmd('bold')"><b>B</b></button><button type="button" onclick="tnCmd('italic')"><i>I</i></button><button type="button" onclick="tnCmd('insertUnorderedList')">• List</button><button type="button" onclick="tnCmd('insertOrderedList')">1.</button><button type="button" onclick="tnLink()">🔗</button></div>
+    <div class="cb">${rteBar('tnText')}
     <div id="tnText" class="rte" contenteditable="true" data-ph="Capture the conversation — what was said, agreed, next steps…">${t.notes_html||(t.notes?esc(t.notes).replace(/\n/g,'<br>'):'')}</div>
     <div class="note" style="margin-top:6px">Write next steps as list points, then turn any into a follow-on task below.</div></div></div>
     ${t.customer_id?`<div class="card"><div class="ch"><span>Logged to ${custLink(t.customer_id)}</span></div><div class="cb"><div class="atl">${acts.map(a=>actItem(a,t.customer_id,t.deal_id||null)).join('')||'<div style="color:var(--t4);font-size:12px">Nothing logged from this task yet.</div>'}</div></div></div>`:''}
@@ -1296,12 +1316,41 @@ function vTask(){const t=T().find(x=>x.id===viewArg)||tasks.find(x=>x.id===viewA
     </div></div>`;}
 function tnCmd(c){document.execCommand(c,false,null);const e=g('tnText');if(e)e.focus();}
 async function tnLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
+function captureTaskNotes(id){const t=tasks.find(x=>x.id===id);const el=g('tnText');if(!t||!el)return false;const html=sanitizeHtml(el.innerHTML);if((html||'')===(t.notes_html||'')){return false;}t.notes_html=html;t.notes=htmlToText(html);t.updated_at=now();return true;}
+function taskNotesDirty(id){const t=tasks.find(x=>x.id===id);const el=g('tnText');if(!t||!el)return false;return (sanitizeHtml(el.innerHTML)||'')!==(t.notes_html||'');}
+function logTaskNotes(t){if(!t||!t.customer_id||!t.notes_html)return;
+  const label=(t.type==='call'?'Call: ':'Notes: ')+t.title;
+  let a=activities.find(x=>x.task_id===t.id&&!x.deleted);const n=now();
+  if(a){a.text=label;a.html=t.notes_html;a.kind=t.type==='call'?'call':'note';a.contact_id=t.contact_id||null;a.updated_at=n;}
+  else activities.push({id:uid(),kind:t.type==='call'?'call':'note',text:label,html:t.notes_html,task_id:t.id,customer_id:t.customer_id,deal_id:t.deal_id||null,contact_id:t.contact_id||null,at:n,created_at:n,updated_at:n});}
 function saveTaskNotes(id){const t=tasks.find(x=>x.id===id);if(!t)return;const el=g('tnText');if(!el)return;t.notes_html=sanitizeHtml(el.innerHTML);t.notes=htmlToText(t.notes_html);t.updated_at=now();
-  if(t.customer_id)logActivity(t.type==='call'?'call':'note','Notes on: '+t.title,t.customer_id,t.deal_id||null,t.contact_id||null);
+  logTaskNotes(t);
   persist();renderView();toast('Notes saved'+(t.customer_id?' and logged to account.':'.'));}
-function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;const o=g('tkO').value,d=g('tkD').value||null,n=now();
+function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;captureTaskNotes(pid);const o=g('tkO').value,d=g('tkD').value||null,n=now();
   tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?(d?addDays(d,-1):addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Delegated to '+pname(o):'Follow-on added');}
+
+function buildTaskSummary(t){const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const kind=t.type==='call'?'Call':'Task';const dd=t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
+  const kids=T().filter(x=>x.parent_task===t.id);
+  let h='<div style="font-size:11px;letter-spacing:.08em;color:#888;text-transform:uppercase">'+kind+(t.status==='done'?' — completed':'')+'</div><h2 style="margin:2px 0 4px">'+esc2(t.title)+'</h2>';
+  const meta=[];if(t.customer_id)meta.push('<b>Account:</b> '+esc2(cname(t.customer_id)));
+  if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)meta.push('<b>Contact:</b> '+esc2(c.name));}
+  meta.push('<b>Owner:</b> '+esc2(pname(t.owner)));if(dd)meta.push('<b>'+(t.type==='call'?'When':'Due')+':</b> '+fmtD(dd));
+  meta.push('<b>Status:</b> '+(t.status==='done'?'Done':t.status==='waiting'?'Waiting':'Open'));
+  h+='<p>'+meta.join(' &nbsp; ')+'</p>';
+  h+='<h3>Notes</h3>'+(t.notes_html||(t.notes?'<p>'+esc2(t.notes).replace(/\n/g,'<br>')+'</p>':'<p>—</p>'));
+  if(kids.length)h+='<h3>Follow-on tasks</h3><ul>'+kids.map(k=>'<li>'+esc2(k.title)+' — <b>'+esc2(pname(k.owner))+'</b>'+(k.due?', due '+fmtD(k.due):'')+(k.status==='done'?' ✓':'')+'</li>').join('')+'</ul>';
+  return h;}
+function taskSummaryText(t){const dd=t.type==='call'?(t.when||'').slice(0,10):(t.due||'');const L=[(t.type==='call'?'CALL':'TASK')+': '+t.title];
+  if(t.customer_id)L.push('Account: '+cname(t.customer_id));if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)L.push('Contact: '+c.name);}
+  L.push('Owner: '+pname(t.owner));if(dd)L.push((t.type==='call'?'When: ':'Due: ')+fmtD(dd));L.push('Status: '+(t.status==='done'?'Done':t.status||'open'));
+  L.push('','NOTES',t.notes||'-');return L.join('\n');}
+function taskSummary(id){const t=T().find(x=>x.id===id)||tasks.find(x=>x.id===id);if(!t)return;
+  const html=buildTaskSummary(t);const mailto='mailto:?subject='+encodeURIComponent((t.type==='call'?'Call':'Task')+': '+t.title)+'&body='+encodeURIComponent(taskSummaryText(t));
+  const style='body{font-family:system-ui,Segoe UI,Arial;max-width:720px;margin:24px auto;padding:0 18px;color:#181818;line-height:1.5}h2{margin:0 0 4px}h3{margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}ul{margin:4px 0 4px 20px}li{margin:2px 0}button{padding:6px 12px;margin-right:8px}@media print{.noprint{display:none}}';
+  const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(t.title)+' — summary</title><style>'+style+'</style></head><body><div class="noprint" style="margin-bottom:14px"><button onclick="window.print()">Print</button><a href="'+mailto.replace(/"/g,'&quot;')+'"><button>Email</button></a></div>'+html+'</body></html>';
+  const w=window.open('','_blank');if(w){w.document.open();w.document.write(doc);w.document.close();}else{toast('Allow pop-ups to open the summary.');}}
 /* ═══ + NEW MENU ═══ */
 function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)return;
   if(m.classList.contains('on')){m.classList.remove('on');return;}
@@ -1320,7 +1369,10 @@ function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)re
   <button class="nm-i" onclick="openOpp()">Improvement idea</button>`;
   m.classList.add('on');}
 document.addEventListener('click',e=>{const m=g('newmenu');if(m&&!(e.target.closest&&e.target.closest('#newmenu')))m.classList.remove('on');
-  const mm=g('moremenu');if(mm&&!(e.target.closest&&(e.target.closest('#moremenu')||e.target.closest('#moreBtn'))))mm.classList.remove('on');});
+  const mm=g('moremenu');if(mm&&!(e.target.closest&&(e.target.closest('#moremenu')||e.target.closest('#moreBtn'))))mm.classList.remove('on');
+  if(!(e.target.closest&&e.target.closest('.rte-dd'))){['rteFgPop','rteHiPop'].forEach(id=>{const p=g(id);if(p)p.style.display='none';});}});
+// Tab / Shift-Tab inside a rich editor = indent / outdent (Word-style sub-bullets)
+document.addEventListener('keydown',e=>{const el=e.target;if(el&&el.classList&&el.classList.contains('rte')&&e.key==='Tab'){e.preventDefault();try{document.execCommand('styleWithCSS',false,true);}catch(_){}document.execCommand(e.shiftKey?'outdent':'indent',false,null);}});
 function newDump(){openTask();const t=g('tTitle');if(t)t.placeholder='Park an idea — leave the date empty';toast('No date = stays in Brain dump until you schedule it.');}
 
 /* ═══ HELP / FAQ ═══ */
@@ -1355,7 +1407,7 @@ function vHelp(){
   </div>
   <div class="card faq"><div class="ch">CRM — accounts and pipeline</div>
   ${faqItem('Accounts — list, sort, filter, cards','The accounts list sorts by any column — click a header to sort, click again to reverse. Filter by KAM or segment, or search name, city and segment. Toggle between List and Cards (top right). Each account opens its own page: details, contacts (tap ✆ to dial), open items, meetings, deals, the rich Notes & calls panel, and a stamped activity timeline.')}
-  ${faqItem('Tasks tab and task pages','The Tasks tab is a flat, filterable list of every task in one place — separate from Commitments, which is the chase workflow. Filter by status (open, overdue, done), owner or department, search, and sort any column. Click a row to open the task page: rich notes to capture the conversation, follow-on tasks you can spin off, and — when the task is tagged to an account — everything logged straight to that account’s trail. Completing any task or call tagged to an account (and contact) now writes to that account’s activity log automatically.')}
+  ${faqItem('Tasks tab and task pages','The Tasks tab is a flat, filterable list of every task in one place — separate from Commitments, which is the chase workflow. Filter by status (open, overdue, done), owner or department, search, and sort any column. Click a row to open the task page: rich notes to capture the conversation, follow-on tasks you can spin off, and — when the task is tagged to an account — everything logged straight to that account’s trail. Completing any task or call tagged to an account (and contact) writes to that account’s activity log automatically. Saving notes on a task, call or meeting also posts the full formatted notes to the account trail — updating the same entry rather than piling up duplicates — so you can read what was discussed straight from the account after it’s done. Each task, call and meeting has a Summary button that opens a printable, emailable sheet with the notes and follow-on actions.')}
   ${faqItem('Editing log entries','Notes and calls in an activity trail can be edited — hover an entry and use ✎ to change its text or type, or ✕ to delete. Edited entries are marked. This applies on account and deal pages wherever the Notes & calls trail appears.')}
   ${faqItem('Contacts (FPRs)','Add a contact from any account page — name, role, phone, email, notes. Click a contact to edit it, or the ✕ to remove. The Contacts tab lists every contact across all accounts, searchable and sortable by name, role, account, phone or email, with an account filter. You can also create a contact from + New, and the global search finds contacts by name.')}
   ${faqItem('Next action — the one rule','Each account names a <b>key account manager</b> — one of your internal people, shown on the account and in the accounts list, starred in the team card. Every account should also always carry exactly one next action. That next action is now a <b>real task</b> tagged to the account and owned by the KAM (or you), so it appears on Home, in the planner and in Commitments with everything else — not in a separate silo. Press ✓ Done and it’s completed and logged, and Clario immediately asks for the next one. Actions due today or overdue also surface on the Sales dashboard. This single habit keeps accounts from going quiet.')}
@@ -1461,7 +1513,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   </div><div>
     <div class="card"><div class="ch"><span>Notes & calls</span></div>
     <div class="cb" style="border-bottom:1px solid var(--bdr)">
-    <div class="rte-tb"><button type="button" title="Bold" onclick="rteCmd('bold')"><b>B</b></button><button type="button" title="Italic" onclick="rteCmd('italic')"><i>I</i></button><button type="button" title="Bulleted list — each point can become a task" onclick="rteCmd('insertUnorderedList')">• List</button><button type="button" title="Numbered list" onclick="rteCmd('insertOrderedList')">1.</button><button type="button" title="Link" onclick="rteLink()">🔗</button></div>
+    ${rteBar('npText')}
     <div id="npText" class="rte" contenteditable="true" data-ph="Write notes as points — save, then turn any point into a task…"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${c.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${c.id}')">Log as call</button></div></div>
     <div class="cb"><div class="atl">${acts.map(a=>actItem(a,c.id,null)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet. Completed calls and meetings also land here.</div>'}</div></div></div>
@@ -1487,15 +1539,52 @@ async function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)r
 async function logQuick(kind,cid,did){const t=await askText(kind==='call'?'Call summary — who, what was said, outcome:':'Note:',{title:kind==='call'?'Log call':'Log note',ok:'Save'});if(!t||!t.trim())return;
   logActivity(kind,t.trim(),cid||null,did||null);persist();renderView();toast(kind==='call'?'Call logged.':'Note logged.');}
 /* rich-text notes */
-function rteCmd(cmd){document.execCommand(cmd,false,null);const el=g('npText')||g('dpText');if(el)el.focus();}
-async function rteLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',type:'url',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
-const RTE_OK=new Set(['B','STRONG','I','EM','U','A','UL','OL','LI','BR','DIV','P','SPAN']);
+let _rteEl=null;
+function rteFocus(id){_rteEl=g(id)||_rteEl;if(_rteEl)_rteEl.focus();}
+function rteActive(){return _rteEl&&document.body&&document.body.contains&&document.body.contains(_rteEl)?_rteEl:(_rteEl||null);}
+function rteCmd(cmd,val){const el=rteActive();if(el)el.focus();try{document.execCommand('styleWithCSS',false,true);}catch(e){}document.execCommand(cmd,false,val==null?null:val);if(el)el.focus();}
+function rteColor(id){const el=g(id);if(!el)return;el.style.display=el.style.display==='none'?'':'none';}
+function rteSwatch(type,color){rteCmd(type==='hi'?'hiliteColor':'foreColor',color);const p=g(type==='hi'?'rteHiPop':'rteFgPop');if(p)p.style.display='none';}
+async function rteLink(){const el=rteActive();const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',type:'url',ok:'Add'});if(!u)return;if(el)el.focus();document.execCommand('createLink',false,u);}
+const RTE_FG=['#181818','#c0392b','#2563eb','#059669','#d97706','#7c3aed','#0891b2','#be185d'];
+const RTE_HI=['#fff3a3','#b8f5c8','#bfe3ff','#ffd0d6','#e6d4ff','#ffe0b3','transparent'];
+function rteBar(edId){const fg=RTE_FG.map(c=>`<button type="button" class="sw" style="background:${c}" onclick="rteSwatch('fg','${c}')"></button>`).join('');
+  const hi=RTE_HI.map(c=>`<button type="button" class="sw" style="background:${c==='transparent'?'#fff':c};${c==='transparent'?'background-image:linear-gradient(45deg,transparent 45%,#c0392b 45%,#c0392b 55%,transparent 55%)':''}" onclick="rteSwatch('hi','${c}')"></button>`).join('');
+  return `<div class="rte-tb" onmousedown="rteFocus('${edId}')">
+    <button type="button" title="Bold" onclick="rteCmd('bold')"><b>B</b></button>
+    <button type="button" title="Italic" onclick="rteCmd('italic')"><i>I</i></button>
+    <button type="button" title="Underline" onclick="rteCmd('underline')"><u>U</u></button>
+    <button type="button" title="Strikethrough" onclick="rteCmd('strikeThrough')"><s>S</s></button>
+    <span class="rte-sep"></span>
+    <div class="rte-dd"><button type="button" title="Text colour" onclick="rteColor('rteFgPop')"><span style="border-bottom:3px solid #c0392b;line-height:1">A</span></button><div class="rte-pop" id="rteFgPop" style="display:none">${fg}</div></div>
+    <div class="rte-dd"><button type="button" title="Highlight" onclick="rteColor('rteHiPop')"><span style="background:#fff3a3;padding:0 3px;border-radius:2px">H</span></button><div class="rte-pop" id="rteHiPop" style="display:none">${hi}</div></div>
+    <span class="rte-sep"></span>
+    <button type="button" title="Bulleted list" onclick="rteCmd('insertUnorderedList')">• List</button>
+    <button type="button" title="Numbered list" onclick="rteCmd('insertOrderedList')">1.</button>
+    <button type="button" title="Decrease indent" onclick="rteCmd('outdent')">⇤</button>
+    <button type="button" title="Increase indent (sub-bullet / sub-number)" onclick="rteCmd('indent')">⇥</button>
+    <span class="rte-sep"></span>
+    <button type="button" title="Align left" onclick="rteCmd('justifyLeft')">⯇</button>
+    <button type="button" title="Align centre" onclick="rteCmd('justifyCenter')">≡</button>
+    <button type="button" title="Align right" onclick="rteCmd('justifyRight')">⯈</button>
+    <span class="rte-sep"></span>
+    <button type="button" title="Link" onclick="rteLink()">🔗</button>
+    <button type="button" title="Clear formatting" onclick="rteCmd('removeFormat')">⌫</button>
+  </div>`;}
+const RTE_OK=new Set(['B','STRONG','I','EM','U','A','UL','OL','LI','BR','DIV','P','SPAN','FONT']);
+const RTE_STYLE_OK={'color':/^#[0-9a-f]{3,6}$|^rgb\(/i,'background-color':/^#[0-9a-f]{3,6}$|^rgb\(/i,'text-align':/^(left|right|center|justify)$/i,'font-weight':/^(bold|[1-9]00)$/i,'font-style':/^italic$/i,'text-decoration':/underline|line-through/i};
+function safeStyle(el){const out=[];const st=el.getAttribute&&el.getAttribute('style');if(st){st.split(';').forEach(pair=>{const i=pair.indexOf(':');if(i<0)return;const k=pair.slice(0,i).trim().toLowerCase();const v=pair.slice(i+1).trim();if(RTE_STYLE_OK[k]&&RTE_STYLE_OK[k].test(v))out.push(k+':'+v);});}return out.join(';');}
 function sanitizeHtml(html){const d=document.createElement('div');d.innerHTML=html;
   (function walk(node){[...node.childNodes].forEach(ch=>{
     if(ch.nodeType===1){
       if(!RTE_OK.has(ch.tagName)){const t=document.createTextNode(ch.textContent);ch.replaceWith(t);return;}
-      [...ch.attributes].forEach(a=>{if(!(ch.tagName==='A'&&a.name==='href'))ch.removeAttribute(a.name);});
-      if(ch.tagName==='A'){ch.setAttribute('target','_blank');ch.setAttribute('rel','noopener');}
+      const href=ch.tagName==='A'?ch.getAttribute('href'):null;
+      const color=ch.tagName==='FONT'?ch.getAttribute('color'):null;
+      const sty=safeStyle(ch);
+      [...ch.attributes].forEach(a=>ch.removeAttribute(a.name));
+      if(sty)ch.setAttribute('style',sty);
+      if(ch.tagName==='A'&&href&&/^https?:|^mailto:/i.test(href)){ch.setAttribute('href',href);ch.setAttribute('target','_blank');ch.setAttribute('rel','noopener');}
+      if(ch.tagName==='FONT'&&color&&/^#[0-9a-f]{3,6}$/i.test(color))ch.setAttribute('color',color);
       walk(ch);
     }else if(ch.nodeType===8){ch.remove();}
   });})(d);
@@ -1517,7 +1606,8 @@ function actItem(a,cid,did){const acts='<div class="at-acts"><button class="lit"
 let editAc=null;
 function editAct(id){editAc=activities.find(a=>a.id===id);if(!editAc)return;
   g('acEKind').value=editAc.kind;const ed=g('acEText');ed.innerHTML=editAc.html||esc(editAc.text||'').replace(/\n/g,'<br>');
-  g('mActEdit').classList.add('open');setTimeout(()=>ed.focus(),60);}
+  const bar=g('acEBar');if(bar)bar.innerHTML=rteBar('acEText');
+  g('mActEdit').classList.add('open');setTimeout(()=>{_rteEl=ed;ed.focus();},60);}
 function saveActEdit(){if(!editAc)return;const ed=g('acEText');const html=sanitizeHtml(ed.innerHTML);const text=htmlToText(html);
   if(!text){toast('Empty — delete instead.');return;}
   editAc.kind=g('acEKind').value;editAc.html=html;editAc.text=text;editAc.edited=true;editAc.updated_at=now();
@@ -1598,7 +1688,7 @@ function vDeal(){const d=DL().find(x=>x.id===viewArg);if(!d)return vPipeline();
   </div><div>
     <div class="card"><div class="ch"><span>Notes & calls</span></div>
     <div class="cb" style="border-bottom:1px solid var(--bdr)">
-    <div class="rte-tb"><button type="button" title="Bold" onclick="rteCmd('bold')"><b>B</b></button><button type="button" title="Italic" onclick="rteCmd('italic')"><i>I</i></button><button type="button" title="Bulleted list — each point can become a task" onclick="rteCmd('insertUnorderedList')">• List</button><button type="button" title="Numbered list" onclick="rteCmd('insertOrderedList')">1.</button><button type="button" title="Link" onclick="rteLink()">🔗</button></div>
+    ${rteBar('dpText')}
     <div id="dpText" class="rte" contenteditable="true" data-ph="Notes as points — save, then turn any point into a task…"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${dcid}','${d.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${dcid}','${d.id}')">Log as call</button></div></div>
     <div class="cb"><div class="atl">${acts.map(a=>actItem(a,dcid,d.id)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet.</div>'}</div></div></div>
@@ -2067,7 +2157,10 @@ const REPEAT_DAYS={daily:1,weekly:7,fortnightly:14,monthly:30};
 function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
   const wasOpen=t.status!=='done';
   t.status=t.status==='done'?(t.owner!=='me'?'waiting':'open'):'done';t.updated_at=now();
-  if(wasOpen&&t.status==='done'&&t.customer_id){const who=t.contact_id?(CO().find(c=>c.id===t.contact_id)||{}).name:'';const lbl=(t.type==='call'?'Call done: ':'Done: ')+t.title+(who?' — '+who:'');logActivity(t.type==='call'?'call':'note',lbl,t.customer_id,t.deal_id||null,t.contact_id||null);}
+  if(wasOpen&&t.status==='done'&&t.customer_id){const who=t.contact_id?(CO().find(c=>c.id===t.contact_id)||{}).name:'';const lbl=(t.type==='call'?'Call: ':'Done: ')+t.title+(who?' — '+who:'');
+    let a=activities.find(x=>x.task_id===t.id&&!x.deleted);const n2=now();
+    if(a){a.text=lbl;if(t.notes_html)a.html=t.notes_html;a.kind=t.type==='call'?'call':'note';a.updated_at=n2;}
+    else activities.push({id:uid(),kind:t.type==='call'?'call':'note',text:lbl,html:t.notes_html||null,task_id:t.id,customer_id:t.customer_id,deal_id:t.deal_id||null,contact_id:t.contact_id||null,at:n2,created_at:n2,updated_at:n2});}
   if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();const nd=addDays(base,REPEAT_DAYS[t.repeat]);const n2=now();
     tasks.push({id:uid(),type:t.type,title:t.title,owner:t.owner,priority:t.priority,dept:t.dept,customer_id:t.customer_id,contact_id:t.contact_id,deal_id:t.deal_id,due:nd,original_due:nd,at:t.at,estimate_min:t.estimate_min,repeat:t.repeat,phone:t.phone,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
     toast('Next occurrence scheduled '+fmtD(nd)+'.');}
