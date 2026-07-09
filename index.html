@@ -121,6 +121,7 @@ table.t td.r,table.t th.r{text-align:right}
 .row{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid var(--bdr)}
 .row:last-child{border-bottom:0}
 .row:hover{background:var(--sub)}
+.row.click{cursor:pointer}
 .chk{width:16px;height:16px;border:1.5px solid var(--bdr2);border-radius:3px;flex:0 0 auto;margin-top:2px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;background:#fff}
 .chk.on{background:var(--grn);border-color:var(--grn)}
 .row .bd{flex:1;min-width:0}
@@ -800,13 +801,13 @@ function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
   const dueH=t.type==='call'?(t.when?`<span class="due ${t.when.slice(0,10)<td?'over':t.when.slice(0,10)===td?'today':''}">${fmtDT(t.when)}</span>`:''):(t.due?`<span class="due ${ov?'over':t.due===td?'today':''}">${ov?'Overdue '+ageDays(t.due)+'d · was ':''}${fmtD(t.due)}</span>${orig}`:'');
   const tel=t.type==='call'&&t.phone?`<a class="telbtn" href="tel:${esc(t.phone)}">✆ ${esc(t.phone)}</a>`:'';
   const rep=t.repeat?`<span class="pill b" title="Repeats ${esc(t.repeat)}">↻ ${esc(t.repeat)}</span>`:'';
-  return`<div class="row ${t.status==='done'?'done':''}">
+  return`<div class="row click ${t.status==='done'?'done':''}" onclick="nav('task','${t.id}')" title="Open task">
     ${opts.bulk?`<input type="checkbox" class="bchk" ${_bulkSel&&_bulkSel.has(t.id)?'checked':''} onclick="event.stopPropagation();bulkTog('${t.id}',this)" style="margin-right:2px">`:''}
     <span class="pri ${t.priority||'medium'}"></span>
-    <button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')">${t.status==='done'?'✓':''}</button>
+    <button class="chk ${t.status==='done'?'on':''}" onclick="event.stopPropagation();toggleTask('${t.id}')">${t.status==='done'?'✓':''}</button>
     <div class="bd"><div class="tt">${t.type==='call'?'Call: ':''}${esc(t.title)}</div>
     <div class="meta">${dueH}${tel}${t.at?`<span class="pill n num">${t.at}</span>`:''}${t.dept?deptLink(t.dept):''}${cu}${ow}${wt}${rep}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
-    <div class="rowacts">${opts.snooze&&t.status==='waiting'?`<button class="iconb" title="Push follow-up +1 day" onclick="snoozeFollow('${t.id}')">⏲</button>`:''}${t.type!=='call'&&t.status!=='done'?`<button class="iconb" title="Reschedule to tomorrow" onclick="bumpDue('${t.id}')">→</button>`:''}${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" onclick="openTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="rowDelTask('${t.id}')">✕</button></div></div>`;}
+    <div class="rowacts">${opts.snooze&&t.status==='waiting'?`<button class="iconb" title="Push follow-up +1 day" onclick="event.stopPropagation();snoozeFollow('${t.id}')">⏲</button>`:''}${t.type!=='call'&&t.status!=='done'?`<button class="iconb" title="Reschedule to tomorrow" onclick="event.stopPropagation();bumpDue('${t.id}')">→</button>`:''}${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="event.stopPropagation();toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" title="Quick edit" onclick="event.stopPropagation();openTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="event.stopPropagation();rowDelTask('${t.id}')">✕</button></div></div>`;}
 async function rowDelTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();toast('Deleted.');}}
 function bumpDue(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();persist();reRender();toast('Moved to '+fmtD(t.due)+'.');}
 function snoozeFollow(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.follow_up&&t.follow_up>=today()?t.follow_up:today();t.follow_up=addDays(base,1);t.updated_at=now();persist();reRender();toast('Follow-up '+fmtD(t.follow_up)+'.');}
