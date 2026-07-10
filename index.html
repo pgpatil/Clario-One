@@ -631,12 +631,13 @@ function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');cle
 var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
+var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;stateUpdatedAt=s.updatedAt||now();}
+function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
+function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
 function persist(){stateUpdatedAt=now();try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
 function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
@@ -658,11 +659,11 @@ const DL=()=>deals.filter(d=>!d.deleted);
 const AC=()=>activities.filter(a=>!a.deleted);
 const TR=()=>toolruns.filter(t=>!t.deleted);
 const OP=()=>opps.filter(o=>!o.deleted);
-const pname=id=>id==='me'||!id?'Me':(P().find(p=>p.id===id)||{}).name||'—';
+const pname=id=>id==='me'||!id?(myProfile.name||'Me'):(P().find(p=>p.id===id)||{}).name||'—';
 const cname=id=>id?(CU().find(c=>c.id===id)||{}).name||'':'';
 /* clickable name chips — navigate to the entity */
 const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
-const personLink=(id,cls)=>id&&id!=='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`:'';
+const personLink=(id,cls)=>id?(id==='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();openMyProfile()" title="Edit your profile">${esc(pname(id))}</span>`:`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`):'';
 const deptLink=(d,cls)=>d?`<span class="${cls||'pill n'} lnk" onclick="event.stopPropagation();deptFilter('${esc(d)}')" title="Filter by department">${esc(d)}</span>`:'';
 function deptFilter(d){window._cd=d;cTab='mine';nav('commit');}
 const openMine=()=>T().filter(t=>t.status==='open'&&(t.owner==='me'||!t.owner));
@@ -1933,6 +1934,12 @@ function exportReview(){const td=today();const lines=['# Weekly Review — '+td,
 function vSettings(){const enc=_encMeta&&_encMeta.on;
   return pagehead('SETUP','Settings','',' ')+
   `<div class="grid2"><div>
+  <div class="setcard"><h4>Your profile</h4>
+    <div class="srow"><span>Name</span><b>${myProfile.name?esc(myProfile.name):'Not set — shows as "Me"'}</b></div>
+    ${myProfile.dept?`<div class="srow"><span>Department</span><b>${esc(myProfile.dept)}</b></div>`:''}
+    ${myProfile.role?`<div class="srow"><span>Role</span><b>${esc(myProfile.role)}</b></div>`:''}
+    <div style="margin-top:10px"><button class="btn sm" onclick="openMyProfile()">${myProfile.name?'Edit':'Set your name'}</button></div>
+    <p class="note">Your name replaces "Me" as the owner on tasks, calls and meeting actions — in the app and in summaries printed or sent to Outlook.</p></div>
   ${gCard()}
   <div class="setcard"><h4>OneDrive folder sync (desktop Edge/Chrome)</h4>
     <div class="srow"><span>Folder</span><b>${_fsDir?esc(_fsDir.name):'Not linked'}</b></div>
@@ -2156,7 +2163,7 @@ document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.shiftKey)return;co
   if(save){e.preventDefault();save.click();}});
 document.addEventListener('keydown',e=>{const ov=g('mAsk');if(ov&&ov.classList.contains('open')){if(e.key==='Enter'&&_askKind!=='text'){e.preventDefault();if(_askKind==='confirm'||_askKind==='people')askOk();}if(e.key==='Escape'){askResolve(_askKind==='confirm'?false:null);}}});
 function fillDept(sel,val){g(sel).innerHTML='<option value="">—</option>'+depts.map(d=>`<option${d===val?' selected':''}>${esc(d)}</option>`).join('');}
-function fillOwner(sel,val){g(sel).innerHTML='<option value="me">Me</option>'+P().map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');}
+function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');}
 function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');}
 function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+products.map(p=>`<option${p===val?' selected':''}>${esc(p)}</option>`).join('');}
 function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');}
@@ -2210,8 +2217,13 @@ function openPerson(id){editP=id?people.find(x=>x.id===id):null;
   g('mPersonTitle').textContent=editP?'Edit Person':'New Person';
   g('pName').value=editP?.name||'';fillDept('pDept',editP?.dept||'');g('pRole').value=editP?.role||'';g('pPhone').value=editP?.phone||'';g('pEmail').value=editP?.email||'';g('pNotes').value=editP?.notes||'';
   g('pDel').style.display=editP?'':'none';g('mPerson').classList.add('open');setTimeout(()=>g('pName').focus(),50);}
+function openMyProfile(){editP='me';
+  g('mPersonTitle').textContent='Your profile';
+  g('pName').value=myProfile.name||'';fillDept('pDept',myProfile.dept||'');g('pRole').value=myProfile.role||'';g('pPhone').value=myProfile.phone||'';g('pEmail').value=myProfile.email||'';g('pNotes').value=myProfile.notes||'';
+  g('pDel').style.display='none';g('mPerson').classList.add('open');setTimeout(()=>g('pName').focus(),50);}
 function savePerson(){const name=g('pName').value.trim();if(!name){toast('Name required.');return;}const n=now();
   const d={name,dept:g('pDept').value,role:g('pRole').value.trim(),phone:g('pPhone').value.trim(),email:g('pEmail').value.trim(),notes:g('pNotes').value.trim(),updated_at:n};
+  if(editP==='me'){Object.assign(myProfile,d);closeM();persist();renderView();toast('Profile saved.');return;}
   if(editP)Object.assign(editP,d);else people.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();}
 async function delPerson(){if(editP&&await askConfirm('Delete '+editP.name+'? Their items stay.',{ok:'Delete',danger:true})){editP.deleted=true;editP.updated_at=now();closeM();nav('people');toast('Deleted.');}}
