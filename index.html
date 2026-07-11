@@ -441,7 +441,7 @@ canvas{display:block;max-width:100%}
     <div class="fld" id="fAt"><label>Time (for day plan)</label><input type="time" id="tAt"></div>
     <div class="fld" id="fEst"><label>Estimate (min)</label><input type="number" id="tEst" min="5" step="5" placeholder="30"></div>
     <div class="fld" id="fRepeat"><label>Repeat</label><select id="tRepeat"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
-    <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="date" id="tFup" onchange="this.dataset.auto=0"></div>
+    <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="datetime-local" id="tFup" onchange="this.dataset.auto=0"></div>
     <div class="fld" id="fWhen" style="display:none"><label>Call by</label><input type="datetime-local" id="tWhen"></div>
     <div class="fld" id="fPhone" style="display:none"><label>Phone</label><input id="tPhone" placeholder="+91…"></div>
     <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="tCust" style="flex:1" onchange="fillContact('tContact',this.value||null,'')"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust')">+</button></div></div>
@@ -622,6 +622,10 @@ const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/
 const fmtD=ds=>ds?new Date(ds+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
 const fmtDT=s=>s?new Date(s).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 const fmtMoney=v=>{v=+v||0;if(v>=1e7)return'₹'+(v/1e7).toFixed(2).replace(/\.00$/,'')+' Cr';if(v>=1e5)return'₹'+(v/1e5).toFixed(2).replace(/\.00$/,'')+' L';return'₹'+v.toLocaleString('en-IN');};
+function defaultFollowUp(dueDate){const td=today();
+  if(dueDate&&dueDate>td)return addDays(dueDate,-1)+'T09:00';
+  const d=new Date(Date.now()+3600000);const hhmm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  return dueDate?(td+'T'+hhmm):(addDays(td,2)+'T09:00');}
 const mondayOf=ds=>{const d=new Date(ds+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);};
 const weekKey=ds=>'W'+mondayOf(ds);
 const monthKey=ds=>ds.slice(0,7);
@@ -796,7 +800,7 @@ function viewToggle(scope,val){return`<div class="vtog"><button class="${val==='
 var _view={accounts:'list',people:'card'};
 function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
   const ow=t.owner&&t.owner!=='me'?personLink(t.owner):'';
-  const wt=t.status==='waiting'?`<span class="pill a">waiting${t.follow_up?' · f/u '+fmtD(t.follow_up):''}</span>`:'';
+  const wt=t.status==='waiting'?`<span class="pill a">waiting${t.follow_up?' · f/u '+fmtDT(t.follow_up):''}</span>`:'';
   const cu=t.customer_id?custLink(t.customer_id):'';
   const orig=ov&&t.original_due&&t.original_due!==t.due?` <span class="age">(orig ${fmtD(t.original_due)})</span>`:'';
   const dueH=t.type==='call'?(t.when?`<span class="due ${t.when.slice(0,10)<td?'over':t.when.slice(0,10)===td?'today':''}">${fmtDT(t.when)}</span>`:''):(t.due?`<span class="due ${ov?'over':t.due===td?'today':''}">${ov?'Overdue '+ageDays(t.due)+'d · was ':''}${fmtD(t.due)}</span>${orig}`:'');
@@ -811,7 +815,10 @@ function trow(t,opts={}){const td=today(),ov=t.due&&t.due<td&&t.status!=='done';
     <div class="rowacts">${opts.snooze&&t.status==='waiting'?`<button class="iconb" title="Push follow-up +1 day" onclick="event.stopPropagation();snoozeFollow('${t.id}')">⏲</button>`:''}${t.type!=='call'&&t.status!=='done'?`<button class="iconb" title="Reschedule to tomorrow" onclick="event.stopPropagation();bumpDue('${t.id}')">→</button>`:''}${opts.star!==false?`<button class="star ${t.focus?'on':''}" title="Focus" onclick="event.stopPropagation();toggleFocus('${t.id}')">★</button>`:''}<button class="iconb" title="Quick edit" onclick="event.stopPropagation();openTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="event.stopPropagation();rowDelTask('${t.id}')">✕</button></div></div>`;}
 async function rowDelTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();toast('Deleted.');}}
 function bumpDue(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();persist();reRender();toast('Moved to '+fmtD(t.due)+'.');}
-function snoozeFollow(id){const t=tasks.find(x=>x.id===id);if(!t)return;const base=t.follow_up&&t.follow_up>=today()?t.follow_up:today();t.follow_up=addDays(base,1);t.updated_at=now();persist();reRender();toast('Follow-up '+fmtD(t.follow_up)+'.');}
+function snoozeFollow(id){const t=tasks.find(x=>x.id===id);if(!t)return;
+  const fd=(t.follow_up||'').slice(0,10),ft=(t.follow_up||'').slice(11,16)||'09:00';
+  const baseDate=fd&&fd>=today()?fd:today();
+  t.follow_up=addDays(baseDate,1)+'T'+ft;t.updated_at=now();persist();reRender();toast('Follow-up '+fmtDT(t.follow_up)+'.');}
 function seccard(title,n,inner,emptyMsg,extra){return`<div class="card"><div class="ch"><span>${title} ${n?`<span class="n num">(${n})</span>`:''}</span>${extra||''}</div>${n?inner:`<div class="empty">${emptyMsg}</div>`}</div>`;}
 function dayItems(ds){
   const mt=M().filter(m=>m.date===ds).map(m=>({k:'m',s:(m.time||'')+' '+m.title,o:m,sort:'0'+(m.time||'')}));
@@ -842,7 +849,7 @@ function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,tim
   return r;}
 function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'').trim();if(!v)return;const r=parseQA(v);if(dueOverride)r.due=dueOverride;const n=now();
   if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
-  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?(r.due?addDays(r.due,-1):addDays(today(),2)):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
+  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
   if(inp)inp.value='';persist();renderView();}
 function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
@@ -976,7 +983,7 @@ function vHome(){const td=today();
     </div>
     <div>
       ${seccard("Today's focus",focus.length,focus.map((t,i)=>`<div class="top3-it"><span class="rank num">${i+1}</span><div style="flex:1;font-weight:600;font-size:12.5px">${esc(t.title)}</div><button class="chk ${t.status==='done'?'on':''}" onclick="toggleTask('${t.id}')"></button></div>`).join(''),'Star up to 3 tasks ★ to set focus.')}
-      ${seccard('Chase — waiting on others',chase.length,`<div class="row" style="background:var(--sub)"><div class="bd" style="font-size:11px;color:var(--t3)">Work you handed to someone that is still open. Ordered by follow-up date — tap to update or close.</div></div>`+waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9')).slice(0,4).map(t=>`<div class="row" style="cursor:pointer" onclick="nav('task','${t.id}')"><div class="bd"><div class="tt" style="font-size:12.5px"><span style="color:var(--blue-d)">${esc(pname(t.owner))}</span> — ${esc(t.title)}</div><div class="meta">${t.follow_up?`<span class="due ${t.follow_up<td?'over':t.follow_up===td?'today':''}">follow up ${fmtD(t.follow_up)}</span>`:'<span>no follow-up date</span>'}</div></div></div>`).join(''),'Nothing delegated. Assign work with @name in the capture bar or the Owner field — it lands here until they deliver.',`<button class="btn xs" onclick="cTab='chase';nav('commit')">All ↗</button>`)}
+      ${seccard('Chase — waiting on others',chase.length,`<div class="row" style="background:var(--sub)"><div class="bd" style="font-size:11px;color:var(--t3)">Work you handed to someone that is still open. Ordered by follow-up date — tap to update or close.</div></div>`+waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9')).slice(0,4).map(t=>`<div class="row" style="cursor:pointer" onclick="nav('task','${t.id}')"><div class="bd"><div class="tt" style="font-size:12.5px"><span style="color:var(--blue-d)">${esc(pname(t.owner))}</span> — ${esc(t.title)}</div><div class="meta">${t.follow_up?`<span class="due ${t.follow_up.slice(0,10)<td?'over':t.follow_up.slice(0,10)===td?'today':''}">follow up ${fmtDT(t.follow_up)}</span>`:'<span>no follow-up date</span>'}</div></div></div>`).join(''),'Nothing delegated. Assign work with @name in the capture bar or the Owner field — it lands here until they deliver.',`<button class="btn xs" onclick="cTab='chase';nav('commit')">All ↗</button>`)}
       ${seccard('Account next actions',naDue.length,naDue.slice(0,4).map(({c,t})=>`<div class="row" style="cursor:pointer" onclick="nav('accounts','${c.id}')"><div class="bd"><div class="tt" style="font-size:12.5px;color:var(--blue-d)">${esc(c.name)}</div><div class="meta"><span>${esc(t.title||'')}</span><span class="due ${t.due<td?'over':'today'}">${fmtD(t.due)}</span></div></div></div>`).join(''),'No account actions due.')}
     </div></div>`;}
 
@@ -1144,7 +1151,7 @@ async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)retu
     persist();nav('meeting',nm.id);toast('Rescheduled to '+fmtD(nd)+'. Agenda carried over.');}}
 function mAgendaAdd(mid){const i=g('mAgInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:null,meeting_id:mid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function mActionAdd(mid){const t=g('mActT').value.trim();if(!t)return;const o=g('mActO').value,d=g('mActD').value||null,n=now();const m=M().find(x=>x.id===mid);
-  tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?(d||addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
+  tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Action delegated to '+pname(o):'Action added');}
 
 g('icsFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const txt=await f.text();let n=0;
@@ -1188,7 +1195,10 @@ function bulkTog(id,el){if(el&&el.checked)_bulkSel.add(id);else _bulkSel.delete(
 function _bulkList(){return [..._bulkSel].map(id=>tasks.find(t=>t.id===id)).filter(Boolean);}
 function bulkClear(){_bulkSel.clear();reRender();}
 function bulkBump(){_bulkList().forEach(t=>{const base=t.due&&t.due>=today()?t.due:today();t.due=addDays(base,1);if(!t.original_due)t.original_due=t.due;t.at=null;t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Rescheduled.');}
-function bulkSnooze(){_bulkList().forEach(t=>{const base=t.follow_up&&t.follow_up>=today()?t.follow_up:today();t.follow_up=addDays(base,1);t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Follow-ups pushed.');}
+function bulkSnooze(){_bulkList().forEach(t=>{
+  const fd=(t.follow_up||'').slice(0,10),ft=(t.follow_up||'').slice(11,16)||'09:00';
+  const baseDate=fd&&fd>=today()?fd:today();
+  t.follow_up=addDays(baseDate,1)+'T'+ft;t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Follow-ups pushed.');}
 function bulkDone(){_bulkList().forEach(t=>{t.status='done';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Marked done.');}
 async function bulkReassign(){const who=await askChoice('Reassign selected to:',P().map(p=>({label:p.name,value:p.id})),{title:'Reassign'});if(!who)return;_bulkList().forEach(t=>{t.owner=who;t.status='waiting';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Reassigned.');}
 
@@ -1349,7 +1359,7 @@ function saveTaskNotes(id){const t=tasks.find(x=>x.id===id);if(!t)return;const e
   logTaskNotes(t);
   persist();renderView();toast('Notes saved'+(t.customer_id?' and logged to account.':'.'));}
 function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;captureTaskNotes(pid);const o=g('tkO').value,d=g('tkD').value||null,n=now();
-  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?(d?addDays(d,-1):addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
+  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Delegated to '+pname(o):'Follow-on added');}
 
 function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1855,7 +1865,7 @@ function vDash(){const td=today();
   let body='';
   if(dbTab==='ops'){
     const byDept={};T().filter(t=>t.status!=='done').forEach(t=>{const d=t.dept||'—';byDept[d]=byDept[d]||{open:0,over:0,oldest:0};byDept[d].open++;const due=t.type==='call'?(t.when||'').slice(0,10):t.due;if(due&&due<td){byDept[d].over++;byDept[d].oldest=Math.max(byDept[d].oldest,ageDays(t.original_due||due));}});
-    const byP={};waiting().forEach(t=>{const k=t.owner;byP[k]=byP[k]||{n:0,past:0,oldest:0};byP[k].n++;if(t.follow_up&&t.follow_up<td){byP[k].past++;byP[k].oldest=Math.max(byP[k].oldest,ageDays(t.follow_up));}});
+    const byP={};waiting().forEach(t=>{const k=t.owner;byP[k]=byP[k]||{n:0,past:0,oldest:0};byP[k].n++;if(t.follow_up&&t.follow_up<td){byP[k].past++;byP[k].oldest=Math.max(byP[k].oldest,ageDays(t.follow_up.slice(0,10)));}});
     const overdue=T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td);
     body=`<div class="kpis">
       <div class="kpi ${overdue.length?'bad':''}" onclick="cTab='mine';nav('commit')"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
@@ -1923,7 +1933,7 @@ function exportReview(){const td=today();const lines=['# Weekly Review — '+td,
   lines.push('Done (7d): '+T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=addDays(td,-7)).length,'Overdue: '+overdue.length,'Stuck delegations: '+waiting().filter(t=>t.follow_up&&t.follow_up<td).length,'Open pipeline: '+fmtMoney(openDeals().reduce((a,d)=>a+(+d.value||0),0)),'','## Overdue items');
   overdue.forEach(t=>lines.push('- '+t.title+' — due '+(t.original_due||t.due)+' ('+ageDays(t.original_due||t.due)+'d), '+(t.dept||'—')+', owner '+pname(t.owner)));
   lines.push('','## Waiting on people');
-  waiting().forEach(t=>lines.push('- '+pname(t.owner)+': '+t.title+(t.follow_up?' — follow up '+t.follow_up:'')));
+  waiting().forEach(t=>lines.push('- '+pname(t.owner)+': '+t.title+(t.follow_up?' — follow up '+fmtDT(t.follow_up):'')));
   lines.push('','## Account next actions due');
   CU().forEach(c=>{const t=acctNextTask(c.id);if(t&&t.due&&t.due<=td)lines.push('- '+c.name+': '+t.title+' — '+t.due);});
   lines.push('','## Decisions pending review');
@@ -2017,7 +2027,7 @@ const CSVDEFS={
 tasks:{label:'Tasks & calls',cols:['title','type','owner','due','time','estimate_min','priority','department','account','status','follow_up','phone','call_when','notes'],
   example:['Review Q2 capex file','task','Me','2026-07-10','15:00','45','high','Finance','','open','','','',''],
   example2:['Payment follow-up','call','Me','','','','medium','Sales','LuLu Mall','open','','+91 98xxxxxx00','2026-07-08 11:00',''],
-  rows(){return T().map(t=>[t.title,t.type||'task',pname(t.owner),t.due||'',t.at||'',t.estimate_min||'',t.priority||'medium',t.dept||'',cname(t.customer_id),t.status,t.follow_up||'',t.phone||'',t.when?t.when.replace('T',' '):'',t.notes||'']);},
+  rows(){return T().map(t=>[t.title,t.type||'task',pname(t.owner),t.due||'',t.at||'',t.estimate_min||'',t.priority||'medium',t.dept||'',cname(t.customer_id),t.status,t.follow_up?t.follow_up.replace('T',' '):'',t.phone||'',t.when?t.when.replace('T',' '):'',t.notes||'']);},
   imp(o){if(!o.title)return'no title';const n=now();
     const type=/call/i.test(o.type)?'call':'task';
     const owner=getOrCreatePerson(o.owner,ensureDept(o.department));
@@ -2027,7 +2037,7 @@ tasks:{label:'Tasks & calls',cols:['title','type','owner','due','time','estimate
     tasks.push({id:uid(),type,title:o.title,owner,due:type==='call'?null:due,original_due:type==='call'?null:due,at:type==='call'?null:normT(o.time),
       estimate_min:+o.estimate_min||30,priority:/high/i.test(o.priority)?'high':/low/i.test(o.priority)?'low':'medium',
       dept:ensureDept(o.department),customer_id:o.account?getOrCreateAccount(o.account):null,
-      status,follow_up:normD(o.follow_up)||(status==='waiting'?(due||addDays(today(),2)):null),
+      status,follow_up:normD(o.follow_up)?(normD(o.follow_up)+'T'+(normT(o.follow_up)||'09:00')):(status==='waiting'?defaultFollowUp(due):null),
       phone:o.phone||'',when:type==='call'&&wd?wd+'T'+wt:null,notes:o.notes||'',created_at:n,updated_at:n});return null;}},
 people:{label:'People',cols:['name','department','role','phone','email','notes'],example:['Priya Sharma','Finance','Finance Head','+91 98xxxxxx01','priya@x.com',''],
   rows(){return P().map(p=>[p.name,p.dept||'',p.role||'',p.phone||'',p.email||'',p.notes||'']);},
@@ -2176,14 +2186,14 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   fillCust('tCust',t?.customer_id||presetCust||'');
   fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
   g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||(t?'':today());g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||(t?'':'5');g('tRepeat').value=t?.repeat||'';
-  g('tFup').value=t?.follow_up||(t?'':(g('tDue').value?addDays(g('tDue').value,-1):''));g('tFup').dataset.auto=t?.follow_up?'0':'1';
+  g('tFup').value=t?.follow_up||(t?'':defaultFollowUp(g('tDue').value||null));g('tFup').dataset.auto=t?.follow_up?'0':'1';
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
   window._presetDeal=presetDeal||t?.deal_id||null;
   taskTypeUI();g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
 function dueChanged(){const due=g('tDue').value;const fup=g('tFup');if(!fup||!due)return;
   const cur=fup.value;const auto=fup.dataset.auto==='1';
-  if(!cur||auto){fup.value=addDays(due,-1);fup.dataset.auto='1';}}
+  if(!cur||auto){fup.value=defaultFollowUp(due);fup.dataset.auto='1';}}
 function ownerAutofill(){const oid=g('tOwner').value;if(oid&&oid!=='me'){const p=P().find(x=>x.id===oid);if(p&&p.dept&&!g('tDept').value)fillDept('tDept',p.dept);}taskTypeUI();}
 function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner').value!=='me';
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
