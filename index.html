@@ -748,7 +748,7 @@ function renderNav(){const td=today();
   const menu=NAVMORE.map(([grp,items])=>`<div class="nm-h">${grp}</div>`+items.map(([id,lbl])=>`<button class="nm-i ${view===id||(view==='meeting'&&id==='meetings')?'sel':''}" onclick="nav('${id}');toggleMore()">${lbl}</button>`).join('')).join('');
   const nb=g('navbar');nb.innerHTML=tabs+`<button id="moreBtn" class="nt ${inMore?'on':''}" onclick="toggleMore(event)">More ▾</button>`;
   const mm=g('moremenu');if(mm)mm.innerHTML=menu;
-  try{if(nb.querySelector){const on=nb.querySelector('.nt.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center'});}}catch(e){}}
+  try{const on=nb.querySelector('.nt.on');if(on)nb.scrollLeft=on.offsetLeft-(nb.clientWidth-on.offsetWidth)/2;}catch(e){}}
 function toggleMore(e){if(e)e.stopPropagation();const m=g('moremenu');if(!m)return;
   const willOpen=!m.classList.contains('on');
   if(willOpen){const b=g('moreBtn');if(b&&b.getBoundingClientRect){const r=b.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';m.style.right=Math.max(6,window.innerWidth-r.right)+'px';m.style.left='auto';}}
