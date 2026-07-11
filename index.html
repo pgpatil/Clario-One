@@ -842,7 +842,7 @@ function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,tim
   return r;}
 function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'').trim();if(!v)return;const r=parseQA(v);if(dueOverride)r.due=dueOverride;const n=now();
   if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
-  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?(r.due?addDays(r.due,-1):addDays(today(),2)):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
+  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?(r.due||addDays(today(),2)):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
   if(inp)inp.value='';persist();renderView();}
 function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
@@ -1349,7 +1349,7 @@ function saveTaskNotes(id){const t=tasks.find(x=>x.id===id);if(!t)return;const e
   logTaskNotes(t);
   persist();renderView();toast('Notes saved'+(t.customer_id?' and logged to account.':'.'));}
 function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;captureTaskNotes(pid);const o=g('tkO').value,d=g('tkD').value||null,n=now();
-  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?(d?addDays(d,-1):addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
+  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?(d||addDays(today(),2)):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Delegated to '+pname(o):'Follow-on added');}
 
 function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2176,14 +2176,14 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   fillCust('tCust',t?.customer_id||presetCust||'');
   fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
   g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||(t?'':today());g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||(t?'':'5');g('tRepeat').value=t?.repeat||'';
-  g('tFup').value=t?.follow_up||(t?'':(g('tDue').value?addDays(g('tDue').value,-1):''));g('tFup').dataset.auto=t?.follow_up?'0':'1';
+  g('tFup').value=t?.follow_up||(t?'':(g('tDue').value||''));g('tFup').dataset.auto=t?.follow_up?'0':'1';
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
   window._presetDeal=presetDeal||t?.deal_id||null;
   taskTypeUI();g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
 function dueChanged(){const due=g('tDue').value;const fup=g('tFup');if(!fup||!due)return;
   const cur=fup.value;const auto=fup.dataset.auto==='1';
-  if(!cur||auto){fup.value=addDays(due,-1);fup.dataset.auto='1';}}
+  if(!cur||auto){fup.value=due;fup.dataset.auto='1';}}
 function ownerAutofill(){const oid=g('tOwner').value;if(oid&&oid!=='me'){const p=P().find(x=>x.id===oid);if(p&&p.dept&&!g('tDept').value)fillDept('tDept',p.dept);}taskTypeUI();}
 function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner').value!=='me';
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
