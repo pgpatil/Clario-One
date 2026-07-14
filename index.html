@@ -1151,7 +1151,8 @@ async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)retu
     persist();nav('meeting',nm.id);toast('Rescheduled to '+fmtD(nd)+'. Agenda carried over.');}}
 function mAgendaAdd(mid){const i=g('mAgInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:null,meeting_id:mid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function mActionAdd(mid){const t=g('mActT').value.trim();if(!t)return;const o=g('mActO').value,d=g('mActD').value||null,n=now();const m=M().find(x=>x.id===mid);
-  tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
+  const ownerDept=o!=='me'?(P().find(x=>x.id===o)||{}).dept:'';
+  tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:ownerDept||m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Action delegated to '+pname(o):'Action added');}
 
 g('icsFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const txt=await f.text();let n=0;
@@ -1359,7 +1360,8 @@ function saveTaskNotes(id){const t=tasks.find(x=>x.id===id);if(!t)return;const e
   logTaskNotes(t);
   persist();renderView();toast('Notes saved'+(t.customer_id?' and logged to account.':'.'));}
 function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;captureTaskNotes(pid);const o=g('tkO').value,d=g('tkD').value||null,n=now();
-  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
+  const ownerDept=o!=='me'?(P().find(x=>x.id===o)||{}).dept:'';
+  tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:ownerDept||p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Delegated to '+pname(o):'Follow-on added');}
 
 function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
