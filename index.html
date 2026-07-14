@@ -485,6 +485,8 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>City</label><input id="cCity"></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="cDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','cDept')">+</button></div></div>
     <div class="fld"><label>Key account manager</label><div style="display:flex;gap:6px"><select id="cKam" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNewKam()">+</button></div></div>
+    <div class="fld"><label>Region</label><div style="display:flex;gap:6px"><select id="cRegion" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New region" onclick="quickNew('region','cRegion')">+</button></div></div>
+    <div class="fld"><label>Visit cadence</label><select id="cVisitCadence"><option value="">No set cadence</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option></select></div>
   </div>
   <div class="fld"><label>Address</label><textarea id="cAddr" style="min-height:40px"></textarea></div>
   <div class="g2">
@@ -571,6 +573,23 @@ canvas{display:block;max-width:100%}
   </div>
   <div class="macts"><button class="btn dg sm" id="mDel" style="display:none" onclick="delMeeting()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveMeeting()">Save</button></div></div>
+</div></div>
+
+<!-- Plan-ahead prompt -->
+<div class="ovl" id="mPlan"><div class="modal">
+  <h3>Plan this <span id="planPeriodLabel"></span><button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <p class="note">Travelling anywhere this period? We'll surface accounts nearby, plus anyone overdue for a touchpoint.</p>
+  <div class="g2">
+    <div class="fld"><label>Travelling to</label><select id="planRegion"></select></div>
+    <div></div>
+    <div class="fld"><label>From</label><input type="date" id="planTripFrom"></div>
+    <div class="fld"><label>To</label><input type="date" id="planTripTo"></div>
+  </div>
+  <button class="btn gh2 sm" onclick="planSuggest()">Suggest touchpoints</button>
+  <div id="planSuggestions" style="margin-top:10px"></div>
+  </div>
+  <div class="macts"><div class="rr"><button class="btn gh2" onclick="closeM()">Skip</button><button class="btn" id="planAddBtn" style="display:none" onclick="planAddSelected()">Add selected to plan</button></div></div>
 </div></div>
 
 <!-- Decision modal -->
@@ -678,13 +697,14 @@ function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');cle
 var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
+var regions=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
+function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
+function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
 function persist(){stateUpdatedAt=now();try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
 function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
@@ -1110,6 +1130,8 @@ async function shutdownDay(ds){const open=T().filter(t=>t.type!=='call'&&t.statu
 
 function vPlanner(){const td=today();
   const tabs=`<div class="tabs">${[['day','Day'],['week','Week'],['month','Month'],['meet','Meetings']].map(([k,l])=>`<button class="tab ${plTab===k?'on':''}" onclick="plTab='${k}';renderView()">${l}</button>`).join('')}</div>`;
+  if(plTab==='week'||plTab==='month'){const periodKey=(plTab==='week'?'w:':'m:')+(plTab==='week'?weekKey(plAnchor):monthKey(plAnchor));
+    if(window._planPrompted!==periodKey){window._planPrompted=periodKey;const t=plTab,a=plAnchor;setTimeout(()=>openPlanPrompt(t,a),80);}}
   let title='',body='';
   if(plTab==='day'){title=fmtD(plAnchor);body=vDayPlanner(plAnchor);}
   else if(plTab==='month'){
@@ -1148,6 +1170,7 @@ function vPlanner(){const td=today();
     `<div class="pl-nav"><button class="btn gh2 sm" onclick="plShift(-1)">‹</button><span class="pl-title">${title}</span><button class="btn gh2 sm" onclick="plShift(1)">›</button>
     <button class="btn gh2 sm" onclick="plAnchor=today();selDay=today();renderView()">Today</button></div>
     ${plTab==='meet'?`<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button>`:''}
+    ${(plTab==='week'||plTab==='month')?`<button class="btn gh2 sm" onclick="openPlanPrompt('${plTab}','${plAnchor}')">Plan ahead ✈</button>`:''}
     <button class="btn gh2 sm" onclick="openMeeting(null,plTab==='month'?selDay:plAnchor)">+ Meeting</button><button class="btn sm" onclick="openTask(null,null,plTab==='month'?selDay:plAnchor)">+ Task</button>`)+
   tabs+body;}
 function dayPanel(ds){if(!ds)return'';const items=dayItems(ds);const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
@@ -1541,12 +1564,17 @@ function faqSearch(q){window._faqQ=q;q=(q||'').trim().toLowerCase();
 const CADENCE_DAYS={weekly:7,fortnightly:14,monthly:30,quarterly:92};
 function supplyLapsed(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])return false;return ageDays(c.last_order)>Math.round(CADENCE_DAYS[c.cadence]*1.5);}
 function supplyDue(c){if(!c.cadence||!c.last_order||!CADENCE_DAYS[c.cadence])return false;const d=CADENCE_DAYS[c.cadence],a=ageDays(c.last_order);return a>=d&&a<=Math.round(d*1.5);}
+function lastTouchpoint(cid){const md=M().filter(m=>m.customer_id===cid&&m.status==='done').map(m=>m.completed_at||m.date);
+  const ad=AC().filter(a=>a.customer_id===cid).map(a=>a.at||a.created_at);
+  const all=[...md,...ad].filter(Boolean).sort();return all.length?all[all.length-1]:null;}
+function visitDue(c){if(!c.visit_cadence||!CADENCE_DAYS[c.visit_cadence])return false;
+  const last=lastTouchpoint(c.id);if(!last)return true;return ageDays(last.slice(0,10))>=CADENCE_DAYS[c.visit_cadence];}
 function logOrderToday(cid){const c=customers.find(x=>x.id===cid);if(!c)return;c.last_order=today();c.updated_at=now();logActivity('note','Order logged',cid,null);persist();renderView();toast('Order dated today.');}
 function vAccounts(){
   if(viewArg){const c=CU().find(x=>x.id===viewArg);if(c)return acctPage(c);}
-  const q=(window._cq||'').toLowerCase();const td=today();const kf=window._caKam||'';const sf=window._caSeg||'';
+  const q=(window._cq||'').toLowerCase();const td=today();const kf=window._caKam||'';const sf=window._caSeg||'';const rf=window._caReg||'';
   let list=CU().filter(c=>(!q||(c.name+' '+(c.city||'')+' '+(c.segment||'')).toLowerCase().includes(q))
-    &&(!kf||(kf==='__none'?!c.kam_id:c.kam_id===kf))&&(!sf||(c.segment||'')===sf));
+    &&(!kf||(kf==='__none'?!c.kam_id:c.kam_id===kf))&&(!sf||(c.segment||'')===sf)&&(!rf||(c.region||'')===rf));
   const meta=c=>{const dls=openDeals().filter(d=>d.customer_id===c.id);return{
     nCo:CO().filter(x=>x.customer_id===c.id).length,
     open:T().filter(t=>t.customer_id===c.id&&t.status!=='done').length,
@@ -1557,17 +1585,19 @@ function vAccounts(){
   if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
   const segs=[...new Set(CU().map(c=>c.segment).filter(Boolean))].sort();
   const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))];
+  const regs=[...new Set(CU().map(c=>c.region).filter(Boolean))].sort();
   const view=_view.accounts||'list';
   const filters=`<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
     <select onchange="window._caKam=this.value;renderView()"><option value="">All KAMs</option><option value="__none"${kf==='__none'?' selected':''}>— No KAM —</option>${kams.map(id=>`<option value="${id}"${kf===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>
     <select onchange="window._caSeg=this.value;renderView()"><option value="">All segments</option>${segs.map(x=>`<option${sf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
-    ${(kf||sf||q)?`<button class="btn gh2 sm" onclick="window._cq='';window._caKam='';window._caSeg='';renderView()">Clear</button>`:''}
+    <select onchange="window._caReg=this.value;renderView()"><option value="">All regions</option>${regs.map(x=>`<option${rf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
+    ${(kf||sf||rf||q)?`<button class="btn gh2 sm" onclick="window._cq='';window._caKam='';window._caSeg='';window._caReg='';renderView()">Clear</button>`:''}
     ${viewToggle('accounts',view)}</div>`;
   let body;
   if(!list.length){body='<div class="card"><div class="empty">No accounts match. Add one, or clear the filters.</div></div>';}
   else if(view==='card'){
     body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>
-      <div class="ameta">${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM '+esc(pname(c.kam_id)):''}</div>
+      <div class="ameta">${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.region?' · '+esc(c.region):''}${c.kam_id?' · KAM '+esc(pname(c.kam_id)):''}</div>
       <div class="astats"><span>Contacts <b class="num">${m.nCo}</b></span><span>Open <b class="num">${m.open}</b></span>${m.dls?`<span>Deals <b class="num">${m.dls}</b> · ${fmtMoney(m.dv)}</span>`:''}</div>
       ${m.nt?`<div class="ameta" style="margin-top:6px"><span class="due ${m.nt.due&&m.nt.due<td?'over':m.nt.due===td?'today':''}">${m.nt.due?fmtD(m.nt.due):''}</span> ${esc(m.nt.title)}</div>`:'<div class="ameta" style="margin-top:6px;color:var(--t4)">No next action</div>'}</div>`;}).join('')}</div>`;
   }else{
@@ -2032,12 +2062,18 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
   <div class="setcard"><h4>Products & services</h4>
     <div class="chips">${products.map((d,i)=>`<span class="chip">${esc(d)}<button onclick="products.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newProd" placeholder="Add product / service" style="flex:1"><button class="btn sm" onclick="addProd()">Add</button></div></div>
+  <div class="setcard"><h4>Regions</h4>
+    <div class="chips">${regions.map((r,i)=>`<span class="chip">${esc(r)}<button onclick="regions.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
+    <div style="display:flex;gap:7px;margin-top:10px"><input id="newRegion" placeholder="Add region" style="flex:1"><button class="btn sm" onclick="addRegion()">Add</button></div>
+    <p class="note">Group accounts by region so travel plans can surface everyone nearby.</p></div>
   <div class="setcard"><h4>Data</h4>
     <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button></div>
   <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
   </div></div>`;}
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
+function addRegion(){const v=g('newRegion').value.trim();if(v&&!regions.includes(v)){regions.push(v);persist();renderView();}}
+function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
 
 function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._coAcct||'';
@@ -2079,6 +2115,7 @@ function getOrCreatePerson(nm,dept){if(!nm||/^me$/i.test(nm))return'me';let id=f
 function getOrCreateAccount(nm){if(!nm)return null;const c=CU().find(x=>x.name.toLowerCase()===nm.toLowerCase());if(c)return c.id;
   const n=now();const nc={id:uid(),name:nm,segment:'',city:'',dept:'',address:'',notes:'',next_action:null,next_action_due:null,created_at:n,updated_at:n};customers.push(nc);return nc.id;}
 function ensureDept(d){if(d&&!depts.includes(d))depts.push(d);return d||'';}
+function ensureRegion(r){if(r&&!regions.includes(r))regions.push(r);return r||'';}
 
 const CSVDEFS={
 tasks:{label:'Tasks & calls',cols:['title','type','owner','due','time','estimate_min','priority','department','account','status','follow_up','phone','call_when','notes'],
@@ -2101,17 +2138,18 @@ people:{label:'People',cols:['name','department','role','phone','email','notes']
   imp(o){if(!o.name)return'no name';const ex=P().find(x=>x.name.toLowerCase()===o.name.toLowerCase());const n=now();
     if(ex){if(o.department)ex.dept=ensureDept(o.department);if(o.role)ex.role=o.role;if(o.phone)ex.phone=o.phone;if(o.email)ex.email=o.email;if(o.notes)ex.notes=o.notes;ex.updated_at=n;return'updated';}
     people.push({id:uid(),name:o.name,dept:ensureDept(o.department),role:o.role||'',phone:o.phone||'',email:o.email||'',notes:o.notes||'',created_at:n,updated_at:n});return null;}},
-accounts:{label:'Accounts (customers)',cols:['name','kam','segment','city','department','address','cadence','last_order','supply_note','notes'],
-  example:['LuLu Mall','Priya Sharma','Retail','Kochi','Sales','Edappally, Kochi','monthly','2026-06-20','4 t/mo batters','Key account — monthly review'],
-  rows(){return CU().map(c=>[c.name,c.kam_id?pname(c.kam_id):'',c.segment||'',c.city||'',c.dept||'',c.address||'',c.cadence||'',c.last_order||'',c.supply_note||'',c.notes||'']);},
+accounts:{label:'Accounts (customers)',cols:['name','kam','segment','city','department','region','visit_cadence','address','cadence','last_order','supply_note','notes'],
+  example:['LuLu Mall','Priya Sharma','Retail','Kochi','Sales','South','monthly','Edappally, Kochi','monthly','2026-06-20','4 t/mo batters','Key account — monthly review'],
+  rows(){return CU().map(c=>[c.name,c.kam_id?pname(c.kam_id):'',c.segment||'',c.city||'',c.dept||'',c.region||'',c.visit_cadence||'',c.address||'',c.cadence||'',c.last_order||'',c.supply_note||'',c.notes||'']);},
   imp(o){if(!o.name)return'no name';const ex=CU().find(x=>x.name.toLowerCase()===o.name.toLowerCase());const n=now();
     const kamId=o.kam?getOrCreatePerson(o.kam,ensureDept(o.department)):null;
     const cad=/^(weekly|fortnightly|monthly|quarterly)$/i.test(o.cadence||'')?o.cadence.toLowerCase():'';
-    if(ex){['segment','city','address','notes','supply_note'].forEach(k=>{if(o[k])ex[k]=o[k];});if(o.department)ex.dept=ensureDept(o.department);
-      if(cad)ex.cadence=cad;if(o.last_order)ex.last_order=normD(o.last_order);
+    const visitCad=/^(weekly|fortnightly|monthly|quarterly)$/i.test(o.visit_cadence||'')?o.visit_cadence.toLowerCase():'';
+    if(ex){['segment','city','address','notes','supply_note'].forEach(k=>{if(o[k])ex[k]=o[k];});if(o.department)ex.dept=ensureDept(o.department);if(o.region)ex.region=ensureRegion(o.region);
+      if(cad)ex.cadence=cad;if(visitCad)ex.visit_cadence=visitCad;if(o.last_order)ex.last_order=normD(o.last_order);
       if(kamId){ex.kam_id=kamId;ex.people_ids=ex.people_ids||[];if(!ex.people_ids.includes(kamId))ex.people_ids.push(kamId);}
       ex.updated_at=n;return'updated';}
-    customers.push({id:uid(),name:o.name,segment:o.segment||'',city:o.city||'',dept:ensureDept(o.department),kam_id:kamId,people_ids:kamId?[kamId]:[],address:o.address||'',cadence:cad,last_order:o.last_order?normD(o.last_order):null,supply_note:o.supply_note||'',notes:o.notes||'',created_at:n,updated_at:n});return null;}},
+    customers.push({id:uid(),name:o.name,segment:o.segment||'',city:o.city||'',dept:ensureDept(o.department),region:ensureRegion(o.region),visit_cadence:visitCad,kam_id:kamId,people_ids:kamId?[kamId]:[],address:o.address||'',cadence:cad,last_order:o.last_order?normD(o.last_order):null,supply_note:o.supply_note||'',notes:o.notes||'',created_at:n,updated_at:n});return null;}},
 contacts:{label:'Contacts',cols:['account','name','role','phone','email'],example:['LuLu Mall','Rajesh Nair','Category Head','+91 98xxxxxx02','rajesh@example.com'],
   rows(){return CO().map(x=>[cname(x.customer_id),x.name,x.role||'',x.phone||'',x.email||'']);},
   imp(o){if(!o.name)return'no name';if(!o.account)return'no account';const cid=getOrCreateAccount(o.account);const n=now();
@@ -2335,10 +2373,10 @@ let editC=null;
 function openCust(id){editC=id?customers.find(x=>x.id===id):null;
   g('mCustTitle').textContent=editC?'Edit Account':'New Account';
   g('cName').value=editC?.name||'';g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
-  fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');g('cAddr').value=editC?.address||'';g('cCadence').value=editC?.cadence||'';g('cLastOrder').value=editC?.last_order||'';g('cSupplyNote').value=editC?.supply_note||'';g('cNotes').value=editC?.notes||'';
+  fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');fillRegion('cRegion',editC?.region||'');g('cVisitCadence').value=editC?.visit_cadence||'';g('cAddr').value=editC?.address||'';g('cCadence').value=editC?.cadence||'';g('cLastOrder').value=editC?.last_order||'';g('cSupplyNote').value=editC?.supply_note||'';g('cNotes').value=editC?.notes||'';
   g('cDel').style.display=editC?'':'none';g('mCust').classList.add('open');setTimeout(()=>g('cName').focus(),50);}
 function saveCust(){const nm=g('cName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,cadence:g('cCadence').value||'',last_order:g('cLastOrder').value||null,supply_note:g('cSupplyNote').value.trim(),address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
+  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,region:g('cRegion').value||'',visit_cadence:g('cVisitCadence').value||'',cadence:g('cCadence').value||'',last_order:g('cLastOrder').value||null,supply_note:g('cSupplyNote').value.trim(),address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
   if(editC)Object.assign(editC,d);else editC2push(d,n);
   if(d.kam_id){const cc=editC||customers[customers.length-1];cc.people_ids=cc.people_ids||[];if(!cc.people_ids.includes(d.kam_id))cc.people_ids.push(d.kam_id);}
   closeM();persist();renderView();}
@@ -2422,6 +2460,39 @@ function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('T
   closeM();persist();renderView();}
 async function delMeeting(){if(editM&&await askConfirm('Delete meeting?',{ok:'Delete',danger:true})){editM.deleted=true;editM.updated_at=now();closeM();plTab='meet';nav('planner');toast('Deleted.');}}
 
+/* ═══ plan-ahead prompt — travel + cadence-due suggestions for week/month planning ═══ */
+function planPeriodRange(tab,anchor){
+  if(tab==='week'){const mon=mondayOf(anchor);return[mon,addDays(mon,6)];}
+  const mk=monthKey(anchor),first=mk+'-01';const d=new Date(first+'T12:00');
+  const last=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+  return[first,last];}
+function openPlanPrompt(tab,anchor){
+  const[start,end]=planPeriodRange(tab,anchor);
+  g('planPeriodLabel').textContent=tab==='week'?('week of '+fmtD(start)):new Date(start+'T12:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  window._planCtx={tab,start,end};
+  g('planRegion').innerHTML='<option value="">Not travelling</option>'+regions.map(r=>`<option>${esc(r)}</option>`).join('');
+  g('planTripFrom').value=start;g('planTripTo').value=end;
+  g('planSuggestions').innerHTML='';g('planAddBtn').style.display='none';
+  g('mPlan').classList.add('open');}
+function planSuggest(){
+  const region=g('planRegion').value;const{start,end}=window._planCtx;
+  const cands=new Map();
+  if(region)CU().filter(c=>c.region===region).forEach(c=>cands.set(c.id,{c,reasons:['travelling to '+region]}));
+  CU().forEach(c=>{if(visitDue(c)){const e=cands.get(c.id)||{c,reasons:[]};e.reasons.push('due for a '+c.visit_cadence+' touchpoint');cands.set(c.id,e);}});
+  const list=[...cands.values()].filter(({c})=>!M().some(m=>m.customer_id===c.id&&m.status==='open'&&m.date>=start&&m.date<=end));
+  if(!list.length){g('planSuggestions').innerHTML='<p class="note">No suggestions — nothing overdue, and no accounts tagged in that region.</p>';g('planAddBtn').style.display='none';return;}
+  g('planSuggestions').innerHTML='<div class="fld"><label>Suggested touchpoints</label>'+
+    list.map(({c,reasons})=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="plan-sugg" data-cid="${c.id}" checked><span>${esc(c.name)} <span class="note">— ${esc(reasons.join(', '))}</span></span></label>`).join('')+'</div>';
+  g('planAddBtn').style.display='';}
+function planAddSelected(){
+  const{start}=window._planCtx;const region=g('planRegion').value;const tripFrom=g('planTripFrom').value||start;
+  const checked=[...g('planSuggestions').querySelectorAll('.plan-sugg:checked')].map(el=>el.dataset.cid);
+  const n=now();let added=0;
+  checked.forEach(cid=>{const c=CU().find(x=>x.id===cid);if(!c)return;
+    const owner=c.kam_id||'me';
+    tasks.push({id:uid(),type:'task',title:(region&&c.region===region?'Visit — ':'Touch base — ')+c.name,owner,customer_id:c.id,dept:c.dept||'',due:tripFrom,original_due:tripFrom,estimate_min:30,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'Suggested while planning',created_at:n,updated_at:n});added++;});
+  persist();closeM();renderView();toast(added?added+' added to your plan.':'Nothing selected.');}
+
 let editD=null,decMid=null;
 function openDecision(id,mid){editD=id?decisions.find(x=>x.id===id):null;decMid=mid||editD?.meeting_id||null;
   g('mDecTitle').textContent=editD?'Edit Decision':'Record Decision';
@@ -2465,7 +2536,9 @@ async function quickNew(kind,sel){const n=now();
     if((sel||'tCust')==='dlCust'&&g('dlContact'))fillContact('dlContact',id,'');
     if((sel||'tCust')==='tCust'&&g('tContact'))fillContact('tContact',id,'');return;}
   if(kind==='prod'){const v=((await askText('New product / service:',{title:'New product'}))||'').trim();if(!v)return;
-    if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}}
+    if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}
+  if(kind==='region'){const v=((await askText('New region:',{title:'New region'}))||'').trim();if(!v)return;
+    if(!regions.includes(v))regions.push(v);persist();fillRegion(sel||'cRegion',v);return;}}
 function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   if(g('csvPick'))csvPickUI();
   if(g('faqQ')&&window._faqQ)faqSearch(window._faqQ);
