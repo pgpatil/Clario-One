@@ -547,7 +547,7 @@ canvas{display:block;max-width:100%}
   <div class="mbody">
   <div class="fld"><label>Title <span class="req">*</span></label><input id="mTitle2"></div>
   <div class="g2">
-    <div class="fld"><label>Date</label><input type="date" id="mDate"></div>
+    <div class="fld"><label>Date</label><input type="date" id="mDate" onchange="meetingRepeatUI()"></div>
     <div class="fld"><label>Time</label><input type="time" id="mTime"></div>
     <div class="fld"><label>Duration (min)</label><input type="number" id="mDur" min="15" step="15" placeholder="60"></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="mDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','mDept')">+</button></div></div>
@@ -555,6 +555,8 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Repeat</label><select id="mRepeat" onchange="meetingRepeatUI()"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
     <div class="fld" id="fMRepeatN" style="display:none"><label>Occurrences (including this one)</label><input type="number" id="mRepeatN" min="2" max="52" value="8"></div>
   </div>
+  <div class="fld" id="fMRepeatWd" style="display:none"><label>Repeat on</label><div class="attlist" id="mRepeatWd"></div></div>
+  <div class="fld" id="fMRepeatMonth" style="display:none"><label>Repeat on</label><select id="mRepeatMonth"></select></div>
   <div class="fld"><label>Attendees</label><div class="attlist" id="mAtt"></div></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="mDel" style="display:none" onclick="delMeeting()">Delete</button>
@@ -624,6 +626,32 @@ const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/
 const fmtD=ds=>ds?new Date(ds+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
 const fmtDT=s=>s?new Date(s).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 const fmtMoney=v=>{v=+v||0;if(v>=1e7)return'₹'+(v/1e7).toFixed(2).replace(/\.00$/,'')+' Cr';if(v>=1e5)return'₹'+(v/1e5).toFixed(2).replace(/\.00$/,'')+' L';return'₹'+v.toLocaleString('en-IN');};
+/* ═══ recurrence calendar math (weekday-aware weekly, drift-free monthly) ═══ */
+const WEEKDAY_LBL=['S','M','T','W','T','F','S'],WEEKDAY_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],NTH_LBL=['1st','2nd','3rd','4th'];
+const dateWeekday=ds=>new Date(ds+'T12:00').getDay();
+const daysInMonth=(y,m)=>new Date(y,m+1,0).getDate();
+function addMonthsClamped(ds,n,day){const d=new Date(ds+'T12:00');let y=d.getFullYear(),m=d.getMonth()+n;y+=Math.floor(m/12);m=((m%12)+12)%12;
+  const dim=daysInMonth(y,m);return y+'-'+String(m+1).padStart(2,'0')+'-'+String(Math.min(day,dim)).padStart(2,'0');}
+function nthWeekdayOfMonth(y,m,weekday,nth){const dim=daysInMonth(y,m);const matches=[];
+  for(let day=1;day<=dim;day++){if(new Date(y,m,day).getDay()===weekday)matches.push(day);}
+  const day=nth===-1?matches[matches.length-1]:(matches[nth-1]||matches[matches.length-1]);
+  return y+'-'+String(m+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');}
+function weekdayPosition(ds){const d=new Date(ds+'T12:00');const day=d.getDate(),weekday=d.getDay();
+  return{nth:Math.ceil(day/7),isLast:(day+7)>daysInMonth(d.getFullYear(),d.getMonth()),weekday};}
+function buildRepeatDates(startDate,repeat,count,opts){opts=opts||{};const dates=[startDate];
+  if(repeat==='daily'){for(let i=1;i<count;i++)dates.push(addDays(startDate,i));return dates;}
+  if(repeat==='weekly'||repeat==='fortnightly'){const interval=repeat==='fortnightly'?2:1;
+    const wds=(opts.weekdays&&opts.weekdays.length)?[...opts.weekdays].sort((a,b)=>a-b):[dateWeekday(startDate)];
+    let weekStart=addDays(startDate,-dateWeekday(startDate));
+    while(dates.length<count){for(const wd of wds){if(dates.length>=count)break;const cand=addDays(weekStart,wd);if(cand>startDate)dates.push(cand);}weekStart=addDays(weekStart,7*interval);}
+    return dates.sort();}
+  if(repeat==='monthly'){
+    if(opts.monthMode==='weekday'){const{nth,isLast,weekday}=weekdayPosition(startDate);
+      for(let i=1;i<count;i++){const d=new Date(startDate+'T12:00');let m=d.getMonth()+i,y=d.getFullYear();y+=Math.floor(m/12);m=((m%12)+12)%12;
+        dates.push(nthWeekdayOfMonth(y,m,weekday,isLast?-1:nth));}
+    }else{const day=new Date(startDate+'T12:00').getDate();for(let i=1;i<count;i++)dates.push(addMonthsClamped(startDate,i,day));}
+    return dates;}
+  return dates;}
 function defaultFollowUp(dueDate){const td=today();
   if(dueDate&&dueDate>td)return addDays(dueDate,-1)+'T09:00';
   const d=new Date(Date.now()+3600000);const hhmm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -2234,7 +2262,8 @@ function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
     let a=activities.find(x=>x.task_id===t.id&&!x.deleted);const n2=now();
     if(a){a.text=lbl;if(t.notes_html)a.html=t.notes_html;a.kind=t.type==='call'?'call':'note';a.updated_at=n2;}
     else activities.push({id:uid(),kind:t.type==='call'?'call':'note',text:lbl,html:t.notes_html||null,task_id:t.id,customer_id:t.customer_id,deal_id:t.deal_id||null,contact_id:t.contact_id||null,at:n2,created_at:n2,updated_at:n2});}
-  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();const nd=addDays(base,REPEAT_DAYS[t.repeat]);const n2=now();
+  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();
+    const nd=t.repeat==='monthly'?addMonthsClamped(base,1,new Date(base+'T12:00').getDate()):addDays(base,REPEAT_DAYS[t.repeat]);const n2=now();
     tasks.push({id:uid(),type:t.type,title:t.title,owner:t.owner,priority:t.priority,dept:t.dept,customer_id:t.customer_id,contact_id:t.contact_id,deal_id:t.deal_id,due:nd,original_due:nd,at:t.at,estimate_min:t.estimate_min,repeat:t.repeat,phone:t.phone,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
     toast('Next occurrence scheduled '+fmtD(nd)+'.');}
   persist();renderView();}
@@ -2304,12 +2333,23 @@ async function saveDeal(){const nm=g('dlName').value.trim();if(!nm){toast('Deal 
 async function delDeal(){if(editDl&&await askConfirm('Delete deal '+editDl.name+'?',{ok:'Delete',danger:true})){editDl.deleted=true;editDl.updated_at=now();closeM();nav('pipeline');toast('Deleted.');}}
 
 let editM=null;
-function meetingRepeatUI(){const on=!!g('mRepeat').value&&!editM;g('fMRepeatN').style.display=on?'':'none';}
+function meetingRepeatUI(){const rep=g('mRepeat').value,on=!!rep&&!editM;const ds=g('mDate').value||today();
+  g('fMRepeatN').style.display=on?'':'none';
+  const wdOn=on&&(rep==='weekly'||rep==='fortnightly');g('fMRepeatWd').style.display=wdOn?'':'none';
+  if(wdOn){const cur=new Set([...g('mRepeatWd').querySelectorAll('.attchip.on')].map(c=>+c.dataset.wd));
+    const keep=g('mRepeatWd').dataset.forDate===ds&&cur.size?cur:new Set([dateWeekday(ds)]);
+    g('mRepeatWd').dataset.forDate=ds;
+    g('mRepeatWd').innerHTML=WEEKDAY_LBL.map((lbl,i)=>`<span class="attchip ${keep.has(i)?'on':''}" data-wd="${i}" title="${WEEKDAY_FULL[i]}" onclick="this.classList.toggle('on')">${lbl}</span>`).join('');}
+  const moOn=on&&rep==='monthly';g('fMRepeatMonth').style.display=moOn?'':'none';
+  if(moOn){const day=new Date(ds+'T12:00').getDate();const{nth,isLast}=weekdayPosition(ds);
+    const wdLbl=WEEKDAY_FULL[dateWeekday(ds)];const nthLbl=isLast?'last':NTH_LBL[nth-1]||NTH_LBL[3];
+    g('mRepeatMonth').innerHTML=`<option value="date">Monthly on day ${day}</option><option value="weekday">Monthly on the ${nthLbl} ${wdLbl}</option>`;}}
 function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   g('mMeetTitle').textContent=editM?'Edit Meeting':'New Meeting';
   g('mTitle2').value=editM?.title||'';g('mDate').value=editM?.date||presetDate||today();g('mTime').value=editM?.time||'';g('mDur').value=editM?.duration||60;
   fillDept('mDept',editM?.dept||'');fillCust('mCustSel',editM?.customer_id||'');
   g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;
+  g('mRepeatWd').dataset.forDate='';
   meetingRepeatUI();
   const selSet=new Set(editM?.attendee_ids||[]);
   g('mAtt').innerHTML=P().map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('')||'<span class="note">Add people first.</span>';
@@ -2320,10 +2360,12 @@ function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('T
   const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,repeat,updated_at:n};
   if(editM)Object.assign(editM,d);
   else{const repGroup=repeat?uid():null;const first=Object.assign({id:uid(),status:'open',created_at:n,repeat_group:repGroup},d);meetings.push(first);
-    if(repeat&&REPEAT_DAYS[repeat]){const count=Math.min(52,Math.max(2,+g('mRepeatN').value||8));
-      for(let i=1;i<count;i++){const nd=addDays(d.date,REPEAT_DAYS[repeat]*i);
-        meetings.push(Object.assign({},d,{id:uid(),status:'open',created_at:n,updated_at:n,date:nd,repeat_group:repGroup}));}
-      toast(count+' occurrences scheduled.');}}
+    if(repeat){const count=Math.min(52,Math.max(2,+g('mRepeatN').value||8));
+      const weekdays=[...g('mRepeatWd').querySelectorAll('.attchip.on')].map(c=>+c.dataset.wd);
+      const monthMode=g('mRepeatMonth').value||'date';
+      const dates=buildRepeatDates(d.date,repeat,count,{weekdays,monthMode});
+      dates.slice(1).forEach(nd=>meetings.push(Object.assign({},d,{id:uid(),status:'open',created_at:n,updated_at:n,date:nd,repeat_group:repGroup})));
+      toast(dates.length+' occurrences scheduled.');}}
   closeM();persist();renderView();}
 async function delMeeting(){if(editM&&await askConfirm('Delete meeting?',{ok:'Delete',danger:true})){editM.deleted=true;editM.updated_at=now();closeM();plTab='meet';nav('planner');toast('Deleted.');}}
 
