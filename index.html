@@ -1141,7 +1141,7 @@ function STPILL(m){return m.status==='done'?'<span class="pill g">Held</span>':m
 async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)return;
   const out=await askChoice('How did this meeting go?',[{label:'Held — mark done',value:'held'},{label:'Rescheduled — set new date',value:'resched'},{label:'Not attended',value:'noshow'}],{title:'Close out meeting'});
   if(!out)return;const n=now();
-  if(out==='held'){meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=n;});m.status='done';m.updated_at=n;if(m.customer_id){if(m.notes_html)logMeetingNotes(m);else logActivity('meeting','Meeting held: '+m.title,m.customer_id,null);}persist();renderView();toast('Marked held. Agenda items raised.');}
+  if(out==='held'){meetingAgenda(m).forEach(a=>{a.status='raised';a.updated_at=n;});m.status='done';m.updated_at=n;m.completed_at=n;if(m.customer_id){if(m.notes_html)logMeetingNotes(m);else logActivity('meeting','Meeting held: '+m.title,m.customer_id,null);}persist();renderView();toast('Marked held. Agenda items raised.');}
   else if(out==='noshow'){m.status='noshow';m.updated_at=n;persist();renderView();toast('Marked not attended.');}
   else{const nd=await askText('New date:',{title:'Reschedule',type:'date',value:addDays(m.date||today(),7),ok:'Reschedule'});if(!nd)return;
     m.status='rescheduled';m.updated_at=n;
@@ -1171,9 +1171,12 @@ function vCommit(){const td=today();
   const chase=waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
   const mine=openMine().filter(t=>t.type!=='call').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')||['high','medium','low'].indexOf(a.priority)-['high','medium','low'].indexOf(b.priority));
   const calls=T().filter(t=>t.type==='call'&&t.status!=='done').sort((a,b)=>(a.when||'9').localeCompare(b.when||'9'));
-  const done=T().filter(t=>t.status==='done').sort((a,b)=>(b.updated_at||'').localeCompare(a.updated_at||'')).slice(0,15);
+  const doneAll=T().filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||''));
   const dv=window._cd||'';
   const filt=l=>dv?l.filter(t=>t.dept===dv):l;
+  const cdF=window._cDoneField||'completed_at',cdFrom=window._cDoneFrom||'',cdTo=window._cDoneTo||'';
+  const doneFiltered=filt(doneAll).filter(t=>{if(!(cdFrom||cdTo))return true;const v=(t[cdF]||'').slice(0,10);if(!v)return false;if(cdFrom&&v<cdFrom)return false;if(cdTo&&v>cdTo)return false;return true;});
+  const done=(cdFrom||cdTo)?doneFiltered:doneFiltered.slice(0,15);
   const groups={};filt(chase).forEach(t=>{(groups[t.owner]=groups[t.owner]||[]).push(t);});
   const chaseHtml=Object.entries(groups).map(([pid,list])=>seccard('Waiting on '+esc(pname(pid)),list.length,list.map(t=>trow(t)).join(''),'')).join('')||'<div class="card"><div class="empty">Nothing delegated and open. Delegate with @name in quick capture.</div></div>';
   const bulk=(cTab==='chase'||cTab==='mine');
@@ -1189,7 +1192,8 @@ function vCommit(){const td=today();
     <button class="tab ${cTab==='mine'?'on':''}" onclick="cTab='mine';renderView()">My plate <span class="num">(${mine.length})</span></button>
     <button class="tab ${cTab==='calls'?'on':''}" onclick="cTab='calls';renderView()">Calls <span class="num">(${calls.length})</span></button>
     <button class="tab ${cTab==='done'?'on':''}" onclick="cTab='done';renderView()">Done</button></div>
-  <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select></div>
+  <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
+    ${cTab==='done'?`<select onchange="window._cDoneField=this.value;renderView()" title="Filter by date"><option value="completed_at"${cdF==='completed_at'?' selected':''}>Completed</option><option value="created_at"${cdF==='created_at'?' selected':''}>Created</option><option value="updated_at"${cdF==='updated_at'?' selected':''}>Modified</option></select><input type="date" value="${cdFrom}" title="From" onchange="window._cDoneFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${cdTo}" title="To" onchange="window._cDoneTo=this.value;renderView()" style="max-width:135px">${(cdFrom||cdTo)?`<button class="btn gh2 sm" onclick="window._cDoneFrom='';window._cDoneTo='';renderView()">Clear dates</button>`:''}`:''}</div>
   ${bulkbar}${body}`;}
 var _bulkSel=new Set();
 function bulkTog(id,el){if(el&&el.checked)_bulkSel.add(id);else _bulkSel.delete(id);const b=g('bulkbar'),n=g('bulkn');if(b){b.style.display=_bulkSel.size?'':'none';if(n)n.textContent=_bulkSel.size+' selected';}}
@@ -1200,7 +1204,7 @@ function bulkSnooze(){_bulkList().forEach(t=>{
   const fd=(t.follow_up||'').slice(0,10),ft=(t.follow_up||'').slice(11,16)||'09:00';
   const baseDate=fd&&fd>=today()?fd:today();
   t.follow_up=addDays(baseDate,1)+'T'+ft;t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Follow-ups pushed.');}
-function bulkDone(){_bulkList().forEach(t=>{t.status='done';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Marked done.');}
+function bulkDone(){_bulkList().forEach(t=>{t.status='done';t.updated_at=now();t.completed_at=t.updated_at;});_bulkSel.clear();persist();reRender();toast('Marked done.');}
 async function bulkReassign(){const who=await askChoice('Reassign selected to:',P().map(p=>({label:p.name,value:p.id})),{title:'Reassign'});if(!who)return;_bulkList().forEach(t=>{t.owner=who;t.status='waiting';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Reassigned.');}
 
 /* ═══ PEOPLE ═══ */
@@ -1226,7 +1230,7 @@ function vPeople(){
 
 function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='open');
   const w=waiting().filter(t=>t.owner===p.id).sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
-  const doneRecent=T().filter(t=>t.owner===p.id&&t.status==='done').sort((a,b)=>(b.updated_at||'').localeCompare(a.updated_at||'')).slice(0,5);
+  const doneRecent=T().filter(t=>t.owner===p.id&&t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||'')).slice(0,5);
   const decs=DC().filter(d=>(d.people_ids||[]).includes(p.id)).slice(-5).reverse();
   const nm=esc(p.name);
   return`<span class="backlink" onclick="nav('people')">← People</span>`+
@@ -1246,6 +1250,7 @@ function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised
 function agendaDel(id){const a=agenda.find(x=>x.id===id);if(a){a.deleted=true;a.updated_at=now();persist();renderView();}}
 
 function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const own=window._tOwn||'';const st=window._tSt||'open';const dp=window._tDp||'';
+  const dfF=window._tDateField||'',dfFrom=window._tDateFrom||'',dfTo=window._tDateTo||'';
   let list=T().filter(t=>{
     if(st==='open'&&t.status==='done')return false;
     if(st==='overdue'&&!(t.status!=='done'&&(t.type==='call'?(t.when||'').slice(0,10):t.due)&&((t.type==='call'?(t.when||'').slice(0,10):t.due)<td)))return false;
@@ -1254,6 +1259,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
     if(own&&own!=='me'&&t.owner!==own)return false;
     if(dp&&(t.dept||'')!==dp)return false;
     if(q&&!((t.title+' '+(cname(t.customer_id))+' '+pname(t.owner)+' '+(t.dept||'')).toLowerCase().includes(q)))return false;
+    if(dfF&&(dfFrom||dfTo)){const v=(t[dfF]||'').slice(0,10);if(!v)return false;if(dfFrom&&v<dfFrom)return false;if(dfTo&&v>dfTo)return false;}
     return true;});
   const dd=t=>t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
   const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status};
@@ -1264,7 +1270,9 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
     <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
     <select onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
     <select onchange="window._tDp=this.value;renderView()"><option value="">All departments</option>${depts2.map(d=>`<option${dp===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
-    ${(q||own||dp||st!=='open')?`<button class="btn gh2 sm" onclick="window._tq='';window._tOwn='';window._tDp='';window._tSt='open';renderView()">Clear</button>`:''}</div>`;
+    <select onchange="window._tDateField=this.value;renderView()" title="Filter by date"><option value="">Any date</option><option value="created_at"${dfF==='created_at'?' selected':''}>Created</option><option value="updated_at"${dfF==='updated_at'?' selected':''}>Modified</option><option value="completed_at"${dfF==='completed_at'?' selected':''}>Completed</option></select>
+    ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._tDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._tDateTo=this.value;renderView()" style="max-width:135px">`:''}
+    ${(q||own||dp||st!=='open'||dfF)?`<button class="btn gh2 sm" onclick="window._tq='';window._tOwn='';window._tDp='';window._tSt='open';window._tDateField='';window._tDateFrom='';window._tDateTo='';renderView()">Clear</button>`:''}</div>`;
   const rows=list.map(t=>{const d=dd(t);const over=t.status!=='done'&&d&&d<td;
     return`<tr class="click" onclick="nav('task','${t.id}')"><td><span class="pri ${t.priority||'medium'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${esc(t.title)}</td><td>${t.type==='call'?'<span class="pill b">Call</span>':''}${t.owner&&t.owner!=='me'?esc(pname(t.owner)):'<span style="color:var(--t4)">Me</span>'}</td><td>${t.customer_id?esc(cname(t.customer_id)):''}</td><td>${esc(t.dept||'')}</td><td>${d?`<span class="due ${over?'over':d===td?'today':''}">${fmtD(d)}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${t.status==='done'?'<span class="pill g">done</span>':t.status==='waiting'?'<span class="pill a">waiting</span>':'<span class="pill b">open</span>'}</td></tr>`;}).join('');
   const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
@@ -1313,15 +1321,19 @@ async function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
   openSummaryWindow(m.title+' — Minutes of Meeting',buildMeetingSummary(m,present),meetingSummaryText(m,present));}
 
 function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(window._mq||'').toLowerCase();
+  const dfF=window._mDateField||'',dfFrom=window._mDateFrom||'',dfTo=window._mDateTo||'';
   let list=M().filter(m=>{
     if(sf==='upcoming'&&!(m.status!=='done'&&m.status!=='noshow'&&m.date>=td))return false;
     if(sf==='past'&&!(m.status==='done'||m.status==='noshow'||m.date<td))return false;
     if(q&&!((m.title+' '+cname(m.customer_id)+' '+(m.attendee_ids||[]).map(pname).join(' ')+' '+(m.dept||'')).toLowerCase().includes(q)))return false;
+    if(dfF&&(dfFrom||dfTo)){const v=(m[dfF]||'').slice(0,10);if(!v)return false;if(dfFrom&&v<dfFrom)return false;if(dfTo&&v>dfTo)return false;}
     return true;});
   list=sf==='past'?list.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||''))):list.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
   const filters=`<div class="filters"><input placeholder="Search title, account, attendee, dept" value="${esc(window._mq||'')}" oninput="window._mq=this.value;clearTimeout(window._mqt);window._mqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
     <select onchange="window._mSt=this.value;renderView()"><option value="upcoming"${sf==='upcoming'?' selected':''}>Upcoming</option><option value="past"${sf==='past'?' selected':''}>Past</option><option value="all"${sf==='all'?' selected':''}>All</option></select>
-    ${(q||sf!=='upcoming')?`<button class="btn gh2 sm" onclick="window._mq='';window._mSt='upcoming';renderView()">Clear</button>`:''}</div>`;
+    <select onchange="window._mDateField=this.value;renderView()" title="Filter by date"><option value="">Any date</option><option value="created_at"${dfF==='created_at'?' selected':''}>Created</option><option value="updated_at"${dfF==='updated_at'?' selected':''}>Modified</option><option value="completed_at"${dfF==='completed_at'?' selected':''}>Completed</option></select>
+    ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._mDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._mDateTo=this.value;renderView()" style="max-width:135px">`:''}
+    ${(q||sf!=='upcoming'||dfF)?`<button class="btn gh2 sm" onclick="window._mq='';window._mSt='upcoming';window._mDateField='';window._mDateFrom='';window._mDateTo='';renderView()">Clear</button>`:''}</div>`;
   const body=list.length?`<div class="card">${list.map(mrowHtml).join('')}</div>`:'<div class="card"><div class="empty">No meetings match. Add one, or import from Outlook (.ics).</div></div>';
   return pagehead('MEETINGS','Meetings',list.length+' shown',
     `<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button><button class="btn sm" onclick="openMeeting()">+ Meeting</button>`)+filters+body;}
@@ -1568,7 +1580,7 @@ function setNextAction(cid){const c=customers.find(x=>x.id===cid);const t=g('naT
   tasks.push({id:uid(),type:'task',title:t,owner,is_next_action:true,customer_id:cid,dept:c.dept||'',due,original_due:due,at:null,estimate_min:5,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'',created_at:n,updated_at:n});
   c.updated_at=now();persist();renderView();toast('Next action set — it is now a task.');}
 async function doneNextAction(cid){const c=customers.find(x=>x.id===cid);if(!c)return;const cur=acctNextTask(cid);
-  if(cur){cur.status='done';cur.updated_at=now();logActivity('note','Done: '+cur.title,cid,null);}
+  if(cur){cur.status='done';cur.updated_at=now();cur.completed_at=cur.updated_at;logActivity('note','Done: '+cur.title,cid,null);}
   const nxt=await askText('Done ✓ logged. Next action for '+c.name+'?',{title:'Next action',placeholder:'Leave blank to skip',ok:'Set'});
   if(nxt&&nxt.trim()){const d=await askText('Due date for this next action:',{title:'Due date',type:'date',value:addDays(today(),3),ok:'Set'});const due=(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))?d:addDays(today(),3);const n=now();const owner=c.kam_id||'me';
     tasks.push({id:uid(),type:'task',title:nxt.trim(),owner,is_next_action:true,customer_id:cid,dept:c.dept||'',due,original_due:due,at:null,estimate_min:5,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'',created_at:n,updated_at:n});}
@@ -1872,7 +1884,7 @@ function vDash(){const td=today();
     body=`<div class="kpis">
       <div class="kpi ${overdue.length?'bad':''}" onclick="cTab='mine';nav('commit')"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
       <div class="kpi ${waiting().length?'warn':''}" onclick="cTab='chase';nav('commit')"><div class="kv num">${waiting().length}</div><div class="kl">Delegated open</div></div>
-      <div class="kpi" onclick="cTab='done';nav('commit')"><div class="kv num">${T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=addDays(td,-7)).length}</div><div class="kl">Done · 7d</div></div>
+      <div class="kpi" onclick="cTab='done';nav('commit')"><div class="kv num">${T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=addDays(td,-7)).length}</div><div class="kl">Done · 7d</div></div>
       <div class="kpi" onclick="dTool='impact';nav('decide')"><div class="kv num">${OP().filter(o=>o.status!=='done').length}</div><div class="kl">Improvements open</div></div></div>
     <div class="grid2">
     <div class="card"><div class="ch">Throughput — 8 weeks</div><div class="cb"><canvas id="trendCv" style="width:100%;height:220px"></canvas></div></div>
@@ -1908,7 +1920,7 @@ function vDash(){const td=today();
 
 /* ═══ REVIEW ═══ */
 function vReview(){const td=today(),wk=addDays(td,-7);
-  const doneW=T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=wk);
+  const doneW=T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=wk);
   const createdW=T().filter(t=>(t.created_at||'').slice(0,10)>=wk);
   const overdue=T().filter(t=>t.status!=='done'&&((t.type==='call'?(t.when||'').slice(0,10):t.due)||'')<td&&(t.type==='call'?t.when:t.due));
   const stuck=waiting().filter(t=>t.follow_up&&t.follow_up<td);
@@ -1932,7 +1944,7 @@ function vReview(){const td=today(),wk=addDays(td,-7);
   <div class="card"><div class="ch">Set next week</div><div class="cb" style="font-size:12.5px;color:var(--t3)">Open the planner and write next week's three priorities while this review is fresh. <button class="btn sm" style="margin-left:8px" onclick="plTab='week';plAnchor=addDays(today(),7);nav('planner')">Plan next week →</button></div></div>`;}
 function exportReview(){const td=today();const lines=['# Weekly Review — '+td,''];
   const overdue=T().filter(t=>t.status!=='done'&&t.due&&t.due<td);
-  lines.push('Done (7d): '+T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=addDays(td,-7)).length,'Overdue: '+overdue.length,'Stuck delegations: '+waiting().filter(t=>t.follow_up&&t.follow_up<td).length,'Open pipeline: '+fmtMoney(openDeals().reduce((a,d)=>a+(+d.value||0),0)),'','## Overdue items');
+  lines.push('Done (7d): '+T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=addDays(td,-7)).length,'Overdue: '+overdue.length,'Stuck delegations: '+waiting().filter(t=>t.follow_up&&t.follow_up<td).length,'Open pipeline: '+fmtMoney(openDeals().reduce((a,d)=>a+(+d.value||0),0)),'','## Overdue items');
   overdue.forEach(t=>lines.push('- '+t.title+' — due '+(t.original_due||t.due)+' ('+ageDays(t.original_due||t.due)+'d), '+(t.dept||'—')+', owner '+pname(t.owner)));
   lines.push('','## Waiting on people');
   waiting().forEach(t=>lines.push('- '+pname(t.owner)+': '+t.title+(t.follow_up?' — follow up '+fmtDT(t.follow_up):'')));
@@ -2206,14 +2218,16 @@ function saveTask(){const title=g('tTitle').value.trim();if(!title){toast('Title
   const d={title,type:g('tType').value,owner:g('tOwner').value,priority:g('tPri').value,dept:g('tDept').value,customer_id:g('tCust').value||null,contact_id:g('tContact').value||null,deal_id:window._presetDeal||null,
     due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||5,repeat:g('tRepeat').value||'',follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
     status:g('tStatus').value,notes:g('tNotes').value.trim(),updated_at:n};
-  if(editT){if(!editT.original_due&&d.due)d.original_due=d.due;Object.assign(editT,d);}
-  else tasks.push(Object.assign({id:uid(),created_at:n,original_due:d.due},d));
+  if(editT){const wasDone=editT.status==='done';if(d.status==='done'&&!wasDone)d.completed_at=n;else if(d.status!=='done'&&wasDone)d.completed_at=null;
+    if(!editT.original_due&&d.due)d.original_due=d.due;Object.assign(editT,d);}
+  else{if(d.status==='done')d.completed_at=n;tasks.push(Object.assign({id:uid(),created_at:n,original_due:d.due},d));}
   closeM();persist();renderView();}
 async function delTask(){if(editT&&await askConfirm('Delete this item? This cannot be undone.',{ok:'Delete',danger:true})){editT.deleted=true;editT.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
 const REPEAT_DAYS={daily:1,weekly:7,fortnightly:14,monthly:30};
 function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
   const wasOpen=t.status!=='done';
   t.status=t.status==='done'?(t.owner!=='me'?'waiting':'open'):'done';t.updated_at=now();
+  t.completed_at=t.status==='done'?t.updated_at:null;
   if(wasOpen&&t.status==='done'&&t.customer_id){const who=t.contact_id?(CO().find(c=>c.id===t.contact_id)||{}).name:'';const lbl=(t.type==='call'?'Call: ':'Done: ')+t.title+(who?' — '+who:'');
     let a=activities.find(x=>x.task_id===t.id&&!x.deleted);const n2=now();
     if(a){a.text=lbl;if(t.notes_html)a.html=t.notes_html;a.kind=t.type==='call'?'call':'note';a.updated_at=n2;}
@@ -2357,7 +2371,7 @@ function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')qui
   const qc=g('quadCv');if(qc)drawQuad(qc,OP());
   const tc=g('trendCv');if(tc){const td=today();const labels=[],done=[],added=[];
     for(let w=7;w>=0;w--){const s=addDays(mondayOf(td),-7*w),e=addDays(s,7);labels.push(fmtD(s));
-      done.push(T().filter(t=>t.status==='done'&&(t.updated_at||'').slice(0,10)>=s&&(t.updated_at||'').slice(0,10)<e).length);
+      done.push(T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=s&&(t.completed_at||t.updated_at||'').slice(0,10)<e).length);
       added.push(T().filter(t=>(t.created_at||'').slice(0,10)>=s&&(t.created_at||'').slice(0,10)<e).length);}
     drawTrend(tc,labels,done,added);}
   const dc=g('deptCv');if(dc){const td=today();const m={};T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td).forEach(t=>{m[t.dept||'—']=(m[t.dept||'—']||0)+1;});
