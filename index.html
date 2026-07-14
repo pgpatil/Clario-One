@@ -437,16 +437,22 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Owner</label><div style="display:flex;gap:6px"><select id="tOwner" onchange="ownerAutofill()" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNew('person')">+</button></div></div>
     <div class="fld"><label>Priority</label><select id="tPri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="tDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept')">+</button></div></div>
-    <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue" onchange="dueChanged()"></div>
+    <div class="fld" id="fDue"><label>Due date</label><input type="date" id="tDue" onchange="dueChanged();taskRepeatUI()"></div>
     <div class="fld" id="fAt"><label>Time (for day plan)</label><input type="time" id="tAt"></div>
     <div class="fld" id="fEst"><label>Estimate (min)</label><input type="number" id="tEst" min="5" step="5" placeholder="30"></div>
-    <div class="fld" id="fRepeat"><label>Repeat</label><select id="tRepeat"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+    <div class="fld" id="fRepeat"><label>Repeat</label><select id="tRepeat" onchange="taskRepeatUI()"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
     <div class="fld" id="fFup" style="display:none"><label>Follow up on</label><input type="datetime-local" id="tFup" onchange="this.dataset.auto=0"></div>
-    <div class="fld" id="fWhen" style="display:none"><label>Call by</label><input type="datetime-local" id="tWhen"></div>
+    <div class="fld" id="fWhen" style="display:none"><label>Call by</label><input type="datetime-local" id="tWhen" onchange="taskRepeatUI()"></div>
     <div class="fld" id="fPhone" style="display:none"><label>Phone</label><input id="tPhone" placeholder="+91…"></div>
     <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="tCust" style="flex:1" onchange="fillContact('tContact',this.value||null,'')"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust')">+</button></div></div>
     <div class="fld" id="fTContact"><label>Account contact (FPR)</label><div style="display:flex;gap:6px"><select id="tContact" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New contact for this account" onclick="quickNewContact('tContact')">+</button></div></div>
     <div class="fld"><label>Status</label><select id="tStatus"><option value="open">Open</option><option value="waiting">Waiting on owner</option><option value="done">Done</option></select></div>
+  </div>
+  <div class="fld" id="fTRepeatWd" style="display:none"><label>Repeat on</label><div class="attlist" id="tRepeatWd"></div></div>
+  <div class="fld" id="fTRepeatMonth" style="display:none"><label>Repeat pattern</label>
+    <select id="tRepeatMonthMode" onchange="taskRepeatUI()"><option value="date">Same day of month</option><option value="weekday">Same weekday</option></select>
+    <div id="fTRepeatMonthDay" style="margin-top:6px;display:flex;align-items:center;gap:8px"><input type="number" id="tRepeatMonthDay" min="1" max="31" style="width:70px"><span class="note">day of the month</span></div>
+    <div id="fTRepeatMonthWd" style="margin-top:6px;display:none;gap:8px"><select id="tRepeatMonthNth" style="width:auto"><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="-1">Last</option></select><select id="tRepeatMonthWdSel" style="width:auto"></select></div>
   </div>
   <div class="fld"><label>Notes</label><textarea id="tNotes"></textarea></div>
   </div>
@@ -556,7 +562,11 @@ canvas{display:block;max-width:100%}
     <div class="fld" id="fMRepeatN" style="display:none"><label>Occurrences (including this one)</label><input type="number" id="mRepeatN" min="2" max="52" value="8"></div>
   </div>
   <div class="fld" id="fMRepeatWd" style="display:none"><label>Repeat on</label><div class="attlist" id="mRepeatWd"></div></div>
-  <div class="fld" id="fMRepeatMonth" style="display:none"><label>Repeat on</label><select id="mRepeatMonth"></select></div>
+  <div class="fld" id="fMRepeatMonth" style="display:none"><label>Repeat pattern</label>
+    <select id="mRepeatMonthMode" onchange="meetingRepeatUI()"><option value="date">Same day of month</option><option value="weekday">Same weekday</option></select>
+    <div id="fMRepeatMonthDay" style="margin-top:6px;display:flex;align-items:center;gap:8px"><input type="number" id="mRepeatMonthDay" min="1" max="31" style="width:70px"><span class="note">day of the month</span></div>
+    <div id="fMRepeatMonthWd" style="margin-top:6px;display:none;gap:8px"><select id="mRepeatMonthNth" style="width:auto"><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="-1">Last</option></select><select id="mRepeatMonthWdSel" style="width:auto"></select></div>
+  </div>
   <div class="fld"><label>Attendees</label><div class="attlist" id="mAtt"></div></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="mDel" style="display:none" onclick="delMeeting()">Delete</button>
@@ -646,12 +656,15 @@ function buildRepeatDates(startDate,repeat,count,opts){opts=opts||{};const dates
     while(dates.length<count){for(const wd of wds){if(dates.length>=count)break;const cand=addDays(weekStart,wd);if(cand>startDate)dates.push(cand);}weekStart=addDays(weekStart,7*interval);}
     return dates.sort();}
   if(repeat==='monthly'){
-    if(opts.monthMode==='weekday'){const{nth,isLast,weekday}=weekdayPosition(startDate);
+    if(opts.monthMode==='weekday'){
+      let nth=opts.monthNth,weekday=opts.monthWeekday;
+      if(nth==null||weekday==null){const pos=weekdayPosition(startDate);nth=nth==null?(pos.isLast?-1:pos.nth):nth;weekday=weekday==null?pos.weekday:weekday;}
       for(let i=1;i<count;i++){const d=new Date(startDate+'T12:00');let m=d.getMonth()+i,y=d.getFullYear();y+=Math.floor(m/12);m=((m%12)+12)%12;
-        dates.push(nthWeekdayOfMonth(y,m,weekday,isLast?-1:nth));}
-    }else{const day=new Date(startDate+'T12:00').getDate();for(let i=1;i<count;i++)dates.push(addMonthsClamped(startDate,i,day));}
+        dates.push(nthWeekdayOfMonth(y,m,weekday,nth));}
+    }else{const day=opts.monthDay!=null?opts.monthDay:new Date(startDate+'T12:00').getDate();for(let i=1;i<count;i++)dates.push(addMonthsClamped(startDate,i,day));}
     return dates;}
   return dates;}
+function nextRepeatDate(base,repeat,pattern){return buildRepeatDates(base,repeat,2,pattern||{})[1];}
 function defaultFollowUp(dueDate){const td=today();
   if(dueDate&&dueDate>td)return addDays(dueDate,-1)+'T09:00';
   const d=new Date(Date.now()+3600000);const hhmm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -2223,6 +2236,20 @@ function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+prod
 function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');}
 
 let editT=null;
+function taskAnchorDate(){return g('tType').value==='call'?(g('tWhen').value||'').slice(0,10):g('tDue').value;}
+function taskRepeatUI(){const rep=g('tRepeat').value,on=!!rep;const ds=taskAnchorDate()||today();
+  const wdOn=on&&(rep==='weekly'||rep==='fortnightly');g('fTRepeatWd').style.display=wdOn?'':'none';
+  if(wdOn){const cur=new Set([...g('tRepeatWd').querySelectorAll('.attchip.on')].map(c=>+c.dataset.wd));
+    const keep=g('tRepeatWd').dataset.forDate===ds&&cur.size?cur:new Set([dateWeekday(ds)]);
+    g('tRepeatWd').dataset.forDate=ds;
+    g('tRepeatWd').innerHTML=WEEKDAY_LBL.map((lbl,i)=>`<span class="attchip ${keep.has(i)?'on':''}" data-wd="${i}" title="${WEEKDAY_FULL[i]}" onclick="this.classList.toggle('on')">${lbl}</span>`).join('');}
+  const moOn=on&&rep==='monthly';g('fTRepeatMonth').style.display=moOn?'':'none';
+  if(moOn){const mode=g('tRepeatMonthMode').value||'date';
+    if(g('fTRepeatMonth').dataset.forDate!==ds){g('fTRepeatMonth').dataset.forDate=ds;
+      g('tRepeatMonthDay').value=new Date(ds+'T12:00').getDate();
+      const pos=weekdayPosition(ds);g('tRepeatMonthNth').value=pos.isLast?-1:pos.nth;fillWeekdaySelect('tRepeatMonthWdSel',pos.weekday);}
+    g('fTRepeatMonthDay').style.display=mode==='date'?'flex':'none';
+    g('fTRepeatMonthWd').style.display=mode==='weekday'?'flex':'none';}}
 function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){editT=id?tasks.find(x=>x.id===id):null;const t=editT;
   g('mTaskTitle').textContent=t?'Edit Item':'New Item';
   g('tTitle').value=t?.title||'';g('tType').value=t?.type||presetType||'task';
@@ -2234,7 +2261,14 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
   g('tNotes').value=t?.notes||'';g('tDel').style.display=t?'':'none';
   window._presetDeal=presetDeal||t?.deal_id||null;
-  taskTypeUI();g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
+  g('tRepeatMonthMode').value=t?.repeat_month_mode||'date';g('tRepeatWd').dataset.forDate='';g('fTRepeatMonth').dataset.forDate='';
+  taskTypeUI();
+  if(t?.repeat_weekdays&&t.repeat_weekdays.length){const set=new Set(t.repeat_weekdays);
+    g('tRepeatWd').querySelectorAll('.attchip').forEach(c=>c.classList.toggle('on',set.has(+c.dataset.wd)));}
+  if(t?.repeat_month_day!=null)g('tRepeatMonthDay').value=t.repeat_month_day;
+  if(t?.repeat_month_nth!=null)g('tRepeatMonthNth').value=t.repeat_month_nth;
+  if(t?.repeat_month_weekday!=null)fillWeekdaySelect('tRepeatMonthWdSel',t.repeat_month_weekday);
+  g('mTask').classList.add('open');setTimeout(()=>g('tTitle').focus(),50);}
 function dueChanged(){const due=g('tDue').value;const fup=g('tFup');if(!fup||!due)return;
   const cur=fup.value;const auto=fup.dataset.auto==='1';
   if(!cur||auto){fup.value=defaultFollowUp(due);fup.dataset.auto='1';}}
@@ -2243,11 +2277,18 @@ function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
   g('fDue').style.display=call?'none':'';g('fAt').style.display=call?'none':'';g('fEst').style.display=call?'none':'';
   g('fFup').style.display=(!call&&deleg)?'':'none';
-  if(!editT)g('tStatus').value=deleg&&!call?'waiting':'open';}
+  if(!editT)g('tStatus').value=deleg&&!call?'waiting':'open';
+  taskRepeatUI();}
 function saveTask(){const title=g('tTitle').value.trim();if(!title){toast('Title required.');return;}const n=now();
+  const repeat=g('tRepeat').value||'';
   const d={title,type:g('tType').value,owner:g('tOwner').value,priority:g('tPri').value,dept:g('tDept').value,customer_id:g('tCust').value||null,contact_id:g('tContact').value||null,deal_id:window._presetDeal||null,
-    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||5,repeat:g('tRepeat').value||'',follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
-    status:g('tStatus').value,notes:g('tNotes').value.trim(),updated_at:n};
+    due:g('tDue').value||null,at:g('tAt').value||null,estimate_min:+g('tEst').value||5,repeat,follow_up:g('tFup').value||null,when:g('tWhen').value||null,phone:g('tPhone').value.trim(),
+    status:g('tStatus').value,notes:g('tNotes').value.trim(),updated_at:n,
+    repeat_weekdays:(repeat==='weekly'||repeat==='fortnightly')?[...g('tRepeatWd').querySelectorAll('.attchip.on')].map(c=>+c.dataset.wd):null,
+    repeat_month_mode:repeat==='monthly'?(g('tRepeatMonthMode').value||'date'):null,
+    repeat_month_day:(repeat==='monthly'&&g('tRepeatMonthMode').value==='date')?(+g('tRepeatMonthDay').value||null):null,
+    repeat_month_nth:(repeat==='monthly'&&g('tRepeatMonthMode').value==='weekday')?(+g('tRepeatMonthNth').value||null):null,
+    repeat_month_weekday:(repeat==='monthly'&&g('tRepeatMonthMode').value==='weekday')?(g('tRepeatMonthWdSel').value!==''?+g('tRepeatMonthWdSel').value:null):null};
   if(editT){const wasDone=editT.status==='done';if(d.status==='done'&&!wasDone)d.completed_at=n;else if(d.status!=='done'&&wasDone)d.completed_at=null;
     if(!editT.original_due&&d.due)d.original_due=d.due;Object.assign(editT,d);}
   else{if(d.status==='done')d.completed_at=n;tasks.push(Object.assign({id:uid(),created_at:n,original_due:d.due},d));}
@@ -2262,9 +2303,14 @@ function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
     let a=activities.find(x=>x.task_id===t.id&&!x.deleted);const n2=now();
     if(a){a.text=lbl;if(t.notes_html)a.html=t.notes_html;a.kind=t.type==='call'?'call':'note';a.updated_at=n2;}
     else activities.push({id:uid(),kind:t.type==='call'?'call':'note',text:lbl,html:t.notes_html||null,task_id:t.id,customer_id:t.customer_id,deal_id:t.deal_id||null,contact_id:t.contact_id||null,at:n2,created_at:n2,updated_at:n2});}
-  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();
-    const nd=t.repeat==='monthly'?addMonthsClamped(base,1,new Date(base+'T12:00').getDate()):addDays(base,REPEAT_DAYS[t.repeat]);const n2=now();
-    tasks.push({id:uid(),type:t.type,title:t.title,owner:t.owner,priority:t.priority,dept:t.dept,customer_id:t.customer_id,contact_id:t.contact_id,deal_id:t.deal_id,due:nd,original_due:nd,at:t.at,estimate_min:t.estimate_min,repeat:t.repeat,phone:t.phone,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
+  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){
+    const isCall=t.type==='call';const base=(isCall?(t.when||'').slice(0,10):t.due)||today();
+    const pattern={weekdays:t.repeat_weekdays,monthMode:t.repeat_month_mode,monthDay:t.repeat_month_day,monthNth:t.repeat_month_nth,monthWeekday:t.repeat_month_weekday};
+    const nd=nextRepeatDate(base,t.repeat,pattern);const n2=now();const timeOfDay=isCall?(t.when||'').slice(10):'';
+    tasks.push({id:uid(),type:t.type,title:t.title,owner:t.owner,priority:t.priority,dept:t.dept,customer_id:t.customer_id,contact_id:t.contact_id,deal_id:t.deal_id,person_id:t.person_id||null,
+      due:isCall?null:nd,original_due:isCall?null:nd,at:t.at,estimate_min:t.estimate_min,repeat:t.repeat,
+      repeat_weekdays:t.repeat_weekdays||null,repeat_month_mode:t.repeat_month_mode||null,repeat_month_day:t.repeat_month_day??null,repeat_month_nth:t.repeat_month_nth??null,repeat_month_weekday:t.repeat_month_weekday??null,
+      phone:t.phone,when:isCall?(nd+timeOfDay):null,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
     toast('Next occurrence scheduled '+fmtD(nd)+'.');}
   persist();renderView();}
 function toggleFocus(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(!t.focus&&T().filter(x=>x.focus&&x.status!=='done').length>=3){toast('Three focus slots — unstar one first.');return;}t.focus=!t.focus;t.updated_at=now();persist();renderView();}
@@ -2333,6 +2379,7 @@ async function saveDeal(){const nm=g('dlName').value.trim();if(!nm){toast('Deal 
 async function delDeal(){if(editDl&&await askConfirm('Delete deal '+editDl.name+'?',{ok:'Delete',danger:true})){editDl.deleted=true;editDl.updated_at=now();closeM();nav('pipeline');toast('Deleted.');}}
 
 let editM=null;
+function fillWeekdaySelect(sel,val){g(sel).innerHTML=WEEKDAY_FULL.map((w,i)=>`<option value="${i}"${i===val?' selected':''}>${w}</option>`).join('');}
 function meetingRepeatUI(){const rep=g('mRepeat').value,on=!!rep&&!editM;const ds=g('mDate').value||today();
   g('fMRepeatN').style.display=on?'':'none';
   const wdOn=on&&(rep==='weekly'||rep==='fortnightly');g('fMRepeatWd').style.display=wdOn?'':'none';
@@ -2341,15 +2388,18 @@ function meetingRepeatUI(){const rep=g('mRepeat').value,on=!!rep&&!editM;const d
     g('mRepeatWd').dataset.forDate=ds;
     g('mRepeatWd').innerHTML=WEEKDAY_LBL.map((lbl,i)=>`<span class="attchip ${keep.has(i)?'on':''}" data-wd="${i}" title="${WEEKDAY_FULL[i]}" onclick="this.classList.toggle('on')">${lbl}</span>`).join('');}
   const moOn=on&&rep==='monthly';g('fMRepeatMonth').style.display=moOn?'':'none';
-  if(moOn){const day=new Date(ds+'T12:00').getDate();const{nth,isLast}=weekdayPosition(ds);
-    const wdLbl=WEEKDAY_FULL[dateWeekday(ds)];const nthLbl=isLast?'last':NTH_LBL[nth-1]||NTH_LBL[3];
-    g('mRepeatMonth').innerHTML=`<option value="date">Monthly on day ${day}</option><option value="weekday">Monthly on the ${nthLbl} ${wdLbl}</option>`;}}
+  if(moOn){const mode=g('mRepeatMonthMode').value||'date';
+    if(g('fMRepeatMonth').dataset.forDate!==ds){g('fMRepeatMonth').dataset.forDate=ds;
+      g('mRepeatMonthDay').value=new Date(ds+'T12:00').getDate();
+      const pos=weekdayPosition(ds);g('mRepeatMonthNth').value=pos.isLast?-1:pos.nth;fillWeekdaySelect('mRepeatMonthWdSel',pos.weekday);}
+    g('fMRepeatMonthDay').style.display=mode==='date'?'flex':'none';
+    g('fMRepeatMonthWd').style.display=mode==='weekday'?'flex':'none';}}
 function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   g('mMeetTitle').textContent=editM?'Edit Meeting':'New Meeting';
   g('mTitle2').value=editM?.title||'';g('mDate').value=editM?.date||presetDate||today();g('mTime').value=editM?.time||'';g('mDur').value=editM?.duration||60;
   fillDept('mDept',editM?.dept||'');fillCust('mCustSel',editM?.customer_id||'');
-  g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;
-  g('mRepeatWd').dataset.forDate='';
+  g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;g('mRepeatMonthMode').value='date';
+  g('mRepeatWd').dataset.forDate='';g('fMRepeatMonth').dataset.forDate='';
   meetingRepeatUI();
   const selSet=new Set(editM?.attendee_ids||[]);
   g('mAtt').innerHTML=P().map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('')||'<span class="note">Add people first.</span>';
@@ -2362,8 +2412,11 @@ function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('T
   else{const repGroup=repeat?uid():null;const first=Object.assign({id:uid(),status:'open',created_at:n,repeat_group:repGroup},d);meetings.push(first);
     if(repeat){const count=Math.min(52,Math.max(2,+g('mRepeatN').value||8));
       const weekdays=[...g('mRepeatWd').querySelectorAll('.attchip.on')].map(c=>+c.dataset.wd);
-      const monthMode=g('mRepeatMonth').value||'date';
-      const dates=buildRepeatDates(d.date,repeat,count,{weekdays,monthMode});
+      const monthMode=g('mRepeatMonthMode').value||'date';
+      const monthDay=+g('mRepeatMonthDay').value||undefined;
+      const monthNth=g('mRepeatMonthNth').value?+g('mRepeatMonthNth').value:undefined;
+      const monthWeekday=g('mRepeatMonthWdSel').value!==''?+g('mRepeatMonthWdSel').value:undefined;
+      const dates=buildRepeatDates(d.date,repeat,count,{weekdays,monthMode,monthDay,monthNth,monthWeekday});
       dates.slice(1).forEach(nd=>meetings.push(Object.assign({},d,{id:uid(),status:'open',created_at:n,updated_at:n,date:nd,repeat_group:repGroup})));
       toast(dates.length+' occurrences scheduled.');}}
   closeM();persist();renderView();}
