@@ -552,6 +552,8 @@ canvas{display:block;max-width:100%}
     <div class="fld"><label>Duration (min)</label><input type="number" id="mDur" min="15" step="15" placeholder="60"></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="mDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','mDept')">+</button></div></div>
     <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="mCustSel" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','mCustSel')">+</button></div></div>
+    <div class="fld"><label>Repeat</label><select id="mRepeat" onchange="meetingRepeatUI()"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+    <div class="fld" id="fMRepeatN" style="display:none"><label>Occurrences (including this one)</label><input type="number" id="mRepeatN" min="2" max="52" value="8"></div>
   </div>
   <div class="fld"><label>Attendees</label><div class="attlist" id="mAtt"></div></div>
   </div>
@@ -827,7 +829,7 @@ function dayItems(ds){
   return[...mt,...cl,...tk].sort((a,b)=>a.sort.localeCompare(b.sort));}
 function mrowHtml(m){const ag=meetingAgenda(m).length;
   return`<div class="mrow" onclick="nav('meeting','${m.id}')"><div class="mwhen"><div class="md">${fmtD(m.date)}</div><div class="mt num">${m.time||''}</div></div>
-  <div style="flex:1"><div class="mtitle">${esc(m.title)}</div><div class="msub">${(m.attendee_ids||[]).map(pname).join(', ')||'No attendees'}${m.customer_id?' · '+esc(cname(m.customer_id)):''}${m.dept?' · '+esc(m.dept):''}</div></div>
+  <div style="flex:1"><div class="mtitle">${esc(m.title)}${m.repeat?` <span class="pill b" title="Repeats ${esc(m.repeat)}">↻</span>`:''}</div><div class="msub">${(m.attendee_ids||[]).map(pname).join(', ')||'No attendees'}${m.customer_id?' · '+esc(cname(m.customer_id)):''}${m.dept?' · '+esc(m.dept):''}</div></div>
   ${m.status==='done'?'<span class="pill g">Done</span>':`<span class="pill b">${ag} agenda</span>`}</div>`;}
 
 /* ═══ QUICK ADD ═══ */
@@ -2302,17 +2304,26 @@ async function saveDeal(){const nm=g('dlName').value.trim();if(!nm){toast('Deal 
 async function delDeal(){if(editDl&&await askConfirm('Delete deal '+editDl.name+'?',{ok:'Delete',danger:true})){editDl.deleted=true;editDl.updated_at=now();closeM();nav('pipeline');toast('Deleted.');}}
 
 let editM=null;
+function meetingRepeatUI(){const on=!!g('mRepeat').value&&!editM;g('fMRepeatN').style.display=on?'':'none';}
 function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   g('mMeetTitle').textContent=editM?'Edit Meeting':'New Meeting';
   g('mTitle2').value=editM?.title||'';g('mDate').value=editM?.date||presetDate||today();g('mTime').value=editM?.time||'';g('mDur').value=editM?.duration||60;
   fillDept('mDept',editM?.dept||'');fillCust('mCustSel',editM?.customer_id||'');
+  g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;
+  meetingRepeatUI();
   const selSet=new Set(editM?.attendee_ids||[]);
   g('mAtt').innerHTML=P().map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('')||'<span class="note">Add people first.</span>';
   g('mDel').style.display=editM?'':'none';g('mMeet').classList.add('open');setTimeout(()=>g('mTitle2').focus(),50);}
 function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('Title required.');return;}const n=now();
   const att=[...g('mAtt').querySelectorAll('.attchip.on')].map(c=>c.dataset.id);
-  const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,updated_at:n};
-  if(editM)Object.assign(editM,d);else meetings.push(Object.assign({id:uid(),status:'open',created_at:n},d));
+  const repeat=editM?editM.repeat||'':g('mRepeat').value;
+  const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,repeat,updated_at:n};
+  if(editM)Object.assign(editM,d);
+  else{const repGroup=repeat?uid():null;const first=Object.assign({id:uid(),status:'open',created_at:n,repeat_group:repGroup},d);meetings.push(first);
+    if(repeat&&REPEAT_DAYS[repeat]){const count=Math.min(52,Math.max(2,+g('mRepeatN').value||8));
+      for(let i=1;i<count;i++){const nd=addDays(d.date,REPEAT_DAYS[repeat]*i);
+        meetings.push(Object.assign({},d,{id:uid(),status:'open',created_at:n,updated_at:n,date:nd,repeat_group:repGroup}));}
+      toast(count+' occurrences scheduled.');}}
   closeM();persist();renderView();}
 async function delMeeting(){if(editM&&await askConfirm('Delete meeting?',{ok:'Delete',danger:true})){editM.deleted=true;editM.updated_at=now();closeM();plTab='meet';nav('planner');toast('Deleted.');}}
 
