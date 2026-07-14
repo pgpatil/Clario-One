@@ -960,7 +960,7 @@ function drawQuad(cv,items){const c=cv.getContext('2d');const W=cv.width=cv.clie
     c.font='600 16px Inter';c.fillStyle='#181818';c.textAlign='left';c.fillText(String(o.title).slice(0,16),x+14,y+5);c.font='700 18px Inter';});}
 /* ═══ ONEDRIVE ACCOUNT SYNC (Microsoft Graph) ═══ */
 const GRAPH_FILE='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario/db.json';
-var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false;
+var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false,_gNeedsReauth=false;
 var _gCfg=null;try{_gCfg=JSON.parse(localStorage.getItem('cx_graph')||'null');}catch(e){}
 function gActive(){return!!(_msal&&_gAcct);}
 function gInit(){if(!_gCfg||!_gCfg.clientId)return false;
@@ -971,45 +971,64 @@ async function gRestore(){try{if(!gInit())return;const as=_msal.getAllAccounts()
   if(as.length){_gAcct=as[0];gStart();syncUI('ok','OneDrive · '+(_gAcct.username||'account'));await gPull(true);}}catch(e){}}
 async function gSignIn(){const inp=g('gClient');const id=(inp&&inp.value.trim())||(_gCfg&&_gCfg.clientId)||'';
   if(!id){toast('Paste the Azure client ID first.');return;}
-  _gCfg={clientId:id};localStorage.setItem('cx_graph',JSON.stringify(_gCfg));_msal=null;
+  _gCfg={clientId:id};localStorage.setItem('cx_graph',JSON.stringify(_gCfg));_msal=null;_gNeedsReauth=false;
   if(!gInit()){toast('Sign-in library not loaded — needs internet on first load.');return;}
   try{const r=await _msal.loginPopup({scopes:['Files.ReadWrite'],prompt:'select_account'});
-    _gAcct=r.account;gStart();await gPull(true);await gSave();toast('Signed in as '+(_gAcct.username||'account'));renderView();}
+    _gAcct=r.account;_gNeedsReauth=false;gStart();await gPull(true);await gSave();toast('Signed in as '+(_gAcct.username||'account'));renderView();}
   catch(e){toast('Sign-in failed: '+(e.errorCode||e.message||e));}}
 function gSignOut(){try{if(_msal&&_gAcct)_msal.logoutPopup({account:_gAcct}).catch(()=>{});}catch(e){}
-  _gAcct=null;clearInterval(_gTimer);syncUI(_fsDir?'ok':'', _fsDir?_fsDir.name:'Local only');renderView();}
+  _gAcct=null;_gNeedsReauth=false;clearInterval(_gTimer);syncUI(_fsDir?'ok':'', _fsDir?_fsDir.name:'Local only');renderView();}
+/* Reconnect: interactive re-auth without a full sign-out, for when the cached
+   session has gone stale (expired/revoked refresh token). Must only ever be
+   called from a genuine user gesture (button click) — acquireTokenPopup is
+   blocked by browsers outside one, which is exactly the trap the old silent-
+   refresh fallback fell into from background timers. */
+async function gReconnect(){if(!_msal){toast('Not set up.');return;}
+  try{const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite'],account:_gAcct||undefined,prompt:_gAcct?undefined:'select_account'});
+    _gAcct=r.account;_gNeedsReauth=false;gStart();syncUI('busy');await gPull(true);await gSave();toast('Reconnected to OneDrive.');renderView();}
+  catch(e){toast('Reconnect failed: '+(e.errorCode||e.message||e));}}
+function gAuthErr(e){return e&&(e.name==='InteractionRequiredAuthError'||/interaction_required|login_required|consent_required|no_tokens_found/.test(e.errorCode||''));}
 async function gToken(){try{return(await _msal.acquireTokenSilent({scopes:['Files.ReadWrite'],account:_gAcct})).accessToken;}
-  catch(e){const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite']});_gAcct=r.account;return r.accessToken;}}
+  catch(e){if(gAuthErr(e)){_gNeedsReauth=true;syncUI('err','Sign-in expired — reconnect');}throw e;}}
+function gCheckAuthResp(r){if(r.status===401){_gNeedsReauth=true;syncUI('err','Sign-in expired — reconnect');return true;}return false;}
 async function gMeta(){const t=await gToken();const r=await fetch(GRAPH_FILE+'?select=lastModifiedDateTime',{headers:{Authorization:'Bearer '+t}});
+  if(gCheckAuthResp(r))throw new Error('reauth');
   if(r.status===404)return null;if(!r.ok)throw new Error('meta '+r.status);return(await r.json()).lastModifiedDateTime||'';}
-async function gPull(silent){if(!gActive())return;
+async function gPull(silent){if(!gActive()||_gNeedsReauth)return;
   try{const t=await gToken();const r=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t}});
+    if(gCheckAuthResp(r))return;
     if(r.status===404){if(!silent)toast('No db.json in OneDrive yet — it will be created on first save.');return;}
     if(!r.ok)throw new Error('pull '+r.status);
     mergeRemote(await parseDb(await r.text()));_gLastM=await gMeta()||'';
     localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent){toast('Pulled from OneDrive.');}reRender();}
-  catch(e){if(!silent)toast('Pull failed: '+(e.message||e));}}
-async function gSave(){if(!gActive())return;if(_gSaving){_gQ=true;return;}_gSaving=true;syncUI('busy');
+  catch(e){if(_gNeedsReauth)return;if(!silent)toast('Pull failed: '+(e.message||e));}}
+async function gSave(){if(!gActive()||_gNeedsReauth)return;if(_gSaving){_gQ=true;return;}_gSaving=true;syncUI('busy');
   try{const m=await gMeta();
     if(m&&_gLastM&&m>_gLastM){const t0=await gToken();const r0=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t0}});
+      if(gCheckAuthResp(r0))throw new Error('reauth');
       if(r0.ok){mergeRemote(await parseDb(await r0.text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();}}
     const out=await serializeDb();const t=await gToken();
     const r=await fetch(GRAPH_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:out});
+    if(gCheckAuthResp(r))throw new Error('reauth');
     if(!r.ok)throw new Error('save '+r.status);
     _gLastM=await gMeta()||'';syncUI('ok','OneDrive · '+(_gAcct.username||''));}
-  catch(e){syncUI('err');if(e.message!=='no pass')toast('OneDrive save failed: '+(e.message||e));}
-  finally{_gSaving=false;if(_gQ){_gQ=false;gSave();}}}
+  catch(e){if(_gNeedsReauth)return;syncUI('err');if(e.message!=='no pass')toast('OneDrive save failed: '+(e.message||e));}
+  finally{_gSaving=false;if(_gQ){_gQ=false;if(!_gNeedsReauth)gSave();}}}
 function gSched(){clearTimeout(_gST);_gST=setTimeout(gSave,1200);}
-function gStart(){clearInterval(_gTimer);_gTimer=setInterval(async()=>{if(!gActive()||_gSaving)return;
+function gStart(){clearInterval(_gTimer);_gTimer=setInterval(async()=>{if(!gActive()||_gSaving||_gNeedsReauth)return;
   try{const m=await gMeta();if(m&&m>_gLastM)await gPull(true);}catch(e){}},20000);}
-async function gSyncNow(){if(!gActive()){toast('Sign in first.');return;}await gPull(true);await gSave();toast('Synced with OneDrive ⇅');}
+async function gSyncNow(){if(!gActive()){toast('Sign in first.');return;}
+  if(_gNeedsReauth){await gReconnect();return;}
+  await gPull(true);await gSave();
+  if(_gNeedsReauth){await gReconnect();return;}
+  toast('Synced with OneDrive ⇅');}
 function gCard(){const on=gActive();
-  return`<div class="setcard" style="border-left:3px solid var(--blue)"><h4>OneDrive account sync — works on every device</h4>
-  <div class="srow"><span>Status</span><b>${on?'Signed in · '+esc(_gAcct.username||''):(_gCfg&&_gCfg.clientId?'Client ID saved, not signed in':'Not set up')}</b></div>
+  return`<div class="setcard" style="border-left:3px solid ${_gNeedsReauth?'var(--red)':'var(--blue)'}"><h4>OneDrive account sync — works on every device</h4>
+  <div class="srow"><span>Status</span><b>${_gNeedsReauth?'Sign-in expired':on?'Signed in · '+esc(_gAcct.username||''):(_gCfg&&_gCfg.clientId?'Client ID saved, not signed in':'Not set up')}</b></div>
   ${on?'':`<div style="margin-top:8px"><input id="gClient" placeholder="Azure application (client) ID" value="${esc(_gCfg?_gCfg.clientId:'')}" style="width:100%"></div>`}
   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-    ${on?`<button class="btn gh2 sm" onclick="gSyncNow()">Sync now ⇅</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:`<button class="btn sm" onclick="gSignIn()">Sign in with Microsoft</button>`}</div>
-  <p class="note">Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>${esc(location.origin+location.pathname)}</b>. Changes from other devices are picked up every 20 seconds.</p></div>`;}
+    ${_gNeedsReauth?`<button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:on?`<button class="btn gh2 sm" onclick="gSyncNow()">Sync now ⇅</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:`<button class="btn sm" onclick="gSignIn()">Sign in with Microsoft</button>`}</div>
+  <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are picked up every 20 seconds.'}</p></div>`;}
 /* ═══ HOME ═══ */
 function vHome(){const td=today();
   const dueMe=T().filter(t=>t.type!=='call'&&t.status!=='done'&&(t.owner==='me'||!t.owner)&&t.due&&t.due<=td);
