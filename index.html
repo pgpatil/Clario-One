@@ -1034,7 +1034,7 @@ function upcomingHtml(){const td=today();let out='',n=0;
   for(let i=1;i<=6&&n<12;i++){const ds=addDays(td,i);const items=dayItems(ds);if(!items.length)continue;
     const d=new Date(ds+'T12:00');
     out+=`<div class="row" style="background:var(--sub);font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--t3)"><div class="bd">${d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</div></div>`;
-    items.slice(0,3).forEach(it=>{n++;const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`openTask('${it.o.id}')`;
+    items.slice(0,3).forEach(it=>{n++;const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`nav('task','${it.o.id}')`;
       out+=`<div class="row" style="cursor:pointer" onclick="${click}"><div class="bd"><div class="tt" style="font-size:12.5px;font-weight:500">${it.k==='m'?(it.o.time?'<span class="num">'+it.o.time+'</span> ':''):''}${esc(it.k==='m'?it.o.title:it.o.title)}</div><div class="meta">${it.k==='m'?'Meeting':it.k==='c'?'Call':pname(it.o.owner)==='Me'?'Task':'Waiting · '+esc(pname(it.o.owner))}</div></div></div>`;});
     if(items.length>3)out+=`<div class="row"><div class="bd" style="font-size:11px;color:var(--t4)">+${items.length-3} more — see planner</div></div>`;}
   return out?`<div class="card"><div class="ch"><span>Coming up — next 6 days</span><button class="btn xs" onclick="plTab='week';plAnchor=today();nav('planner')">Week ↗</button></div>${out}</div>`:'';}
@@ -1131,7 +1131,7 @@ function vPlanner(){const td=today();
       const doneT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status==='done');
       return`<div class="wcol ${ds===td?'todaycol':''}"><div class="wc-h"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span style="display:flex;gap:6px;align-items:center"><button class="iconb" style="font-size:10.5px" title="Open day" onclick="plTab='day';plAnchor='${ds}';renderView()">↗</button><span class="dn num">${d.getDate()}</span></span></div>
       <div class="wc-b">${items.map(it=>{const ov=it.k==='t'&&it.o.due<td;
-        const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`openTask('${it.o.id}')`;
+        const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`nav('task','${it.o.id}')`;
         return`<div class="wc-it ${ov?'ov':it.k}" onclick="${click}">${esc(it.s)}</div>`;}).join('')}
       ${doneT.map(t=>`<div class="wc-it done">${esc(t.title)}</div>`).join('')}</div>
       <div class="wc-add" style="display:flex;gap:4px"><input style="flex:1" placeholder="+ add" onkeydown="if(event.key==='Enter'&&this.value.trim()){addQuickDay('${ds}',this.value.trim());this.value=''}"><button class="btn xs" onclick="const i=this.previousElementSibling;if(i.value.trim())addQuickDay('${ds}',i.value.trim())">Add</button></div></div>`;}).join('');
