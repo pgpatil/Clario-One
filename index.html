@@ -416,10 +416,11 @@ canvas{display:block;max-width:100%}
 
 <header id="gh">
   <div class="gh-brand"><div class="gh-logo">C1</div><span>Clario One</span></div>
-  <div class="gh-search"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
+  <div class="gh-search" id="ghSearchWrap"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
   <div class="gh-right">
-    <button class="gh-sync" onclick="nav('settings')" title="Sync: green = synced, blue = syncing, red = attention, grey = not connected. Tap for Settings."><span class="sdot" id="sdot"></span><span id="stxt">Local only</span></button>
-    <div style="position:relative"><button class="btn sm" onclick="toggleNewMenu(event)">+ New ▾</button><div id="newmenu"></div></div>
+    <div class="vtog" id="modeToggle"></div>
+    <button class="gh-sync" id="ghSyncBtn" onclick="nav('settings')" title="Sync: green = synced, blue = syncing, red = attention, grey = not connected. Tap for Settings."><span class="sdot" id="sdot"></span><span id="stxt">Local only</span></button>
+    <div style="position:relative" id="ghNewWrap"><button class="btn sm" onclick="toggleNewMenu(event)">+ New ▾</button><div id="newmenu"></div></div>
     <button class="gh-sync" style="font-weight:800;font-size:14px" title="Help & FAQ" onclick="nav('help')">?</button>
   </div>
 </header>
@@ -458,6 +459,35 @@ canvas{display:block;max-width:100%}
   </div>
   <div class="macts"><button class="btn dg sm" id="tDel" style="display:none" onclick="delTask()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveTask()">Save</button></div></div>
+</div></div>
+
+<!-- Personal task modal -->
+<div class="ovl" id="mPTask"><div class="modal">
+  <h3 id="mPTaskTitle">New Personal Task<button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Title <span class="req">*</span></label><input id="ptTitle"></div>
+  <div class="g2">
+    <div class="fld"><label>Due date</label><input type="date" id="ptDue"></div>
+    <div class="fld"><label>Priority</label><select id="ptPri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
+    <div class="fld"><label>Assign to</label><div style="display:flex;gap:6px"><select id="ptOwner" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New family member" onclick="quickNewFamily('ptOwner')">+</button></div></div>
+    <div class="fld"><label>Repeat</label><select id="ptRepeat"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
+  </div>
+  <div class="fld"><label>Notes</label><textarea id="ptNotes"></textarea></div>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="ptDel" style="display:none" onclick="delPersonalTaskModal()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="savePersonalTask()">Save</button></div></div>
+</div></div>
+
+<!-- Family member modal -->
+<div class="ovl" id="mFamily"><div class="modal">
+  <h3 id="mFamilyTitle">New Family Member<button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Name <span class="req">*</span></label><input id="faName"></div>
+  <div class="fld"><label>Birthday</label><input type="date" id="faBday"></div>
+  <div class="fld"><label>Notes</label><textarea id="faNotes" style="min-height:40px"></textarea></div>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="faDel" style="display:none" onclick="delFamily()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveFamily()">Save</button></div></div>
 </div></div>
 
 <!-- Person modal -->
@@ -641,7 +671,7 @@ canvas{display:block;max-width:100%}
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc';
+const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
 const g=id=>document.getElementById(id);
@@ -694,13 +724,14 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals'];
+var appMode=localStorage.getItem(MODE_KEY)||'official';
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -714,8 +745,10 @@ function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.delet
   c.next_action=null;c.next_action_due=null;});
   if(m)persist();}
 
-const T=()=>tasks.filter(t=>!t.deleted);
+const T=()=>tasks.filter(t=>!t.deleted&&t.scope!=='personal');
+const TP=()=>tasks.filter(t=>!t.deleted&&t.scope==='personal');
 const P=()=>people.filter(p=>!p.deleted);
+const FA=()=>family.filter(f=>!f.deleted);
 const AG=()=>agenda.filter(a=>!a.deleted);
 const M=()=>meetings.filter(m=>!m.deleted);
 const DC=()=>decisions.filter(d=>!d.deleted);
@@ -728,6 +761,13 @@ const TR=()=>toolruns.filter(t=>!t.deleted);
 const OP=()=>opps.filter(o=>!o.deleted);
 const pname=id=>id==='me'||!id?(myProfile.name||'Me'):(P().find(p=>p.id===id)||{}).name||'—';
 const cname=id=>id?(CU().find(c=>c.id===id)||{}).name||'':'';
+const famName=id=>(FA().find(f=>f.id===id)||{}).name||'—';
+const daysUntil=ds=>Math.round((new Date(ds+'T12:00')-new Date(today()+'T12:00'))/86400000);
+function nextBirthday(bday){const m=(bday||'').match(/^\d{4}-(\d{2})-(\d{2})/);if(!m)return null;
+  const td=today();let year=+td.slice(0,4);let next=year+'-'+m[1]+'-'+m[2];
+  if(next<td)next=(year+1)+'-'+m[1]+'-'+m[2];
+  return next;}
+function upcomingBirthdays(){return FA().filter(f=>f.birthday).map(f=>{const next=nextBirthday(f.birthday);return{id:f.id,name:f.name,next,inDays:daysUntil(next)};}).sort((a,b)=>a.inDays-b.inDays);}
 /* clickable name chips — navigate to the entity */
 const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
 const personLink=(id,cls)=>id?(id==='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();openMyProfile()" title="Edit your profile">${esc(pname(id))}</span>`:`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`):'';
@@ -802,7 +842,13 @@ const NAVMORE=[
   ['Insight',[['decide','Decide'],['dash','Dashboards'],['review','Review']]],
   ['System',[['settings','Settings']]]];
 const MOREIDS=NAVMORE.flatMap(([g,items])=>items.map(i=>i[0]));
-function renderNav(){const td=today();
+function setMode(m){appMode=m;localStorage.setItem(MODE_KEY,m);applyModeUI();renderView();}
+function applyModeUI(){const personal=appMode==='personal';
+  const mt=g('modeToggle');if(mt)mt.innerHTML=`<button class="${!personal?'on':''}" onclick="setMode('official')">Official</button><button class="${personal?'on':''}" onclick="setMode('personal')">Personal</button>`;
+  const hide=el=>{if(el)el.style.display=personal?'none':'';};
+  hide(g('ghSearchWrap'));hide(g('navbar'));hide(g('ghNewWrap'));}
+function renderNav(){if(appMode==='personal'){const nb=g('navbar');if(nb)nb.innerHTML='';const mm=g('moremenu');if(mm)mm.innerHTML='';return;}
+  const td=today();
   const nHome=openMine().filter(t=>t.type!=='call'&&t.due&&t.due<=td).length;
   const nChase=waiting().length;
   const bdg={home:nHome,commit:nChase};
@@ -822,8 +868,8 @@ function flushEditors(){try{
   if(view==='task'&&viewArg){const t=tasks.find(x=>x.id===viewArg);const el=g('tnText');if(t&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(t.notes_html||'')){t.notes_html=h;t.notes=htmlToText(h);t.updated_at=now();if(typeof logTaskNotes==='function')logTaskNotes(t);}}}
   if(view==='meeting'&&viewArg){const m=meetings.find(x=>x.id===viewArg);const el=g('mnText');if(m&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(m.notes_html||'')){m.notes_html=h;m.notes=htmlToText(h);m.updated_at=now();if(typeof logMeetingNotes==='function')logMeetingNotes(m);}}}
 }catch(e){}}
-function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,0);}
-function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=(m[view]||vHome)();wire();window.scrollTo(0,y);}
+function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -1029,6 +1075,58 @@ function gCard(){const on=gActive();
   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
     ${_gNeedsReauth?`<button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:on?`<button class="btn gh2 sm" onclick="gSyncNow()">Sync now ⇅</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:`<button class="btn sm" onclick="gSignIn()">Sign in with Microsoft</button>`}</div>
   <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are picked up every 20 seconds.'}</p></div>`;}
+/* ═══ PERSONAL MODE — minimal task list, family owners, birthdays ═══ */
+function prow(t){const td=today();const over=t.status!=='done'&&t.due&&t.due<td;
+  return`<div class="row ${t.status==='done'?'done':''}"><button class="chk ${t.status==='done'?'on':''}" onclick="togglePersonalTask('${t.id}')">${t.status==='done'?'✓':''}</button>
+    <div class="bd"><div class="tt">${esc(t.title)}</div>
+    <div class="meta">${t.due?`<span class="due ${over?'over':t.due===td?'today':''}">${fmtD(t.due)}</span>`:''}${t.owner&&t.owner!=='me'?`<span class="pill b">${esc(famName(t.owner))}</span>`:''}${t.repeat?`<span class="pill b" title="Repeats ${esc(t.repeat)}">↻ ${esc(t.repeat)}</span>`:''}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
+    <div class="rowacts"><button class="iconb" onclick="openPersonalTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="delPersonalTask('${t.id}')">✕</button></div></div>`;}
+function vPersonal(){const td=today();
+  const list=TP().sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+  const open=list.filter(t=>t.status!=='done');
+  const done=list.filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||'')).slice(0,10);
+  const bdays=upcomingBirthdays();
+  return pagehead('PERSONAL','Your tasks','',`<button class="btn gh2 sm" onclick="openFamily()">+ Family</button><button class="btn sm" onclick="openPersonalTask()">+ Task</button>`)+
+  `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="ptQuick" placeholder="Add a personal task…" onkeydown="if(event.key==='Enter')quickAddPersonal()" style="flex:1"><button class="btn" onclick="quickAddPersonal()">Add</button></div></div>`+
+  (bdays.length?seccard('Upcoming birthdays',bdays.length,bdays.map(b=>`<div class="row"><div class="bd"><div class="tt">🎂 ${esc(b.name)}</div><div class="meta">${b.inDays===0?'Today!':b.inDays===1?'Tomorrow':'in '+b.inDays+' days'} · ${fmtD(b.next)}</div></div></div>`).join(''),''):'')+
+  seccard('Open',open.length,open.map(prow).join(''),'Nothing here. Add a personal task above.')+
+  (done.length?seccard('Recently done',done.length,done.map(prow).join(''),''):'')+
+  (FA().length?seccard('Family',FA().length,FA().map(f=>`<div class="row" style="cursor:pointer" onclick="openFamily('${f.id}')"><div class="bd"><div class="tt">${esc(f.name)}</div>${f.birthday?`<div class="meta">🎂 ${fmtD(f.birthday)}</div>`:''}</div></div>`).join(''),''):'');}
+function quickAddPersonal(){const i=g('ptQuick');const v=(i?i.value:'').trim();if(!v)return;const n=now();
+  tasks.push({id:uid(),type:'task',scope:'personal',title:v,owner:'me',due:null,priority:'medium',status:'open',notes:'',created_at:n,updated_at:n});
+  if(i)i.value='';persist();renderView();}
+function togglePersonalTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
+  const wasOpen=t.status!=='done';t.status=wasOpen?'done':'open';t.updated_at=now();t.completed_at=t.status==='done'?t.updated_at:null;
+  if(wasOpen&&t.status==='done'&&t.repeat&&REPEAT_DAYS[t.repeat]){const base=t.due||today();const nd=nextRepeatDate(base,t.repeat,{});const n2=now();
+    tasks.push({id:uid(),type:'task',scope:'personal',title:t.title,owner:t.owner,due:nd,original_due:nd,repeat:t.repeat,priority:t.priority,notes:t.notes,status:'open',created_at:n2,updated_at:n2});}
+  persist();renderView();}
+async function delPersonalTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();renderView();}}
+function fillFamily(sel,val){g(sel).innerHTML='<option value="me">Me</option>'+FA().map(f=>`<option value="${f.id}"${f.id===val?' selected':''}>${esc(f.name)}</option>`).join('');}
+let editPT=null;
+function openPersonalTask(id){editPT=id?tasks.find(x=>x.id===id):null;const t=editPT;
+  g('mPTaskTitle').textContent=t?'Edit Personal Task':'New Personal Task';
+  g('ptTitle').value=t?.title||'';g('ptDue').value=t?.due||'';g('ptPri').value=t?.priority||'medium';
+  fillFamily('ptOwner',t?.owner||'me');g('ptRepeat').value=t?.repeat||'';g('ptNotes').value=t?.notes||'';
+  g('ptDel').style.display=t?'':'none';g('mPTask').classList.add('open');setTimeout(()=>g('ptTitle').focus(),50);}
+function savePersonalTask(){const title=g('ptTitle').value.trim();if(!title){toast('Title required.');return;}const n=now();
+  const d={title,due:g('ptDue').value||null,priority:g('ptPri').value,owner:g('ptOwner').value,repeat:g('ptRepeat').value||'',notes:g('ptNotes').value.trim(),updated_at:n};
+  if(editPT){if(!editPT.original_due&&d.due)d.original_due=d.due;Object.assign(editPT,d);}
+  else tasks.push(Object.assign({id:uid(),type:'task',scope:'personal',status:'open',created_at:n,original_due:d.due},d));
+  closeM();persist();renderView();}
+async function delPersonalTaskModal(){if(editPT&&await askConfirm('Delete this task?',{ok:'Delete',danger:true})){editPT.deleted=true;editPT.updated_at=now();closeM();persist();renderView();}}
+async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
+  const n=now();family.push({id:uid(),name:v,birthday:null,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
+let editFA=null;
+function openFamily(id){editFA=id?family.find(x=>x.id===id):null;const f=editFA;
+  g('mFamilyTitle').textContent=f?'Edit Family Member':'New Family Member';
+  g('faName').value=f?.name||'';g('faBday').value=f?.birthday||'';g('faNotes').value=f?.notes||'';
+  g('faDel').style.display=f?'':'none';g('mFamily').classList.add('open');setTimeout(()=>g('faName').focus(),50);}
+function saveFamily(){const nm=g('faName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
+  const d={name:nm,birthday:g('faBday').value||null,notes:g('faNotes').value.trim(),updated_at:n};
+  if(editFA)Object.assign(editFA,d);else family.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();renderView();}
+async function delFamily(){if(editFA&&await askConfirm('Delete '+editFA.name+'? Their tasks stay, unassigned.',{ok:'Delete',danger:true})){editFA.deleted=true;editFA.updated_at=now();closeM();renderView();}}
+
 /* ═══ HOME ═══ */
 function vHome(){const td=today();
   const dueMe=T().filter(t=>t.type!=='call'&&t.status!=='done'&&(t.owner==='me'||!t.owner)&&t.due&&t.due<=td);
@@ -2601,7 +2699,7 @@ const _origNav=nav;
 nav=async function(v,arg){if(v!=='decide'){dTool=null;window._trId=null;window._mtx=null;window._pm=null;window._fw=null;window._pa=null;window._sw=null;}return _origNav(v,arg);};
 
 /* ═══ BOOT ═══ */
-(function boot(){loadLS();renderView();restoreFolder();gRestore();
+(function boot(){loadLS();applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}})();
 </script>
 </body>
