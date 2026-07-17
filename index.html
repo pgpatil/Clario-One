@@ -483,11 +483,22 @@ canvas{display:block;max-width:100%}
   <h3 id="mFamilyTitle">New Family Member<button class="mx" type="button" onclick="closeM()">✕</button></h3>
   <div class="mbody">
   <div class="fld"><label>Name <span class="req">*</span></label><input id="faName"></div>
-  <div class="fld"><label>Birthday</label><input type="date" id="faBday"></div>
   <div class="fld"><label>Notes</label><textarea id="faNotes" style="min-height:40px"></textarea></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="faDel" style="display:none" onclick="delFamily()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveFamily()">Save</button></div></div>
+</div></div>
+
+<!-- Birthday modal -->
+<div class="ovl" id="mBday"><div class="modal">
+  <h3 id="mBdayTitle">New Birthday<button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Name <span class="req">*</span></label><input id="bdName"></div>
+  <div class="fld"><label>Birthday</label><input type="date" id="bdDate"></div>
+  <div class="fld"><label>Notes</label><textarea id="bdNotes" style="min-height:40px"></textarea></div>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="bdDel" style="display:none" onclick="delBday()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveBday()">Save</button></div></div>
 </div></div>
 
 <!-- Person modal -->
@@ -724,14 +735,15 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
 var appMode=localStorage.getItem(MODE_KEY)||'official';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family'];
+var personalTab='tasks';
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -749,6 +761,7 @@ const T=()=>tasks.filter(t=>!t.deleted&&t.scope!=='personal');
 const TP=()=>tasks.filter(t=>!t.deleted&&t.scope==='personal');
 const P=()=>people.filter(p=>!p.deleted);
 const FA=()=>family.filter(f=>!f.deleted);
+const BD=()=>birthdays.filter(b=>!b.deleted);
 const AG=()=>agenda.filter(a=>!a.deleted);
 const M=()=>meetings.filter(m=>!m.deleted);
 const DC=()=>decisions.filter(d=>!d.deleted);
@@ -767,7 +780,7 @@ function nextBirthday(bday){const m=(bday||'').match(/^\d{4}-(\d{2})-(\d{2})/);i
   const td=today();let year=+td.slice(0,4);let next=year+'-'+m[1]+'-'+m[2];
   if(next<td)next=(year+1)+'-'+m[1]+'-'+m[2];
   return next;}
-function upcomingBirthdays(){return FA().filter(f=>f.birthday).map(f=>{const next=nextBirthday(f.birthday);return{id:f.id,name:f.name,next,inDays:daysUntil(next)};}).sort((a,b)=>a.inDays-b.inDays);}
+function upcomingBirthdays(){return BD().filter(b=>b.date).map(b=>{const next=nextBirthday(b.date);return{id:b.id,name:b.name,next,inDays:daysUntil(next)};}).sort((a,b)=>a.inDays-b.inDays);}
 /* clickable name chips — navigate to the entity */
 const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
 const personLink=(id,cls)=>id?(id==='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();openMyProfile()" title="Edit your profile">${esc(pname(id))}</span>`:`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`):'';
@@ -1081,17 +1094,23 @@ function prow(t){const td=today();const over=t.status!=='done'&&t.due&&t.due<td;
     <div class="bd"><div class="tt">${esc(t.title)}</div>
     <div class="meta">${t.due?`<span class="due ${over?'over':t.due===td?'today':''}">${fmtD(t.due)}</span>`:''}${t.owner&&t.owner!=='me'?`<span class="pill b">${esc(famName(t.owner))}</span>`:''}${t.repeat?`<span class="pill b" title="Repeats ${esc(t.repeat)}">↻ ${esc(t.repeat)}</span>`:''}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
     <div class="rowacts"><button class="iconb" onclick="openPersonalTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="delPersonalTask('${t.id}')">✕</button></div></div>`;}
-function vPersonal(){const td=today();
+function vPersonal(){const bdays=upcomingBirthdays();const soon=bdays.filter(b=>b.inDays<=7).length;
+  const tabs=`<div class="tabs">
+    <button class="tab ${personalTab==='tasks'?'on':''}" onclick="personalTab='tasks';renderView()">Tasks</button>
+    <button class="tab ${personalTab==='birthdays'?'on':''}" onclick="personalTab='birthdays';renderView()">Birthdays${soon?` <span class="num">(${soon})</span>`:''}</button></div>`;
+  return tabs+(personalTab==='birthdays'?vPersonalBirthdays(bdays):vPersonalTasks());}
+function vPersonalTasks(){
   const list=TP().sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
   const open=list.filter(t=>t.status!=='done');
   const done=list.filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||'')).slice(0,10);
-  const bdays=upcomingBirthdays();
   return pagehead('PERSONAL','Your tasks','',`<button class="btn gh2 sm" onclick="openFamily()">+ Family</button><button class="btn sm" onclick="openPersonalTask()">+ Task</button>`)+
   `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="ptQuick" placeholder="Add a personal task…" onkeydown="if(event.key==='Enter')quickAddPersonal()" style="flex:1"><button class="btn" onclick="quickAddPersonal()">Add</button></div></div>`+
-  (bdays.length?seccard('Upcoming birthdays',bdays.length,bdays.map(b=>`<div class="row"><div class="bd"><div class="tt">🎂 ${esc(b.name)}</div><div class="meta">${b.inDays===0?'Today!':b.inDays===1?'Tomorrow':'in '+b.inDays+' days'} · ${fmtD(b.next)}</div></div></div>`).join(''),''):'')+
   seccard('Open',open.length,open.map(prow).join(''),'Nothing here. Add a personal task above.')+
   (done.length?seccard('Recently done',done.length,done.map(prow).join(''),''):'')+
-  (FA().length?seccard('Family',FA().length,FA().map(f=>`<div class="row" style="cursor:pointer" onclick="openFamily('${f.id}')"><div class="bd"><div class="tt">${esc(f.name)}</div>${f.birthday?`<div class="meta">🎂 ${fmtD(f.birthday)}</div>`:''}</div></div>`).join(''),''):'');}
+  (FA().length?seccard('Family',FA().length,FA().map(f=>`<div class="row" style="cursor:pointer" onclick="openFamily('${f.id}')"><div class="bd"><div class="tt">${esc(f.name)}</div></div></div>`).join(''),''):'');}
+function vPersonalBirthdays(bdays){bdays=bdays||upcomingBirthdays();
+  return pagehead('PERSONAL','Birthdays','',`<button class="btn sm" onclick="openBday()">+ Birthday</button>`)+
+  seccard('Upcoming',bdays.length,bdays.map(b=>`<div class="row" style="cursor:pointer" onclick="openBday('${b.id}')"><div class="bd"><div class="tt">🎂 ${esc(b.name)}</div><div class="meta">${b.inDays===0?'Today!':b.inDays===1?'Tomorrow':'in '+b.inDays+' days'} · ${fmtD(b.next)}</div></div></div>`).join(''),'No birthdays tracked yet — add anyone, not just family.');}
 function quickAddPersonal(){const i=g('ptQuick');const v=(i?i.value:'').trim();if(!v)return;const n=now();
   tasks.push({id:uid(),type:'task',scope:'personal',title:v,owner:'me',due:null,priority:'medium',status:'open',notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
@@ -1115,17 +1134,27 @@ function savePersonalTask(){const title=g('ptTitle').value.trim();if(!title){toa
   closeM();persist();renderView();}
 async function delPersonalTaskModal(){if(editPT&&await askConfirm('Delete this task?',{ok:'Delete',danger:true})){editPT.deleted=true;editPT.updated_at=now();closeM();persist();renderView();}}
 async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
-  const n=now();family.push({id:uid(),name:v,birthday:null,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
+  const n=now();family.push({id:uid(),name:v,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
 let editFA=null;
 function openFamily(id){editFA=id?family.find(x=>x.id===id):null;const f=editFA;
   g('mFamilyTitle').textContent=f?'Edit Family Member':'New Family Member';
-  g('faName').value=f?.name||'';g('faBday').value=f?.birthday||'';g('faNotes').value=f?.notes||'';
+  g('faName').value=f?.name||'';g('faNotes').value=f?.notes||'';
   g('faDel').style.display=f?'':'none';g('mFamily').classList.add('open');setTimeout(()=>g('faName').focus(),50);}
 function saveFamily(){const nm=g('faName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const d={name:nm,birthday:g('faBday').value||null,notes:g('faNotes').value.trim(),updated_at:n};
+  const d={name:nm,notes:g('faNotes').value.trim(),updated_at:n};
   if(editFA)Object.assign(editFA,d);else family.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();}
 async function delFamily(){if(editFA&&await askConfirm('Delete '+editFA.name+'? Their tasks stay, unassigned.',{ok:'Delete',danger:true})){editFA.deleted=true;editFA.updated_at=now();closeM();renderView();}}
+let editBD=null;
+function openBday(id){editBD=id?birthdays.find(x=>x.id===id):null;const b=editBD;
+  g('mBdayTitle').textContent=b?'Edit Birthday':'New Birthday';
+  g('bdName').value=b?.name||'';g('bdDate').value=b?.date||'';g('bdNotes').value=b?.notes||'';
+  g('bdDel').style.display=b?'':'none';g('mBday').classList.add('open');setTimeout(()=>g('bdName').focus(),50);}
+function saveBday(){const nm=g('bdName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
+  const d={name:nm,date:g('bdDate').value||null,notes:g('bdNotes').value.trim(),updated_at:n};
+  if(editBD)Object.assign(editBD,d);else birthdays.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();renderView();}
+async function delBday(){if(editBD&&await askConfirm('Delete '+editBD.name+'\'s birthday?',{ok:'Delete',danger:true})){editBD.deleted=true;editBD.updated_at=now();closeM();persist();renderView();}}
 
 /* ═══ HOME ═══ */
 function vHome(){const td=today();
