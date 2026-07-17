@@ -330,6 +330,19 @@ canvas{display:block;max-width:100%}
 .mrow .mtitle{font-weight:600;color:var(--blue-d)}
 .mrow .msub{font-size:11.5px;color:var(--t3);margin-top:1px}
 
+/* ═══ searchable select ═══ */
+.sselw{position:relative;display:inline-block}
+select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height:1px!important;width:1px!important;padding:0;border:0;left:0;top:0}
+.sseli{width:100%;box-sizing:border-box;cursor:pointer;background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%23888"/></svg>') no-repeat right 10px center}
+.sseli:focus{cursor:text}
+.sselp{display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:80;background:#fff;border:1px solid var(--bdr);border-radius:var(--rs);max-height:230px;overflow-y:auto;box-shadow:0 10px 28px rgba(24,24,24,.18)}
+.sselp.show{display:block}
+.sselo{padding:7px 11px;cursor:pointer;font-size:13px}
+.sselo:hover,.sselo.hi{background:var(--blue-l)}
+.sselo.on{color:var(--blue-d);font-weight:600}
+.sselo.empty{color:var(--t3);cursor:default}
+.sselo.empty:hover{background:none}
+
 /* ═══ modal ═══ */
 .ovl{position:fixed;inset:0;background:rgba(24,24,24,.45);display:none;align-items:flex-start;justify-content:center;padding:44px 16px;z-index:70;overflow:auto}
 .ovl.open{display:flex}
@@ -610,7 +623,7 @@ canvas{display:block;max-width:100%}
     <div id="fMRepeatMonthDay" style="margin-top:6px;display:flex;align-items:center;gap:8px"><input type="number" id="mRepeatMonthDay" min="1" max="31" style="width:70px"><span class="note">day of the month</span></div>
     <div id="fMRepeatMonthWd" style="margin-top:6px;display:none;gap:8px"><select id="mRepeatMonthNth" style="width:auto"><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="-1">Last</option></select><select id="mRepeatMonthWdSel" style="width:auto"></select></div>
   </div>
-  <div class="fld"><label>Attendees</label><div class="attlist" id="mAtt"></div></div>
+  <div class="fld"><label>Attendees</label><input id="mAttSearch" placeholder="Search, or type a new name and press Enter to add" oninput="_filterMAtt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();mAttAddNew(this.value);}" style="margin-bottom:6px"><div class="attlist" id="mAtt"></div></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="mDel" style="display:none" onclick="delMeeting()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveMeeting()">Save</button></div></div>
@@ -622,7 +635,7 @@ canvas{display:block;max-width:100%}
   <div class="mbody">
   <p class="note">Travelling anywhere this period? We'll surface accounts nearby, plus anyone overdue for a touchpoint.</p>
   <div class="g2">
-    <div class="fld"><label>Travelling to</label><select id="planRegion"></select></div>
+    <div class="fld"><label>Travelling to</label><input id="planTravel" list="planTravelDL" placeholder="e.g. Mumbai — leave blank if not travelling"><datalist id="planTravelDL"></datalist></div>
     <div></div>
     <div class="fld"><label>From</label><input type="date" id="planTripFrom"></div>
     <div class="fld"><label>To</label><input type="date" id="planTripTo"></div>
@@ -735,7 +748,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -743,7 +756,7 @@ var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
 var appMode=localStorage.getItem(MODE_KEY)||'official';
 var personalTab='tasks';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -772,7 +785,26 @@ const DL=()=>deals.filter(d=>!d.deleted);
 const AC=()=>activities.filter(a=>!a.deleted);
 const TR=()=>toolruns.filter(t=>!t.deleted);
 const OP=()=>opps.filter(o=>!o.deleted);
+const LOC=()=>locations.filter(x=>!x.deleted);
 const pname=id=>id==='me'||!id?(myProfile.name||'Me'):(P().find(p=>p.id===id)||{}).name||'—';
+const deptForOwner=oid=>oid==='me'||!oid?(myProfile.dept||''):(P().find(p=>p.id===oid)||{}).dept||'';
+function lastLocEntry(){return LOC().slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0)[0]||null;}
+function locOn(ds){const hits=LOC().filter(x=>x.date<=ds);return hits.length?hits.sort((a,b)=>a.date<b.date?1:-1)[0].city:'';}
+function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();if(ex){ex.city=city;ex.updated_at=n;}else locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});persist();}
+async function checkLocationConfirmation(){
+  if(appMode!=='official')return;
+  const td=today();const last=lastLocEntry();
+  if(last&&last.date===td)return;
+  if(!last){const v=await askText('Where are you based right now? You can change this anytime from the planner.',{title:'Set your location',placeholder:'e.g. Mumbai, Home office'});
+    if(v&&v.trim())setLoc(td,v.trim());
+    return;}
+  const gapDays=Math.round((new Date(td+'T12:00')-new Date(last.date+'T12:00'))/86400000);
+  const msg=gapDays<=1?`Still in ${last.city}?`:`Last confirmed location: ${last.city} — ${fmtD(last.date)} (${gapDays} days ago). Still there?`;
+  const choice=await askChoice(msg,[{label:'Yes, still in '+last.city,value:'same'},{label:'Change location',value:'change'}],{title:'Confirm your location'});
+  if(choice==='same')setLoc(td,last.city);
+  else if(choice==='change'){const v=await askText('Where are you now?',{title:'Change location',value:last.city,placeholder:'e.g. Mumbai, Home'});
+    if(v&&v.trim())setLoc(td,v.trim());}
+}
 const cname=id=>id?(CU().find(c=>c.id===id)||{}).name||'':'';
 const famName=id=>(FA().find(f=>f.id===id)||{}).name||'—';
 const daysUntil=ds=>Math.round((new Date(ds+'T12:00')-new Date(today()+'T12:00'))/86400000);
@@ -970,10 +1002,10 @@ function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,tim
   r.title=txt.replace(/^call\s+/i,'').replace(/@\w[\w]*/g,'').replace(/\btoday\b|\btomorrow\b|\bnext week\b/gi,'').replace(new RegExp('\\b('+days.join('|')+')\\b','gi'),'').replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,'').replace(/!high|!low|urgent/gi,'').replace(/\s+/g,' ').trim().replace(/\s+(by|on|to)$/i,'')||txt;
   return r;}
 function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'').trim();if(!v)return;const r=parseQA(v);if(dueOverride)r.due=dueOverride;const n=now();
-  if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
-  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deleg?(P().find(p=>p.id===r.owner)||{}).dept||'':'',customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
+  if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
+  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deptForOwner(r.owner),customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
   if(inp)inp.value='';persist();renderView();}
-function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
+function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
 
 /* ═══ TINY CHARTS (canvas) ═══ */
@@ -1246,7 +1278,7 @@ function vDayPlanner(ds){const td=today();
   const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   return`<div class="grid31">
     <div>
-      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>':''}</span>
+      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>':''} <span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm your location for this day">📍 ${esc(locOn(ds)||'Set location')}</span></span>
         <span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="openMeeting(null,'${ds}')">+ Meeting</button><button class="btn xs" onclick="openTask(null,null,'${ds}')">+ Task</button></span></div>
         <div class="tl" style="height:${(H1-H0)*HPX}px">${hours}<div class="tl-blocks">${nowLine}${blockHtml}</div></div></div>
       <div class="card"><div class="ch"><span>Notes & reflection — ${fmtD(ds)}</span><button class="btn xs" onclick="saveJournal('${ds}')">Save</button></div>
@@ -1263,12 +1295,24 @@ function vDayPlanner(ds){const td=today();
       <div class="addline"><input id="dumpInp" placeholder="Park an idea — no date" onkeydown="if(event.key==='Enter')addDump()"><button class="btn sm" onclick="addDump()">Add</button></div></div>
       ${ds<=td?`<div class="card"><div class="ch">Shutdown ritual</div><div class="cb" style="font-size:12px;color:var(--t3)">Close the day: unfinished items roll to tomorrow with their original dates preserved.<div style="margin-top:8px"><button class="btn sm" onclick="shutdownDay('${ds}')">Run shutdown</button></div></div></div>`:''}
     </div></div>`;}
+async function editDayLoc(ds){const cur=locOn(ds);
+  const v=await askText('Location for '+fmtD(ds)+':',{title:'Set location',value:cur,placeholder:'e.g. Mumbai, Home, client site'});
+  if(v==null)return;ensureRegion(v.trim());setLoc(ds,v.trim());renderView();}
+function weekLocSummary(mon){const days=[...Array(7)].map((_,i)=>addDays(mon,i));const cities=days.map(ds=>locOn(ds)||'—');
+  const runs=[];let i=0;while(i<cities.length){let j=i;while(j+1<cities.length&&cities[j+1]===cities[i])j++;runs.push({city:cities[i],from:days[i],to:days[j]});i=j+1;}
+  const chips=runs.filter(r=>r.city!=='—').map(r=>`<span class="pill n">📍 ${esc(r.city)}${r.from!==r.to?' ('+new Date(r.from+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+'–'+new Date(r.to+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+')':''}</span>`).join(' ');
+  return chips||'<span class="note">No location set for this week — <a onclick="openPlanPrompt(\'week\',plAnchor)">plan ahead ✈</a></span>';}
+function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
+  const tally={};for(let day=1;day<=last;day++){const ds=mk+'-'+String(day).padStart(2,'0');const c=locOn(ds)||'—';tally[c]=(tally[c]||0)+1;}
+  const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="pill n">📍 ${esc(c)} · ${n}d</span>`).join(' ');
+  return chips||'<span class="note">No location set for this month — <a onclick="openPlanPrompt(\'month\',plAnchor)">plan ahead ✈</a></span>';}
 function setTaskAt(id,val){const t=tasks.find(x=>x.id===id);if(t&&val){t.at=val;t.updated_at=now();persist();renderView();}}
 function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t.original_due)t.original_due=ds;t.updated_at=now();persist();renderView();}}
 function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
-  tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:'',customer_id:null,notes:'',created_at:n,updated_at:n});
+  tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
-async function shutdownDay(ds){const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
+async function shutdownDay(ds){if(ds===today())await checkLocationConfirmation();
+  const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
   if(!open.length){toast('Nothing open. Clean close — well done.');return;}
   if(!await askConfirm(open.length+' unfinished item(s). Carry to tomorrow? Original due dates are kept for ageing.',{title:'Run shutdown',ok:'Carry over'}))return;
   const tm=addDays(ds,1);open.forEach(t=>{if(!t.original_due)t.original_due=t.due;t.due=tm;t.at=null;t.rolled=true;t.updated_at=now();});
@@ -1291,7 +1335,7 @@ function vPlanner(){const td=today();
         ${items.slice(0,3).map(it=>{const ov=it.k==='t'&&it.o.due<td;return`<div class="mg-it ${ov?'ov':it.k}">${esc(it.s)}</div>`;}).join('')}
         ${items.length>3?`<div class="mg-more">+${items.length-3} more</div>`:''}</div>`;}).join('');
     body=planHtml('month',mk,'Goals — '+title,'What must this month deliver? Three to five goals.')+
-      `<div style="height:12px"></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
+      `<div style="margin:8px 0">${monthLocSummary(mk)}</div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
@@ -1304,7 +1348,7 @@ function vPlanner(){const td=today();
       ${doneT.map(t=>`<div class="wc-it done">${esc(t.title)}</div>`).join('')}</div>
       <div class="wc-add" style="display:flex;gap:4px"><input style="flex:1" placeholder="+ add" onkeydown="if(event.key==='Enter'&&this.value.trim()){addQuickDay('${ds}',this.value.trim());this.value=''}"><button class="btn xs" onclick="const i=this.previousElementSibling;if(i.value.trim())addQuickDay('${ds}',i.value.trim())">Add</button></div></div>`;}).join('');
     body=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the three outcomes this week is for?')+
-      `<div style="height:12px"></div><div class="wgrid">${cols}</div>`;
+      `<div style="margin:8px 0">${weekLocSummary(mon)}</div><div class="wgrid">${cols}</div>`;
   }else{
     title='Meetings';
     const up=M().filter(m=>m.status!=='done'&&m.date>=td).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
@@ -1363,7 +1407,7 @@ async function closeMeeting(mid){const m=meetings.find(x=>x.id===mid);if(!m)retu
     persist();nav('meeting',nm.id);toast('Rescheduled to '+fmtD(nd)+'. Agenda carried over.');}}
 function mAgendaAdd(mid){const i=g('mAgInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:null,meeting_id:mid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function mActionAdd(mid){const t=g('mActT').value.trim();if(!t)return;const o=g('mActO').value,d=g('mActD').value||null,n=now();const m=M().find(x=>x.id===mid);
-  const ownerDept=o!=='me'?(P().find(x=>x.id===o)||{}).dept:'';
+  const ownerDept=deptForOwner(o);
   tasks.push({id:uid(),type:'task',title:t,owner:o,due:d,original_due:d,estimate_min:30,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:ownerDept||m?.dept||'',customer_id:m?.customer_id||null,meeting_id:mid,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Action delegated to '+pname(o):'Action added');}
 
@@ -1480,7 +1524,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
   const filters=`<div class="filters"><input placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
     <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
-    <select onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
+    <select data-ssel onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
     <select onchange="window._tDp=this.value;renderView()"><option value="">All departments</option>${depts2.map(d=>`<option${dp===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
     <select onchange="window._tDateField=this.value;renderView()" title="Filter by date"><option value="">Any date</option><option value="created_at"${dfF==='created_at'?' selected':''}>Created</option><option value="updated_at"${dfF==='updated_at'?' selected':''}>Modified</option><option value="completed_at"${dfF==='completed_at'?' selected':''}>Completed</option></select>
     ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._tDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._tDateTo=this.value;renderView()" style="max-width:135px">`:''}
@@ -1584,7 +1628,7 @@ function saveTaskNotes(id){const t=tasks.find(x=>x.id===id);if(!t)return;const e
   logTaskNotes(t);
   persist();renderView();toast('Notes saved'+(t.customer_id?' and logged to account.':'.'));}
 function taskChildAdd(pid){const p=tasks.find(x=>x.id===pid);if(!p)return;const tt=g('tkT').value.trim();if(!tt)return;captureTaskNotes(pid);const o=g('tkO').value,d=g('tkD').value||null,n=now();
-  const ownerDept=o!=='me'?(P().find(x=>x.id===o)||{}).dept:'';
+  const ownerDept=deptForOwner(o);
   tasks.push({id:uid(),type:'task',title:tt,owner:o,parent_task:pid,due:d,original_due:d,estimate_min:5,follow_up:o!=='me'?defaultFollowUp(d):null,priority:'medium',status:o!=='me'?'waiting':'open',dept:ownerDept||p.dept||'',customer_id:p.customer_id||null,contact_id:p.contact_id||null,notes:'',created_at:n,updated_at:n});
   persist();renderView();toast(o!=='me'?'Delegated to '+pname(o):'Follow-on added');}
 
@@ -1734,7 +1778,7 @@ function vAccounts(){
   const regs=[...new Set(CU().map(c=>c.region).filter(Boolean))].sort();
   const view=_view.accounts||'list';
   const filters=`<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
-    <select onchange="window._caKam=this.value;renderView()"><option value="">All KAMs</option><option value="__none"${kf==='__none'?' selected':''}>— No KAM —</option>${kams.map(id=>`<option value="${id}"${kf===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>
+    <select data-ssel onchange="window._caKam=this.value;renderView()"><option value="">All KAMs</option><option value="__none"${kf==='__none'?' selected':''}>— No KAM —</option>${kams.map(id=>`<option value="${id}"${kf===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>
     <select onchange="window._caSeg=this.value;renderView()"><option value="">All segments</option>${segs.map(x=>`<option${sf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
     <select onchange="window._caReg=this.value;renderView()"><option value="">All regions</option>${regs.map(x=>`<option${rf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
     ${(kf||sf||rf||q)?`<button class="btn gh2 sm" onclick="window._cq='';window._caKam='';window._caSeg='';window._caReg='';renderView()">Clear</button>`:''}
@@ -1774,7 +1818,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id));const avail=P().filter(x=>!ids.includes(x.id));
       return `<div class="card"><div class="ch"><span>Our team on this account</span><span class="n num">${ppl.length}</span></div>
       ${ppl.map(x=>`<div class="row" style="cursor:pointer" onclick="nav('people','${x.id}')"><div class="bd"><div class="tt">${esc(x.name)}${c.kam_id===x.id?' <span class="pill b">KAM</span>':''}</div><div class="meta">${esc(x.role||'')}${x.role&&x.dept?' · ':''}${esc(x.dept||'')}</div></div><div class="rowacts">${c.kam_id===x.id?'':`<button class="iconb" title="Make KAM" onclick="event.stopPropagation();setKam('${c.id}','${x.id}')">★</button>`}<button class="iconb" title="New task for them on this account" onclick="event.stopPropagation();openTask(null,'${x.id}',null,'${c.id}')">+ task</button><button class="iconb" title="Unlink" onclick="event.stopPropagation();acctUnlinkPerson('${c.id}','${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">Link the people who face this account. Star one as KAM.</div>'}
-      <div class="addline"><select id="acctPersonSel" style="flex:1">${avail.length?avail.map(x=>`<option value="${x.id}">${esc(x.name)}${x.role?' — '+esc(x.role):''}</option>`).join(''):'<option value="">All people already linked</option>'}</select><button class="btn sm" onclick="acctLinkPerson('${c.id}')">Link</button><button class="btn gh2 sm" onclick="openPerson()">New person</button></div></div>`;})()}
+      <div class="addline"><select id="acctPersonSel" data-ssel style="flex:1">${avail.length?avail.map(x=>`<option value="${x.id}">${esc(x.name)}${x.role?' — '+esc(x.role):''}</option>`).join(''):'<option value="">All people already linked</option>'}</select><button class="btn sm" onclick="acctLinkPerson('${c.id}')">Link</button><button class="btn gh2 sm" onclick="openPerson()">New person</button></div></div>`;})()}
     ${seccard('Open items',open.length,open.map(t=>trow(t,{star:false})).join(''),'Nothing open for '+nm+'.')}
     ${meets.length?seccard('Upcoming meetings',meets.length,meets.map(mrowHtml).join(''),''):''}
     ${c.notes?`<div class="card"><div class="ch">Notes</div><div class="cb" style="font-size:12.5px;color:var(--t2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
@@ -2039,7 +2083,7 @@ function vPremortem(){const s=pmState();
     <button class="btn sm" onclick="trSave('premortem',_pm.title||'Pre-mortem',_pm)">Save exercise</button>
     <button class="btn gh2 sm" onclick="pmToTasks()">High risks → tasks</button></div>
   </div></div>`;}
-function pmToTasks(){const s=window._pm;let n=0;s.risks.filter(r=>r.lk==='High'&&r.mit).forEach(r=>{const nw=now();tasks.push({id:uid(),type:'task',title:'Mitigate: '+r.mit,owner:'me',due:addDays(today(),7),original_due:addDays(today(),7),estimate_min:30,priority:'high',status:'open',dept:'',customer_id:null,notes:'Pre-mortem risk: '+r.why,created_at:nw,updated_at:nw});n++;});
+function pmToTasks(){const s=window._pm;let n=0;s.risks.filter(r=>r.lk==='High'&&r.mit).forEach(r=>{const nw=now();tasks.push({id:uid(),type:'task',title:'Mitigate: '+r.mit,owner:'me',due:addDays(today(),7),original_due:addDays(today(),7),estimate_min:30,priority:'high',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'Pre-mortem risk: '+r.why,created_at:nw,updated_at:nw});n++;});
   trSave('premortem',s.title||'Pre-mortem',s);persist();toast(n+' mitigation task(s) created, due in 7 days.');}
 /* 5 whys */
 function fwState(){if(!window._fw){const ex=trGet('fivewhys');window._fw=ex?JSON.parse(JSON.stringify(ex.data)):{problem:'',whys:['','','','',''],counter:''};}return window._fw;}
@@ -2053,7 +2097,7 @@ function vFiveWhys(){const s=fwState();
   <button class="btn gh2 sm" onclick="fwToTask()">Countermeasure → task</button></div>
   </div></div>`;}
 function fwToTask(){const s=window._fw;if(!s.counter){toast('Write the countermeasure first.');return;}const nw=now();
-  tasks.push({id:uid(),type:'task',title:s.counter,owner:'me',due:addDays(today(),7),original_due:addDays(today(),7),estimate_min:45,priority:'high',status:'open',dept:'',customer_id:null,notes:'Root cause of: '+s.problem,created_at:nw,updated_at:nw});
+  tasks.push({id:uid(),type:'task',title:s.counter,owner:'me',due:addDays(today(),7),original_due:addDays(today(),7),estimate_min:45,priority:'high',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'Root cause of: '+s.problem,created_at:nw,updated_at:nw});
   trSave('fivewhys',s.problem||'5 Whys',s);persist();toast('Countermeasure task created.');}
 /* pareto */
 function paState(){if(!window._pa){const ex=trGet('pareto');window._pa=ex?JSON.parse(JSON.stringify(ex.data)):{title:'',items:[{cause:'',count:''},{cause:'',count:''},{cause:'',count:''}]};}return window._pa;}
@@ -2228,7 +2272,7 @@ function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._co
   list=applySort('contacts',list,getters);if(!_sort.contacts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
   const accts=[...new Set(CO().map(x=>x.customer_id).filter(Boolean))].map(id=>({id,name:cname(id)})).sort((a,b)=>a.name.localeCompare(b.name));
   const filters=`<div class="filters"><input placeholder="Search name, role, phone, email, account" value="${esc(window._coq||'')}" oninput="window._coq=this.value;clearTimeout(window._cot);window._cot=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px">
-    <select onchange="window._coAcct=this.value;renderView()"><option value="">All accounts</option>${accts.map(a=>`<option value="${a.id}"${af===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}</select>
+    <select data-ssel onchange="window._coAcct=this.value;renderView()"><option value="">All accounts</option>${accts.map(a=>`<option value="${a.id}"${af===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}</select>
     ${(q||af)?`<button class="btn gh2 sm" onclick="window._coq='';window._coAcct='';renderView()">Clear</button>`:''}</div>`;
   const rows=list.map(x=>`<tr class="click" onclick="openContact('${x.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(x.name)}</td><td>${esc(x.role||'')}</td><td>${x.customer_id?`<span class="lnk" onclick="event.stopPropagation();nav('accounts','${x.customer_id}')">${esc(cname(x.customer_id))}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${x.phone?`<a href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">${esc(x.phone)}</a>`:''}</td><td>${x.email?`<a href="mailto:${esc(x.email)}" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</td></tr>`).join('');
   const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('contacts','name','Name')}${sortHead('contacts','role','Role')}${sortHead('contacts','account','Account')}${sortHead('contacts','phone','Phone')}${sortHead('contacts','email','Email')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No contacts match. Add one from any account, or via + New.</div></div>';
@@ -2395,13 +2439,16 @@ function askChoice(msg,choices,opts={}){return new Promise(res=>{_askKind='choic
   g('askOk').style.display='none';g('askCancel').style.display='';
   g('mAsk').classList.add('open');});}
 function _resetAskOk(){g('askOk').style.display='';}
+function _filterAskPpl(q){const f=(q||'').trim().toLowerCase();const l=g('askPplList');if(l)l.querySelectorAll('.ckrow').forEach(r=>{r.style.display=(!f||r.dataset.nm.includes(f))?'':'none';});}
 function askPeople(msg,people,preselected,opts={}){return new Promise(res=>{_askKind='people';_askCb=res;
   g('askTitle').textContent=opts.title||'Select people';g('askMsg').textContent=msg||'';
   g('askField').style.display='none';const box=g('askChoices');box.style.display='flex';
   const pre=new Set(preselected||[]);
-  box.innerHTML=people.map(p=>`<label class="ckrow"><input type="checkbox" value="${p.id}"${pre.has(p.id)?' checked':''}> ${esc(p.name)}${p.role?` <span style="color:var(--t3);font-size:11px">· ${esc(p.role)}</span>`:''}</label>`).join('')||'<div style="color:var(--t4);font-size:12px">No people yet.</div>';
+  const rows=people.map(p=>`<label class="ckrow" data-nm="${esc((p.name+' '+(p.role||'')).toLowerCase())}"><input type="checkbox" value="${p.id}"${pre.has(p.id)?' checked':''}> ${esc(p.name)}${p.role?` <span style="color:var(--t3);font-size:11px">· ${esc(p.role)}</span>`:''}</label>`).join('')||'<div style="color:var(--t4);font-size:12px">No people yet.</div>';
+  box.innerHTML=(people.length>5?`<input id="askPplSearch" placeholder="Search people…" oninput="_filterAskPpl(this.value)">`:'')+
+    `<div id="askPplList" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">${rows}</div>`;
   g('askOk').style.display='';g('askOk').textContent=opts.ok||'Use selected';g('askOk').className='btn';g('askCancel').style.display='';
-  g('mAsk').classList.add('open');});}
+  g('mAsk').classList.add('open');setTimeout(()=>{const s=g('askPplSearch');if(s)s.focus();},60);});}
 
 /* ═══ MODALS ═══ */
 function closeM(){document.querySelectorAll('.ovl').forEach(o=>o.classList.remove('open'));}
@@ -2413,11 +2460,43 @@ document.addEventListener('keydown',e=>{if(e.key!=='Enter'||e.shiftKey)return;co
   const save=ov.querySelector('.macts .rr .btn:not(.gh2)')||ov.querySelector('.macts .btn:not(.gh2):not(.dg)');
   if(save){e.preventDefault();save.click();}});
 document.addEventListener('keydown',e=>{const ov=g('mAsk');if(ov&&ov.classList.contains('open')){if(e.key==='Enter'&&_askKind!=='text'){e.preventDefault();if(_askKind==='confirm'||_askKind==='people')askOk();}if(e.key==='Escape'){askResolve(_askKind==='confirm'?false:null);}}});
+/* ═══ searchable select — wraps a <select> with a type-to-filter text input; keeps the
+   underlying <select> as the source of truth so existing g(id).value / onchange code needs no changes ═══ */
+function ssel(sel){const el=typeof sel==='string'?g(sel):sel;if(!el||el.tagName!=='SELECT')return;
+  if(el._sselApi){el._sselApi.sync();return;}
+  const wrap=document.createElement('span');wrap.className='sselw';
+  wrap.setAttribute('style',el.getAttribute('style')||'');
+  el.parentNode.insertBefore(wrap,el);wrap.appendChild(el);
+  el.classList.add('sselhide');el.tabIndex=-1;
+  const inp=document.createElement('input');inp.type='text';inp.className='sseli';inp.autocomplete='off';inp.spellcheck=false;inp.placeholder='Search…';
+  const panel=document.createElement('div');panel.className='sselp';
+  wrap.appendChild(inp);wrap.appendChild(panel);
+  let curOpts=[],hiIdx=-1;
+  function sync(){inp.value=el.selectedOptions[0]?el.selectedOptions[0].textContent:'';}
+  function matches(f){const q=(f||'').trim().toLowerCase();return[...el.options].filter(o=>o.value!==''||!q).filter(o=>!q||o.textContent.toLowerCase().includes(q));}
+  function draw(f){curOpts=matches(f);hiIdx=curOpts.findIndex(o=>o.value===el.value);
+    panel.innerHTML=curOpts.length?curOpts.map((o,i)=>`<div class="sselo${o.value===el.value?' on':''}${i===hiIdx?' hi':''}" data-i="${i}">${esc(o.textContent)}</div>`).join(''):'<div class="sselo empty">No matches</div>';}
+  function openP(f){draw(f!=null?f:'');panel.classList.add('show');}
+  function closeP(){panel.classList.remove('show');}
+  function pick(i){const o=curOpts[i];if(!o)return;el.value=o.value;el.dispatchEvent(new Event('change',{bubbles:true}));sync();closeP();}
+  function scrollHi(){const h=panel.querySelector('.sselo.hi');if(h)h.scrollIntoView({block:'nearest'});}
+  inp.addEventListener('focus',()=>{inp.select();openP('');});
+  inp.addEventListener('input',()=>openP(inp.value));
+  inp.addEventListener('keydown',e=>{
+    if(!panel.classList.contains('show')){if(e.key==='ArrowDown'||e.key==='Enter'){e.preventDefault();openP('');}return;}
+    if(e.key==='ArrowDown'){e.preventDefault();hiIdx=Math.min(curOpts.length-1,hiIdx+1);draw(inp.value);scrollHi();}
+    else if(e.key==='ArrowUp'){e.preventDefault();hiIdx=Math.max(0,hiIdx-1);draw(inp.value);scrollHi();}
+    else if(e.key==='Enter'){e.preventDefault();if(hiIdx>=0)pick(hiIdx);}
+    else if(e.key==='Escape'){closeP();sync();inp.blur();}});
+  inp.addEventListener('blur',()=>setTimeout(()=>{closeP();sync();},150));
+  panel.addEventListener('mousedown',e=>{const o=e.target.closest('.sselo');if(!o||o.classList.contains('empty'))return;e.preventDefault();pick(+o.dataset.i);});
+  el._sselApi={sync};sync();}
+function wireSSelAll(root){(root||document).querySelectorAll('select[data-ssel]').forEach(ssel);}
 function fillDept(sel,val){g(sel).innerHTML='<option value="">—</option>'+depts.map(d=>`<option${d===val?' selected':''}>${esc(d)}</option>`).join('');}
-function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');}
-function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');}
+function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');ssel(sel);}
+function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
 function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+products.map(p=>`<option${p===val?' selected':''}>${esc(p)}</option>`).join('');}
-function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');}
+function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
 
 let editT=null;
 function taskAnchorDate(){return g('tType').value==='call'?(g('tWhen').value||'').slice(0,10):g('tDue').value;}
@@ -2437,7 +2516,7 @@ function taskRepeatUI(){const rep=g('tRepeat').value,on=!!rep;const ds=taskAncho
 function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){editT=id?tasks.find(x=>x.id===id):null;const t=editT;
   g('mTaskTitle').textContent=t?'Edit Item':'New Item';
   g('tTitle').value=t?.title||'';g('tType').value=t?.type||presetType||'task';
-  fillOwner('tOwner',t?t.owner:presetOwner||'me');fillDept('tDept',t?.dept||(presetOwner?(P().find(p=>p.id===presetOwner)||{}).dept:'')||'');
+  fillOwner('tOwner',t?t.owner:presetOwner||'me');fillDept('tDept',t?.dept||deptForOwner(presetOwner||'me')||'');
   fillCust('tCust',t?.customer_id||presetCust||'');
   fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
   g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||(t?'':today());g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||(t?'':'5');g('tRepeat').value=t?.repeat||'';
@@ -2456,7 +2535,7 @@ function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){edi
 function dueChanged(){const due=g('tDue').value;const fup=g('tFup');if(!fup||!due)return;
   const cur=fup.value;const auto=fup.dataset.auto==='1';
   if(!cur||auto){fup.value=defaultFollowUp(due);fup.dataset.auto='1';}}
-function ownerAutofill(){const oid=g('tOwner').value;if(oid&&oid!=='me'){const p=P().find(x=>x.id===oid);if(p&&p.dept&&!g('tDept').value)fillDept('tDept',p.dept);}taskTypeUI();}
+function ownerAutofill(){const oid=g('tOwner').value;const d=deptForOwner(oid);if(d&&!g('tDept').value)fillDept('tDept',d);taskTypeUI();}
 function taskTypeUI(){const call=g('tType').value==='call';const deleg=g('tOwner').value!=='me';
   g('fWhen').style.display=call?'':'none';g('fPhone').style.display=call?'':'none';
   g('fDue').style.display=call?'none':'';g('fAt').style.display=call?'none':'';g('fEst').style.display=call?'none':'';
@@ -2585,9 +2664,19 @@ function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;g('mRepeatMonthMode').value='date';
   g('mRepeatWd').dataset.forDate='';g('fMRepeatMonth').dataset.forDate='';
   meetingRepeatUI();
-  const selSet=new Set(editM?.attendee_ids||[]);
-  g('mAtt').innerHTML=P().map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('')||'<span class="note">Add people first.</span>';
+  const selSet=new Set(editM?editM.attendee_ids||[]:['me']);
+  g('mAtt').innerHTML=[{id:'me',name:myProfile.name||'Me'},...P()].map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('');
+  if(g('mAttSearch'))g('mAttSearch').value='';
   g('mDel').style.display=editM?'':'none';g('mMeet').classList.add('open');setTimeout(()=>g('mTitle2').focus(),50);}
+function _filterMAtt(q){const f=(q||'').trim().toLowerCase();g('mAtt').querySelectorAll('.attchip').forEach(c=>{c.style.display=(!f||c.textContent.toLowerCase().includes(f))?'':'none';});}
+function mAttAddNew(raw){const nm=(raw||'').trim();if(!nm)return;
+  let chip=[...g('mAtt').querySelectorAll('.attchip')].find(c=>c.textContent.trim().toLowerCase()===nm.toLowerCase());
+  if(!chip){const id=getOrCreatePerson(nm,g('mDept').value||'');persist();
+    chip=document.createElement('span');chip.className='attchip';chip.dataset.id=id;chip.textContent=pname(id);
+    chip.onclick=function(){this.classList.toggle('on');};
+    g('mAtt').appendChild(chip);}
+  chip.classList.add('on');chip.style.display='';
+  const s=g('mAttSearch');if(s)s.value='';_filterMAtt('');}
 function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('Title required.');return;}const n=now();
   const att=[...g('mAtt').querySelectorAll('.attchip.on')].map(c=>c.dataset.id);
   const repeat=editM?editM.repeat||'':g('mRepeat').value;
@@ -2616,12 +2705,14 @@ function openPlanPrompt(tab,anchor){
   const[start,end]=planPeriodRange(tab,anchor);
   g('planPeriodLabel').textContent=tab==='week'?('week of '+fmtD(start)):new Date(start+'T12:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   window._planCtx={tab,start,end};
-  g('planRegion').innerHTML='<option value="">Not travelling</option>'+regions.map(r=>`<option>${esc(r)}</option>`).join('');
+  g('planTravelDL').innerHTML=[...new Set([...regions,...LOC().map(l=>l.city)])].filter(Boolean).map(r=>`<option value="${esc(r)}">`).join('');
+  g('planTravel').value='';
   g('planTripFrom').value=start;g('planTripTo').value=end;
   g('planSuggestions').innerHTML='';g('planAddBtn').style.display='none';
   g('mPlan').classList.add('open');}
 function planSuggest(){
-  const region=g('planRegion').value;const{start,end}=window._planCtx;
+  const region=g('planTravel').value.trim();const{start,end}=window._planCtx;
+  if(region){ensureRegion(region);setLoc(g('planTripFrom').value||start,region);}
   const cands=new Map();
   if(region)CU().filter(c=>c.region===region).forEach(c=>cands.set(c.id,{c,reasons:['travelling to '+region]}));
   CU().forEach(c=>{if(visitDue(c)){const e=cands.get(c.id)||{c,reasons:[]};e.reasons.push('due for a '+c.visit_cadence+' touchpoint');cands.set(c.id,e);}});
@@ -2631,7 +2722,7 @@ function planSuggest(){
     list.map(({c,reasons})=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="plan-sugg" data-cid="${c.id}" checked><span>${esc(c.name)} <span class="note">— ${esc(reasons.join(', '))}</span></span></label>`).join('')+'</div>';
   g('planAddBtn').style.display='';}
 function planAddSelected(){
-  const{start}=window._planCtx;const region=g('planRegion').value;const tripFrom=g('planTripFrom').value||start;
+  const{start}=window._planCtx;const region=g('planTravel').value.trim();const tripFrom=g('planTripFrom').value||start;
   const checked=[...g('planSuggestions').querySelectorAll('.plan-sugg:checked')].map(el=>el.dataset.cid);
   const n=now();let added=0;
   checked.forEach(cid=>{const c=CU().find(x=>x.id===cid);if(!c)return;
@@ -2703,6 +2794,7 @@ function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')qui
     const ks=Object.keys(m);if(ks.length)drawBars(dc,ks,ks.map(k=>m[k]),'#ba0517');else{const c=dc.getContext('2d');dc.width=dc.clientWidth*2;dc.height=dc.clientHeight*2;c.font='600 20px Inter';c.fillStyle='#939393';c.textAlign='center';c.fillText('No overdue items — clean board.',dc.width/2,dc.height/2);}}
   const sc=g('stageCv');if(sc){const vals=STAGES.slice(0,4).map(st=>Math.round(DL().filter(d=>d.stage===st).reduce((a,d)=>a+(+d.value||0),0)/1000));
     drawBars(sc,STAGES.slice(0,4),vals,'#0176d3');}
+  wireSSelAll(g('main'));
 }
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();g('ghSearch').focus();return;}
@@ -2729,7 +2821,8 @@ nav=async function(v,arg){if(v!=='decide'){dTool=null;window._trId=null;window._
 
 /* ═══ BOOT ═══ */
 (function boot(){loadLS();applyModeUI();renderView();restoreFolder();gRestore();
-try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}})();
+try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
+setTimeout(()=>checkLocationConfirmation(),350);})();
 </script>
 </body>
 </html>
