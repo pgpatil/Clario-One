@@ -223,8 +223,29 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .wc-it.c{background:var(--grn-l);color:var(--grn);border-color:transparent}
 .wc-it.ov{background:var(--red-l);color:var(--red);border-color:transparent}
 .wc-it.done{opacity:.5;text-decoration:line-through}
-.wc-add{border-top:1px solid var(--bdr);padding:5px}
+.wc-add{border-top:1px solid var(--bdr);padding:6px}
 .wc-add input{width:100%;font-size:11.5px;padding:4px 7px;border-color:var(--bdr)}
+.wc-loc{padding:5px 8px 0}
+.wc-loc .pill{font-size:10.5px}
+.wtl{position:relative;margin:6px 8px 0;border:1px solid var(--bdr);border-radius:6px;background:#fff;overflow:hidden}
+.wtl-b{position:absolute;left:2px;right:2px;border-radius:2px;cursor:pointer}
+.wtl-b.m{background:var(--blue)}
+.wtl-b.c{background:var(--grn)}
+.wtl-b.done{opacity:.4}
+.wtl-now{position:absolute;left:0;right:0;height:1.5px;background:var(--red);z-index:5}
+.wtl-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--t4)}
+.wc-tasks-hdr{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;font-size:11.5px;font-weight:600;color:var(--t2);cursor:pointer;user-select:none}
+.wc-tasks-hdr:hover{color:var(--blue-d)}
+.wc-tasks-hdr .ar{color:var(--t4);font-size:10px}
+.wc-tasklist{padding:0 8px 6px;display:flex;flex-direction:column;gap:4px}
+.wc-trow{display:flex;align-items:center;gap:6px;font-size:11px}
+.wc-trow .tt{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc-trow.ov .tt{color:var(--red)}
+.wc-trow input[type=date]{font-size:10px;padding:2px 3px;width:100px}
+.wc-top3{padding:0 2px}
+.wc-top3 .card{margin:6px 8px 0;box-shadow:none}
+.vtog.xs{display:inline-flex}
+.vtog.xs button{padding:3px 8px;font-size:10.5px}
 
 /* ═══ planner: day ═══ */
 .tl{position:relative;border:1px solid var(--bdr);border-radius:var(--r);background:#fff;overflow:hidden}
@@ -683,7 +704,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <div class="ovl" id="mAsk"><div class="modal" style="max-width:420px">
   <h3 id="askTitle">Confirm</h3>
   <div class="mbody"><div id="askMsg" style="font-size:13px;color:var(--t2);line-height:1.55;margin-bottom:10px"></div>
-  <div class="fld" id="askField" style="display:none"><input id="askInput"></div>
+  <div class="fld" id="askField" style="display:none"><input id="askInput" list="askInputDL"><datalist id="askInputDL"></datalist></div>
   <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
   <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
@@ -752,15 +773,16 @@ var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
+var locationsList=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var stateUpdatedAt=now();
 var appMode=localStorage.getItem(MODE_KEY)||'official';
 var personalTab='tasks';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
+function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile};TABLES.forEach(t=>s[t]=window[t]);return s;}
+function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
 function persist(){stateUpdatedAt=now();try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
 function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
@@ -813,6 +835,9 @@ function nextBirthday(bday){const m=(bday||'').match(/^\d{4}-(\d{2})-(\d{2})/);i
   if(next<td)next=(year+1)+'-'+m[1]+'-'+m[2];
   return next;}
 function upcomingBirthdays(){return BD().filter(b=>b.date).map(b=>{const next=nextBirthday(b.date);return{id:b.id,name:b.name,next,inDays:daysUntil(next)};}).sort((a,b)=>a.inDays-b.inDays);}
+function todaysBirthdays(){return upcomingBirthdays().filter(b=>b.inDays===0);}
+function birthdayBadge(){const bd=todaysBirthdays();if(!bd.length)return'';
+  return` <span class="pill a lnk" onclick="personalTab='birthdays';appMode==='personal'?renderView():setMode('personal')" title="Today's birthday">🎂 ${bd.map(b=>esc(b.name)).join(', ')}</span>`;}
 /* clickable name chips — navigate to the entity */
 const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
 const personLink=(id,cls)=>id?(id==='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();openMyProfile()" title="Edit your profile">${esc(pname(id))}</span>`:`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`):'';
@@ -1205,7 +1230,7 @@ function vHome(){const td=today();
     :hr>=17
     ?`<div class="card" style="border-left:4px solid var(--amb)"><div class="cb" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Evening.</b> ${openToday} item${openToday===1?'':'s'} still open. Run shutdown to carry them and keep ageing honest.</div><button class="btn sm" onclick="plTab='day';plAnchor=today();nav('planner')">Run shutdown</button></div></div>`
     :'';
-  return pagehead(dt.toLocaleDateString('en-IN',{weekday:'long'}).toUpperCase(),dt.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}),'Your day at a glance',
+  return pagehead(dt.toLocaleDateString('en-IN',{weekday:'long'}).toUpperCase(),dt.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+birthdayBadge(),'Your day at a glance',
     `<button class="btn gh2 sm" onclick="plTab='day';plAnchor=today();nav('planner')">Plan my day</button><button class="btn sm" onclick="openTask()">+ New</button>`)+
   `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1" placeholder="Capture anything — 'call Rajesh tomorrow 3pm' · '@Priya MIS by friday' · 'review capex today !high'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
   <div class="kpis">
@@ -1253,15 +1278,25 @@ function saveJournal(key){const ta=g('jTa');if(!ta)return;const j=getJournal(key
 
 /* ═══ PLANNER ═══ */
 var plTab='day',plAnchor=today(),selDay=today();
+var wkExpanded={},wcMode={};
 function plShift(n){if(plTab==='month'){const d=new Date(plAnchor.slice(0,7)+'-15T12:00');d.setMonth(d.getMonth()+n);plAnchor=d.toISOString().slice(0,10);}
   else if(plTab==='week')plAnchor=addDays(plAnchor,n*7);
   else plAnchor=addDays(plAnchor,n);renderView();}
-const H0=7,H1=21,HPX=46;
+const H0=7,H1=21,HPX=46,WPX=12;
 function timedBlocks(ds){const out=[];
   M().filter(m=>m.date===ds&&m.time).forEach(m=>out.push({k:'m',id:m.id,t:m.time,dur:+m.duration||60,title:m.title,sub:(m.attendee_ids||[]).map(pname).join(', '),done:m.status==='done',go:`nav('meeting','${m.id}')`}));
   T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds).forEach(t=>out.push({k:'c',id:t.id,t:t.when.slice(11,16),dur:30,title:'Call: '+t.title,sub:cname(t.customer_id),done:t.status==='done',go:`openTask('${t.id}')`}));
   T().filter(t=>t.type!=='call'&&t.due===ds&&t.at).forEach(t=>out.push({k:'t',id:t.id,t:t.at,dur:+t.estimate_min||30,title:t.title,sub:t.dept,done:t.status==='done',go:`openTask('${t.id}')`}));
   return out;}
+function weekTimedBlocks(ds){return timedBlocks(ds).filter(b=>b.k!=='t');}
+function miniTimeline(ds,td){const blocks=weekTimedBlocks(ds);
+  const bh=(H1-H0)*WPX;
+  const grid=`background-image:repeating-linear-gradient(to bottom,var(--bdr) 0,var(--bdr) 1px,transparent 1px,transparent ${WPX*3}px)`;
+  const blockHtml=blocks.map(b=>{const[hh,mm]=b.t.split(':').map(Number);if(hh<H0||hh>=H1)return'';
+    const top=((hh-H0)*60+mm)/60*WPX;const hgt=Math.max(4,b.dur/60*WPX-1);
+    return`<div class="wtl-b ${b.k} ${b.done?'done':''}" style="top:${top}px;height:${hgt}px" onclick="${b.go}" title="${esc(b.t)} ${esc(b.title)}${b.sub?' · '+esc(b.sub):''}"></div>`;}).join('');
+  let nowLine='';if(ds===td){const nw=new Date();const mins=(nw.getHours()-H0)*60+nw.getMinutes();if(mins>0&&mins<(H1-H0)*60)nowLine=`<div class="wtl-now" style="top:${mins/60*WPX}px"></div>`;}
+  return`<div class="wtl" style="height:${bh}px;${grid}">${blockHtml}${nowLine}${!blocks.length?'<div class="wtl-empty">No meetings</div>':''}</div>`;}
 function vDayPlanner(ds){const td=today();
   const blocks=timedBlocks(ds);
   const unplaced=T().filter(t=>t.type!=='call'&&t.due===ds&&!t.at&&t.status!=='done');
@@ -1278,7 +1313,7 @@ function vDayPlanner(ds){const td=today();
   const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   return`<div class="grid31">
     <div>
-      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>':''} <span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm your location for this day">📍 ${esc(locOn(ds)||'Set location')}</span></span>
+      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>'+birthdayBadge():''} <span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm your location for this day">📍 ${esc(locOn(ds)||'Set location')}</span></span>
         <span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="openMeeting(null,'${ds}')">+ Meeting</button><button class="btn xs" onclick="openTask(null,null,'${ds}')">+ Task</button></span></div>
         <div class="tl" style="height:${(H1-H0)*HPX}px">${hours}<div class="tl-blocks">${nowLine}${blockHtml}</div></div></div>
       <div class="card"><div class="ch"><span>Notes & reflection — ${fmtD(ds)}</span><button class="btn xs" onclick="saveJournal('${ds}')">Save</button></div>
@@ -1295,9 +1330,10 @@ function vDayPlanner(ds){const td=today();
       <div class="addline"><input id="dumpInp" placeholder="Park an idea — no date" onkeydown="if(event.key==='Enter')addDump()"><button class="btn sm" onclick="addDump()">Add</button></div></div>
       ${ds<=td?`<div class="card"><div class="ch">Shutdown ritual</div><div class="cb" style="font-size:12px;color:var(--t3)">Close the day: unfinished items roll to tomorrow with their original dates preserved.<div style="margin-top:8px"><button class="btn sm" onclick="shutdownDay('${ds}')">Run shutdown</button></div></div></div>`:''}
     </div></div>`;}
+function locationSuggestions(){return[...new Set([...locationsList,...regions,...LOC().map(l=>l.city)])].filter(Boolean);}
 async function editDayLoc(ds){const cur=locOn(ds);
-  const v=await askText('Location for '+fmtD(ds)+':',{title:'Set location',value:cur,placeholder:'e.g. Mumbai, Home, client site'});
-  if(v==null)return;ensureRegion(v.trim());setLoc(ds,v.trim());renderView();}
+  const v=await askText('Location for '+fmtD(ds)+':',{title:'Set location',value:cur,placeholder:'e.g. Mumbai, Home, client site',list:locationSuggestions()});
+  if(v==null)return;ensureLocation(v.trim());setLoc(ds,v.trim());renderView();}
 function weekLocSummary(mon){const days=[...Array(7)].map((_,i)=>addDays(mon,i));const cities=days.map(ds=>locOn(ds)||'—');
   const runs=[];let i=0;while(i<cities.length){let j=i;while(j+1<cities.length&&cities[j+1]===cities[i])j++;runs.push({city:cities[i],from:days[i],to:days[j]});i=j+1;}
   const chips=runs.filter(r=>r.city!=='—').map(r=>`<span class="pill n">📍 ${esc(r.city)}${r.from!==r.to?' ('+new Date(r.from+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+'–'+new Date(r.to+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+')':''}</span>`).join(' ');
@@ -1308,6 +1344,14 @@ function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00
   return chips||'<span class="note">No location set for this month — <a onclick="openPlanPrompt(\'month\',plAnchor)">plan ahead ✈</a></span>';}
 function setTaskAt(id,val){const t=tasks.find(x=>x.id===id);if(t&&val){t.at=val;t.updated_at=now();persist();renderView();}}
 function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t.original_due)t.original_due=ds;t.updated_at=now();persist();renderView();}}
+function toggleWeekTasks(ds){wkExpanded[ds]=!wkExpanded[ds];renderView();}
+function addQuickMeeting(ds,title,time){if(!title)return;const n=now();
+  meetings.push({id:uid(),title,date:ds,time:time||'',duration:60,dept:'',customer_id:null,attendee_ids:['me'],status:'open',created_at:n,updated_at:n});
+  persist();renderView();toast('Meeting added.');}
+function wcSetMode(ds,m){wcMode[ds]=m;renderView();}
+function wcAddGo(ds){const inp=g('wcAddInp_'+ds);const v=(inp?inp.value:'').trim();if(!v)return;
+  if(wcMode[ds]==='meeting'){const t=g('wcAddTime_'+ds);addQuickMeeting(ds,v,t?t.value:'');}
+  else addQuickDay(ds,v);}
 function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
   tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
@@ -1339,14 +1383,23 @@ function vPlanner(){const td=today();
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
-    const cols=[...Array(7)].map((_,i)=>{const ds=addDays(mon,i);const items=dayItems(ds);const d=new Date(ds+'T12:00');
+    const cols=[...Array(7)].map((_,i)=>{const ds=addDays(mon,i);const d=new Date(ds+'T12:00');
+      const openT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done');
       const doneT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status==='done');
-      return`<div class="wcol ${ds===td?'todaycol':''}"><div class="wc-h"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span style="display:flex;gap:6px;align-items:center"><button class="iconb" style="font-size:10.5px" title="Open day" onclick="plTab='day';plAnchor='${ds}';renderView()">↗</button><span class="dn num">${d.getDate()}</span></span></div>
-      <div class="wc-b">${items.map(it=>{const ov=it.k==='t'&&it.o.due<td;
-        const click=it.k==='m'?`nav('meeting','${it.o.id}')`:`nav('task','${it.o.id}')`;
-        return`<div class="wc-it ${ov?'ov':it.k}" onclick="${click}">${esc(it.s)}</div>`;}).join('')}
-      ${doneT.map(t=>`<div class="wc-it done">${esc(t.title)}</div>`).join('')}</div>
-      <div class="wc-add" style="display:flex;gap:4px"><input style="flex:1" placeholder="+ add" onkeydown="if(event.key==='Enter'&&this.value.trim()){addQuickDay('${ds}',this.value.trim());this.value=''}"><button class="btn xs" onclick="const i=this.previousElementSibling;if(i.value.trim())addQuickDay('${ds}',i.value.trim())">Add</button></div></div>`;}).join('');
+      const expanded=!!wkExpanded[ds];const mode=wcMode[ds]||'task';
+      return`<div class="wcol ${ds===td?'todaycol':''}">
+      <div class="wc-h"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span style="display:flex;gap:6px;align-items:center"><button class="iconb" style="font-size:10.5px" title="Open day" onclick="plTab='day';plAnchor='${ds}';renderView()">↗</button><span class="dn num">${d.getDate()}</span></span></div>
+      <div class="wc-loc"><span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span></div>
+      ${miniTimeline(ds,td)}
+      <div class="wc-tasks-hdr" onclick="toggleWeekTasks('${ds}')"><span>${openT.length} open task${openT.length===1?'':'s'}</span><span class="ar">${expanded?'▴':'▾'}</span></div>
+      ${expanded?`<div class="wc-tasklist">${openT.map(t=>{const ov=t.due<td;return`<div class="wc-trow ${ov?'ov':''}"><span class="tt" onclick="nav('task','${t.id}')">${esc(t.title)}</span><input type="date" value="${t.due||ds}" onchange="setTaskDue('${t.id}',this.value)"></div>`;}).join('')||'<div class="empty">Nothing open.</div>'}</div>`:''}
+      ${doneT.length?`<div class="wc-b" style="padding-top:0">${doneT.map(t=>`<div class="wc-it done" onclick="nav('task','${t.id}')">${esc(t.title)}</div>`).join('')}</div>`:''}
+      <div class="wc-top3">${planHtml('day',ds,'Top 3','What are the three outcomes today is for?',3)}</div>
+      <div class="wc-add">
+        <div class="vtog xs" style="margin:0 0 4px"><button class="${mode!=='meeting'?'on':''}" onclick="wcSetMode('${ds}','task')">Task</button><button class="${mode==='meeting'?'on':''}" onclick="wcSetMode('${ds}','meeting')">Meeting</button></div>
+        <div style="display:flex;gap:4px"><input id="wcAddInp_${ds}" style="flex:1" placeholder="${mode==='meeting'?'+ meeting title':'+ add task'}" onkeydown="if(event.key==='Enter'&&this.value.trim())wcAddGo('${ds}')">${mode==='meeting'?`<input type="time" id="wcAddTime_${ds}" style="width:80px">`:''}<button class="btn xs" onclick="wcAddGo('${ds}')">Add</button></div>
+        <button class="btn gh2 xs" style="margin-top:4px;width:100%" onclick="openMeeting(null,'${ds}')">+ Meeting (full)</button>
+      </div></div>`;}).join('');
     body=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the three outcomes this week is for?')+
       `<div style="margin:8px 0">${weekLocSummary(mon)}</div><div class="wgrid">${cols}</div>`;
   }else{
@@ -1364,7 +1417,7 @@ function vPlanner(){const td=today();
     <button class="btn gh2 sm" onclick="openMeeting(null,plTab==='month'?selDay:plAnchor)">+ Meeting</button><button class="btn sm" onclick="openTask(null,null,plTab==='month'?selDay:plAnchor)">+ Task</button>`)+
   tabs+body;}
 function dayPanel(ds){if(!ds)return'';const items=dayItems(ds);const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  return`<div style="height:12px"></div>${seccard(dn,items.length,(items.map(it=>it.k==='m'?mrowHtml(it.o):trow(it.o,{star:false})).join('')),'Nothing planned. Use + Task above or open the day view.',`<button class="btn xs" onclick="plTab='day';plAnchor='${ds}';renderView()">Open day ↗</button>`)}`;}
+  return`<div style="height:12px"></div>${seccard(dn+` <span class="pill n lnk" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span>`,items.length,(items.map(it=>it.k==='m'?mrowHtml(it.o):trow(it.o,{star:false})).join('')),'Nothing planned. Use + Task above or open the day view.',`<button class="btn xs" onclick="plTab='day';plAnchor='${ds}';renderView()">Open day ↗</button>`)}`;}
 
 /* ═══ MEETING PAGE ═══ */
 function meetingAgenda(m){return AG().filter(a=>a.status==='open'&&((m.attendee_ids||[]).includes(a.person_id)||a.meeting_id===m.id));}
@@ -2256,6 +2309,10 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="chips">${regions.map((r,i)=>`<span class="chip">${esc(r)}<button onclick="regions.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newRegion" placeholder="Add region" style="flex:1"><button class="btn sm" onclick="addRegion()">Add</button></div>
     <p class="note">Group accounts by region so travel plans can surface everyone nearby.</p></div>
+  <div class="setcard"><h4>Locations</h4>
+    <div class="chips">${locationsList.map((l,i)=>`<span class="chip">${esc(l)}<button onclick="locationsList.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
+    <div style="display:flex;gap:7px;margin-top:10px"><input id="newLocation" placeholder="Add a standard location — e.g. Mumbai, Home office" style="flex:1"><button class="btn sm" onclick="addLocation()">Add</button></div>
+    <p class="note">Where you're usually based or travel to. Suggested whenever you set your day's location on the planner.</p></div>
   <div class="setcard"><h4>Data</h4>
     <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button></div>
   <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
@@ -2263,6 +2320,8 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
 function addRegion(){const v=g('newRegion').value.trim();if(v&&!regions.includes(v)){regions.push(v);persist();renderView();}}
+function addLocation(){const v=g('newLocation').value.trim();if(v&&!locationsList.includes(v)){locationsList.push(v);persist();renderView();}}
+function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
 function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
 
@@ -2429,6 +2488,7 @@ function askText(msg,opts={}){return new Promise(res=>{_askKind='text';_askCb=re
   g('askTitle').textContent=opts.title||'Enter';g('askMsg').textContent=msg;
   g('askField').style.display='';g('askChoices').style.display='none';g('askOk').style.display='';
   const inp=g('askInput');inp.value=opts.value||'';inp.placeholder=opts.placeholder||'';inp.type=opts.type||'text';
+  g('askInputDL').innerHTML=(opts.list||[]).map(v=>`<option value="${esc(v)}">`).join('');
   g('askOk').textContent=opts.ok||'Save';g('askOk').className='btn';g('askCancel').style.display='';
   g('mAsk').classList.add('open');setTimeout(()=>inp.focus(),60);
   inp.onkeydown=e=>{if(e.key==='Enter')askOk();};});}
@@ -2705,22 +2765,27 @@ function openPlanPrompt(tab,anchor){
   const[start,end]=planPeriodRange(tab,anchor);
   g('planPeriodLabel').textContent=tab==='week'?('week of '+fmtD(start)):new Date(start+'T12:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   window._planCtx={tab,start,end};
-  g('planTravelDL').innerHTML=[...new Set([...regions,...LOC().map(l=>l.city)])].filter(Boolean).map(r=>`<option value="${esc(r)}">`).join('');
+  g('planTravelDL').innerHTML=locationSuggestions().map(r=>`<option value="${esc(r)}">`).join('');
   g('planTravel').value='';
   g('planTripFrom').value=start;g('planTripTo').value=end;
-  g('planSuggestions').innerHTML='';g('planAddBtn').style.display='none';
+  g('planSuggestions').innerHTML='';g('planAddBtn').style.display='none';g('planAddBtn').textContent='Add selected to plan';
   g('mPlan').classList.add('open');}
 function planSuggest(){
   const region=g('planTravel').value.trim();const{start,end}=window._planCtx;
-  if(region){ensureRegion(region);setLoc(g('planTripFrom').value||start,region);}
+  if(region){ensureLocation(region);setLoc(g('planTripFrom').value||start,region);}
   const cands=new Map();
   if(region)CU().filter(c=>c.region===region).forEach(c=>cands.set(c.id,{c,reasons:['travelling to '+region]}));
   CU().forEach(c=>{if(visitDue(c)){const e=cands.get(c.id)||{c,reasons:[]};e.reasons.push('due for a '+c.visit_cadence+' touchpoint');cands.set(c.id,e);}});
   const list=[...cands.values()].filter(({c})=>!M().some(m=>m.customer_id===c.id&&m.status==='open'&&m.date>=start&&m.date<=end));
-  if(!list.length){g('planSuggestions').innerHTML='<p class="note">No suggestions — nothing overdue, and no accounts tagged in that region.</p>';g('planAddBtn').style.display='none';return;}
+  if(!list.length){
+    g('planSuggestions').innerHTML=region
+      ?`<p class="note">📍 Location saved: <b>${esc(region)}</b>. No touchpoint suggestions right now — nothing overdue, and no other accounts tagged in that region.</p>`
+      :'<p class="note">No suggestions — nothing overdue, and no accounts tagged in that region.</p>';
+    g('planAddBtn').style.display=region?'':'none';g('planAddBtn').textContent='Done';
+    return;}
   g('planSuggestions').innerHTML='<div class="fld"><label>Suggested touchpoints</label>'+
     list.map(({c,reasons})=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" class="plan-sugg" data-cid="${c.id}" checked><span>${esc(c.name)} <span class="note">— ${esc(reasons.join(', '))}</span></span></label>`).join('')+'</div>';
-  g('planAddBtn').style.display='';}
+  g('planAddBtn').style.display='';g('planAddBtn').textContent='Add selected to plan';}
 function planAddSelected(){
   const{start}=window._planCtx;const region=g('planTravel').value.trim();const tripFrom=g('planTripFrom').value||start;
   const checked=[...g('planSuggestions').querySelectorAll('.plan-sugg:checked')].map(el=>el.dataset.cid);
@@ -2728,7 +2793,7 @@ function planAddSelected(){
   checked.forEach(cid=>{const c=CU().find(x=>x.id===cid);if(!c)return;
     const owner=c.kam_id||'me';
     tasks.push({id:uid(),type:'task',title:(region&&c.region===region?'Visit — ':'Touch base — ')+c.name,owner,customer_id:c.id,dept:c.dept||'',due:tripFrom,original_due:tripFrom,estimate_min:30,priority:'medium',status:owner!=='me'?'waiting':'open',notes:'Suggested while planning',created_at:n,updated_at:n});added++;});
-  persist();closeM();renderView();toast(added?added+' added to your plan.':'Nothing selected.');}
+  persist();closeM();renderView();toast(added?added+' added to your plan.':(region?'Location saved.':'Nothing selected.'));}
 
 let editD=null,decMid=null;
 function openDecision(id,mid){editD=id?decisions.find(x=>x.id===id):null;decMid=mid||editD?.meeting_id||null;
