@@ -811,6 +811,7 @@ const OP=()=>opps.filter(o=>!o.deleted);
 const LOC=()=>locations.filter(x=>!x.deleted);
 const pname=id=>id==='me'||!id?(myProfile.name||'Me'):(P().find(p=>p.id===id)||{}).name||'—';
 const deptForOwner=oid=>oid==='me'||!oid?(myProfile.dept||''):(P().find(p=>p.id===oid)||{}).dept||'';
+const byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
 function lastLocEntry(){return LOC().slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0)[0]||null;}
 function locOn(ds){const hits=LOC().filter(x=>x.date<=ds);return hits.length?hits.sort((a,b)=>a.date<b.date?1:-1)[0].city:'';}
 function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();if(ex){ex.city=city;ex.updated_at=n;}else locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});persist();}
@@ -1165,7 +1166,7 @@ function vPersonalTasks(){
   `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="ptQuick" placeholder="Add a personal task…" onkeydown="if(event.key==='Enter')quickAddPersonal()" style="flex:1"><button class="btn" onclick="quickAddPersonal()">Add</button></div></div>`+
   seccard('Open',open.length,open.map(prow).join(''),'Nothing here. Add a personal task above.')+
   (done.length?seccard('Recently done',done.length,done.map(prow).join(''),''):'')+
-  (FA().length?seccard('Family',FA().length,FA().map(f=>`<div class="row" style="cursor:pointer" onclick="openFamily('${f.id}')"><div class="bd"><div class="tt">${esc(f.name)}</div></div></div>`).join(''),''):'');}
+  (FA().length?seccard('Family',FA().length,FA().sort(byName).map(f=>`<div class="row" style="cursor:pointer" onclick="openFamily('${f.id}')"><div class="bd"><div class="tt">${esc(f.name)}</div></div></div>`).join(''),''):'');}
 function vPersonalBirthdays(bdays){bdays=bdays||upcomingBirthdays();
   return pagehead('PERSONAL','Birthdays','',`<button class="btn sm" onclick="openBday()">+ Birthday</button>`)+
   seccard('Upcoming',bdays.length,bdays.map(b=>`<div class="row" style="cursor:pointer" onclick="openBday('${b.id}')"><div class="bd"><div class="tt">🎂 ${esc(b.name)}</div><div class="meta">${b.inDays===0?'Today!':b.inDays===1?'Tomorrow':'in '+b.inDays+' days'} · ${fmtD(b.next)}</div></div></div>`).join(''),'No birthdays tracked yet — add anyone, not just family.');}
@@ -1178,7 +1179,7 @@ function togglePersonalTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
     tasks.push({id:uid(),type:'task',scope:'personal',title:t.title,owner:t.owner,due:nd,original_due:nd,repeat:t.repeat,priority:t.priority,notes:t.notes,status:'open',created_at:n2,updated_at:n2});}
   persist();renderView();}
 async function delPersonalTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(await askConfirm('Delete "'+t.title+'"?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();renderView();}}
-function fillFamily(sel,val){g(sel).innerHTML='<option value="me">Me</option>'+FA().map(f=>`<option value="${f.id}"${f.id===val?' selected':''}>${esc(f.name)}</option>`).join('');}
+function fillFamily(sel,val){g(sel).innerHTML='<option value="me">Me</option>'+FA().sort(byName).map(f=>`<option value="${f.id}"${f.id===val?' selected':''}>${esc(f.name)}</option>`).join('');}
 let editPT=null;
 function openPersonalTask(id){editPT=id?tasks.find(x=>x.id===id):null;const t=editPT;
   g('mPTaskTitle').textContent=t?'Edit Personal Task':'New Personal Task';
@@ -1515,7 +1516,7 @@ function bulkSnooze(){_bulkList().forEach(t=>{
   const baseDate=fd&&fd>=today()?fd:today();
   t.follow_up=addDays(baseDate,1)+'T'+ft;t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Follow-ups pushed.');}
 function bulkDone(){_bulkList().forEach(t=>{t.status='done';t.updated_at=now();t.completed_at=t.updated_at;});_bulkSel.clear();persist();reRender();toast('Marked done.');}
-async function bulkReassign(){const who=await askChoice('Reassign selected to:',P().map(p=>({label:p.name,value:p.id})),{title:'Reassign'});if(!who)return;_bulkList().forEach(t=>{t.owner=who;t.status='waiting';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Reassigned.');}
+async function bulkReassign(){const who=await askChoice('Reassign selected to:',P().sort(byName).map(p=>({label:p.name,value:p.id})),{title:'Reassign'});if(!who)return;_bulkList().forEach(t=>{t.owner=who;t.status='waiting';t.updated_at=now();});_bulkSel.clear();persist();reRender();toast('Reassigned.');}
 
 /* ═══ PEOPLE ═══ */
 function vPeople(){
@@ -1574,7 +1575,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const dd=t=>t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
   const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status};
   list=applySort('tasks',list,getters);if(!_sort.tasks)list=list.sort((a,b)=>(dd(a)||'9999').localeCompare(dd(b)||'9999'));
-  const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))];
+  const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
   const filters=`<div class="filters"><input placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
     <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
@@ -1829,7 +1830,7 @@ function vAccounts(){
   list=applySort('accounts',list,getters);
   if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
   const segs=[...new Set(CU().map(c=>c.segment).filter(Boolean))].sort();
-  const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))];
+  const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const regs=[...new Set(CU().map(c=>c.region).filter(Boolean))].sort();
   const view=_view.accounts||'list';
   const filters=`<div class="filters"><input placeholder="Search name, city, segment" value="${esc(window._cq||'')}" oninput="window._cq=this.value;clearTimeout(window._ct);window._ct=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
@@ -1853,7 +1854,7 @@ function vAccounts(){
   }
   return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body;}
 
-function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id);
+function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id).sort(byName);
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
   const dls=DL().filter(d=>d.customer_id===c.id);
   const acts=AC().filter(a=>a.customer_id===c.id).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,25);
@@ -1870,7 +1871,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
     ${cos.map(x=>`<div class="row"><div class="bd" style="cursor:pointer" onclick="openContact('${x.id}')"><div class="tt">${esc(x.name)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" title="Edit" onclick="openContact('${x.id}')">✎</button><button class="iconb" title="Remove" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
     <div class="addline"><input id="coName" placeholder="Name" style="flex:1.2"><input id="coRole" placeholder="Role" style="flex:1"><input id="coPhone" placeholder="Phone" style="flex:1"><input id="coEmail" placeholder="Email" style="flex:1.2"><button class="btn sm" onclick="contactAdd('${c.id}')">Add</button></div></div>
-    ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id));const avail=P().filter(x=>!ids.includes(x.id));
+    ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id)).sort(byName);const avail=P().filter(x=>!ids.includes(x.id)).sort(byName);
       return `<div class="card"><div class="ch"><span>Our team on this account</span><span class="n num">${ppl.length}</span></div>
       ${ppl.map(x=>`<div class="row" style="cursor:pointer" onclick="nav('people','${x.id}')"><div class="bd"><div class="tt">${esc(x.name)}${c.kam_id===x.id?' <span class="pill b">KAM</span>':''}</div><div class="meta">${esc(x.role||'')}${x.role&&x.dept?' · ':''}${esc(x.dept||'')}</div></div><div class="rowacts">${c.kam_id===x.id?'':`<button class="iconb" title="Make KAM" onclick="event.stopPropagation();setKam('${c.id}','${x.id}')">★</button>`}<button class="iconb" title="New task for them on this account" onclick="event.stopPropagation();openTask(null,'${x.id}',null,'${c.id}')">+ task</button><button class="iconb" title="Unlink" onclick="event.stopPropagation();acctUnlinkPerson('${c.id}','${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">Link the people who face this account. Star one as KAM.</div>'}
       <div class="addline"><select id="acctPersonSel" data-ssel style="flex:1">${avail.length?avail.map(x=>`<option value="${x.id}">${esc(x.name)}${x.role?' — '+esc(x.role):''}</option>`).join(''):'<option value="">All people already linked</option>'}</select><button class="btn sm" onclick="acctLinkPerson('${c.id}')">Link</button><button class="btn gh2 sm" onclick="openPerson()">New person</button></div></div>`;})()}
@@ -2274,6 +2275,7 @@ function exportReview(){const td=today();const lines=['# Weekly Review — '+td,
 
 /* ═══ SETTINGS ═══ */
 function vSettings(){const enc=_encMeta&&_encMeta.on;
+  depts.sort((a,b)=>a.localeCompare(b));products.sort((a,b)=>a.localeCompare(b));regions.sort((a,b)=>a.localeCompare(b));locationsList.sort((a,b)=>a.localeCompare(b));
   return pagehead('SETUP','Settings','',' ')+
   `<div class="grid2"><div>
   <div class="setcard"><h4>Your profile</h4>
@@ -2324,7 +2326,7 @@ function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)
 function addRegion(){const v=g('newRegion').value.trim();if(v&&!regions.includes(v)){regions.push(v);persist();renderView();}}
 function addLocation(){const v=g('newLocation').value.trim();if(v&&!locationsList.includes(v)){locationsList.push(v);persist();renderView();}}
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
-function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
+function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.sort((a,b)=>a.localeCompare(b)).map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
 
 function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._coAcct||'';
@@ -2504,9 +2506,9 @@ function _resetAskOk(){g('askOk').style.display='';}
 function _askPplRemove(id){window._askPplSel.delete(id);_askPplRender();}
 function _askPplAddPick(id){if(!id)return;window._askPplSel.add(id);_askPplRender();}
 function _askPplRender(){
-  const sel=[...window._askPplSel].map(id=>window._askPplPool.get(id)||{id,name:pnameAny(id),role:''});
+  const sel=[...window._askPplSel].map(id=>window._askPplPool.get(id)||{id,name:pnameAny(id),role:''}).sort(byName);
   g('askPplSelected').innerHTML=sel.length?sel.map(p=>`<label class="ckrow"><span style="flex:1">${esc(p.name)}${p.role?` <span style="color:var(--t3);font-size:11px">· ${esc(p.role)}</span>`:''}</span><button class="iconb" onclick="_askPplRemove('${p.id}')" title="Remove">✕</button></label>`).join(''):'<div style="color:var(--t4);font-size:12px">Nobody selected yet.</div>';
-  const remaining=[...window._askPplPool.values()].filter(p=>!window._askPplSel.has(p.id));
+  const remaining=[...window._askPplPool.values()].filter(p=>!window._askPplSel.has(p.id)).sort(byName);
   g('askPplAdd').innerHTML='<option value="">+ Add someone…</option>'+remaining.map(p=>`<option value="${p.id}">${esc(p.name)}${p.role?' · '+esc(p.role):''}</option>`).join('');
   ssel('askPplAdd');}
 function askPeople(msg,people,preselected,opts={}){return new Promise(res=>{_askKind='people';_askCb=res;
@@ -2564,11 +2566,11 @@ function ssel(sel){const el=typeof sel==='string'?g(sel):sel;if(!el||el.tagName!
   panel.addEventListener('mousedown',e=>{const o=e.target.closest('.sselo');if(!o||o.classList.contains('empty'))return;e.preventDefault();pick(+o.dataset.i);});
   el._sselApi={sync};sync();}
 function wireSSelAll(root){(root||document).querySelectorAll('select[data-ssel]').forEach(ssel);}
-function fillDept(sel,val){g(sel).innerHTML='<option value="">—</option>'+depts.map(d=>`<option${d===val?' selected':''}>${esc(d)}</option>`).join('');}
-function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');ssel(sel);}
-function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
-function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+products.map(p=>`<option${p===val?' selected':''}>${esc(p)}</option>`).join('');}
-function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
+function fillDept(sel,val){g(sel).innerHTML='<option value="">—</option>'+depts.sort((a,b)=>a.localeCompare(b)).map(d=>`<option${d===val?' selected':''}>${esc(d)}</option>`).join('');}
+function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().sort(byName).map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');ssel(sel);}
+function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().sort(byName).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
+function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+products.sort((a,b)=>a.localeCompare(b)).map(p=>`<option${p===val?' selected':''}>${esc(p)}</option>`).join('');}
+function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).sort(byName).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
 
 let editT=null;
 function taskAnchorDate(){return g('tType').value==='call'?(g('tWhen').value||'').slice(0,10):g('tDue').value;}
@@ -2737,7 +2739,7 @@ function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   g('mRepeatWd').dataset.forDate='';g('fMRepeatMonth').dataset.forDate='';
   meetingRepeatUI();
   const selSet=new Set(editM?editM.attendee_ids||[]:['me']);
-  g('mAtt').innerHTML=[{id:'me',name:myProfile.name||'Me'},...P()].map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('');
+  g('mAtt').innerHTML=[{id:'me',name:myProfile.name||'Me'},...P().sort(byName)].map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('');
   if(g('mAttSearch'))g('mAttSearch').value='';
   g('mDel').style.display=editM?'':'none';g('mMeet').classList.add('open');setTimeout(()=>g('mTitle2').focus(),50);}
 function _filterMAtt(q){const f=(q||'').trim().toLowerCase();g('mAtt').querySelectorAll('.attchip').forEach(c=>{c.style.display=(!f||c.textContent.toLowerCase().includes(f))?'':'none';});}
