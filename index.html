@@ -92,6 +92,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .btn.sm{padding:4px 10px;font-size:12px}
 .btn.xs{padding:2px 8px;font-size:11.5px}
 .card{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:14px}
+.scrolllist{max-height:340px;overflow-y:auto}
 .ch{padding:10px 14px;border-bottom:1px solid var(--bdr);font-size:12.5px;font-weight:700;color:var(--t1);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ch .n{color:var(--t3);font-weight:600}
 .cb{padding:12px 14px}
@@ -1426,20 +1427,20 @@ function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';retu
   return`<span class="backlink" onclick="nav('meetings')">← Meetings</span>`+
   pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
     `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button><button class="btn gh2 sm" onclick="meetingSummary('${m.id}')">Summary</button>${STPILL(m)}`)+
-  `<div class="grid2">
+  `<div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
+    <div class="cb">${rteBar('mnText')}
+    <div id="mnText" class="rte" contenteditable="true" data-ph="Capture the discussion — decisions, points raised, next steps…">${m.notes_html||''}</div></div></div>
+  <div class="grid2">
     <div class="card"><div class="ch"><span>Agenda</span><span class="n num">${ag.length}</span></div>
-      ${ag.map(a=>`<div class="row"><button class="chk" onclick="agendaDone('${a.id}')"></button><div class="bd"><div class="tt" style="font-weight:500">${esc(a.text)}</div><div class="meta">${a.person_id?pname(a.person_id):'ad hoc'}</div></div></div>`).join('')||'<div class="empty">No parked items for these attendees.</div>'}
+      <div class="scrolllist">${ag.map(a=>`<div class="row"><button class="chk" onclick="agendaDone('${a.id}')"></button><div class="bd"><div class="tt" style="font-weight:500">${esc(a.text)}</div><div class="meta">${a.person_id?pname(a.person_id):'ad hoc'}</div></div></div>`).join('')||'<div class="empty">No parked items for these attendees.</div>'}</div>
       <div class="addline"><input id="mAgInput" placeholder="Ad-hoc agenda item"><button class="btn sm" onclick="mAgendaAdd('${m.id}')">Add</button></div></div>
     <div>
       <div class="card"><div class="ch"><span>Decisions</span><button class="btn xs" onclick="openDecision(null,'${m.id}')">+ Decision</button></div>
-        ${decs.map(d=>`<div class="row"><div class="bd"><div class="tt" style="font-weight:500">${esc(d.what)}</div><div class="meta">${d.rationale?esc(d.rationale.slice(0,80)):''}${d.review_date?' · review '+fmtD(d.review_date):''}</div></div><div class="rowacts"><button class="iconb" onclick="openDecision('${d.id}')">✎</button></div></div>`).join('')||'<div class="empty">No decisions recorded.</div>'}</div>
+        <div class="scrolllist">${decs.map(d=>`<div class="row"><div class="bd"><div class="tt" style="font-weight:500">${esc(d.what)}</div><div class="meta">${d.rationale?esc(d.rationale.slice(0,80)):''}${d.review_date?' · review '+fmtD(d.review_date):''}</div></div><div class="rowacts"><button class="iconb" onclick="openDecision('${d.id}')">✎</button></div></div>`).join('')||'<div class="empty">No decisions recorded.</div>'}</div></div>
       <div class="card"><div class="ch"><span>Actions</span><span class="n num">${acts.length}</span></div>
-        ${acts.map(t=>trow(t,{star:false})).join('')||'<div class="empty">No actions yet.</div>'}
+        <div class="scrolllist">${acts.map(t=>trow(t,{star:false})).join('')||'<div class="empty">No actions yet.</div>'}</div>
         <div class="addline"><input id="mActT" placeholder="Action" style="flex:2"><select id="mActO" style="flex:1"></select><input type="date" id="mActD" style="flex:1"><button class="btn sm" onclick="mActionAdd('${m.id}')">Add</button></div></div>
-    </div></div>
-    <div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
-    <div class="cb">${rteBar('mnText')}
-    <div id="mnText" class="rte" contenteditable="true" data-ph="Capture the discussion — decisions, points raised, next steps…">${m.notes_html||''}</div></div></div>`;}
+    </div></div>`;}
 function mnCmd(c){document.execCommand(c,false,null);const e=g('mnText');if(e)e.focus();}
 async function mnLink(){const u=await askText('Link URL:',{title:'Add link',placeholder:'https://',ok:'Add'});if(!u)return;document.execCommand('createLink',false,u);}
 function logMeetingNotes(m){if(!m||!m.customer_id||!m.notes_html)return;const label='Meeting notes: '+m.title;let a=activities.find(x=>x.meeting_id===m.id&&!x.deleted);const n=now();
@@ -1624,9 +1625,9 @@ function meetingSummaryText(m,present){const ids=present||m.attendee_ids||[];con
   if(m.notes){L.push('','NOTES',m.notes);}
   return L.join('\r\n');}
 async function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
-  const pool=[...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!m.customer_id||c.customer_id===m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
+  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!m.customer_id||c.customer_id===m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
   let present=m.attendee_ids||[];
-  if(pool.length){const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;m.attendee_ids=chosen;m.updated_at=now();persist();}
+  const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;m.attendee_ids=chosen;m.updated_at=now();persist();
   openSummaryWindow(m.title+' — Minutes of Meeting',buildMeetingSummary(m,present),meetingSummaryText(m,present));}
 
 function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(window._mq||'').toLowerCase();
@@ -1693,7 +1694,7 @@ function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&
   if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)meta.push('<b>Contact:</b> '+esc2(c.name));}
   if(dd)meta.push('<b>'+(t.type==='call'?'When':'Due')+':</b> '+fmtD(dd));
   meta.push('<b>Status:</b> '+(t.status==='done'?'Done':t.status==='waiting'?'Waiting':'Open'));
-  if(present&&present.length){const nm=present.map(id=>{const p=P().find(x=>x.id===id);if(p)return p.name;const c=CO().find(x=>x.id===id);return c?c.name:'';}).filter(Boolean);if(nm.length)meta.push('<b>Present:</b> '+esc2(nm.join(', ')));}
+  if(present&&present.length){const nm=present.map(pnameAny).filter(Boolean);if(nm.length)meta.push('<b>Present:</b> '+esc2(nm.join(', ')));}
   h+='<p>'+meta.join(' &nbsp; ')+'</p>';
   h+='<h3>Notes</h3>'+(t.notes_html||(t.notes?'<p>'+esc2(t.notes).replace(/\n/g,'<br>')+'</p>':'<p>—</p>'));
   if(kids.length)h+='<h3>Follow-on tasks</h3><ul>'+kids.map(k=>'<li>'+esc2(k.title)+' — <b>'+esc2(pname(k.owner))+'</b>'+(k.due?', due '+fmtD(k.due):'')+(k.status==='done'?' ✓':'')+'</li>').join('')+'</ul>';
@@ -1701,12 +1702,13 @@ function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&
 function taskSummaryText(t,present){const dd=t.type==='call'?(t.when||'').slice(0,10):(t.due||'');const L=[(t.type==='call'?'CALL':'TASK')+': '+t.title];
   if(t.customer_id)L.push('Account: '+cname(t.customer_id));if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)L.push('Contact: '+c.name);}
   if(dd)L.push((t.type==='call'?'When: ':'Due: ')+fmtD(dd));L.push('Status: '+(t.status==='done'?'Done':t.status||'open'));
-  if(present&&present.length){const nm=present.map(id=>{const p=P().find(x=>x.id===id);if(p)return p.name;const c=CO().find(x=>x.id===id);return c?c.name:'';}).filter(Boolean);if(nm.length)L.push('Present: '+nm.join(', '));}
+  if(present&&present.length){const nm=present.map(pnameAny).filter(Boolean);if(nm.length)L.push('Present: '+nm.join(', '));}
   L.push('','NOTES',t.notes||'-');return L.join('\r\n');}
 async function taskSummary(id){const t=T().find(x=>x.id===id)||tasks.find(x=>x.id===id);if(!t)return;
-  const pool=[...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!t.customer_id||c.customer_id===t.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
+  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!t.customer_id||c.customer_id===t.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
   let present=t.contact_id?[t.contact_id]:[];
-  if(pool.length){const chosen=await askPeople('Who was on this '+(t.type==='call'?'call':'task')+'?',pool,present,{title:'People present',ok:'Generate'});if(chosen===null)return;present=chosen;}
+  if(t.owner==='me'||!t.owner)present=[...new Set(['me',...present])];
+  const chosen=await askPeople('Who was on this '+(t.type==='call'?'call':'task')+'?',pool,present,{title:'People present',ok:'Generate'});if(chosen===null)return;present=chosen;
   openSummaryWindow((t.type==='call'?'Call':'Task')+': '+t.title,buildTaskSummary(t,present),taskSummaryText(t,present));}
 /* ═══ + NEW MENU ═══ */
 function toggleNewMenu(e){if(e)e.stopPropagation();const m=g('newmenu');if(!m)return;
@@ -2478,7 +2480,7 @@ function csvPickUI(){const k=g('csvPick')&&g('csvPick').value;if(!k)return;const
 /* ═══ DIALOG ENGINE (replaces prompt/confirm — reliable in iOS PWA) ═══ */
 let _askCb=null,_askKind='confirm';
 function askResolve(v){const o=g('mAsk');if(o)o.classList.remove('open');const cb=_askCb;_askCb=null;if(cb)cb(v);}
-function askOk(){if(_askKind==='text'){askResolve(g('askInput').value);}else if(_askKind==='people'){const ids=[...g('askChoices').querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);askResolve(ids);}else askResolve(true);}
+function askOk(){if(_askKind==='text'){askResolve(g('askInput').value);}else if(_askKind==='people'){askResolve([...(window._askPplSel||[])]);}else askResolve(true);}
 function askConfirm(msg,opts={}){return new Promise(res=>{_askKind='confirm';_askCb=res;
   g('askTitle').textContent=opts.title||'Confirm';g('askMsg').textContent=msg;
   g('askField').style.display='none';g('askChoices').style.display='none';g('askOk').style.display='';
@@ -2499,16 +2501,26 @@ function askChoice(msg,choices,opts={}){return new Promise(res=>{_askKind='choic
   g('askOk').style.display='none';g('askCancel').style.display='';
   g('mAsk').classList.add('open');});}
 function _resetAskOk(){g('askOk').style.display='';}
-function _filterAskPpl(q){const f=(q||'').trim().toLowerCase();const l=g('askPplList');if(l)l.querySelectorAll('.ckrow').forEach(r=>{r.style.display=(!f||r.dataset.nm.includes(f))?'':'none';});}
+function _askPplRemove(id){window._askPplSel.delete(id);_askPplRender();}
+function _askPplAddPick(id){if(!id)return;window._askPplSel.add(id);_askPplRender();}
+function _askPplRender(){
+  const sel=[...window._askPplSel].map(id=>window._askPplPool.get(id)||{id,name:pnameAny(id),role:''});
+  g('askPplSelected').innerHTML=sel.length?sel.map(p=>`<label class="ckrow"><span style="flex:1">${esc(p.name)}${p.role?` <span style="color:var(--t3);font-size:11px">· ${esc(p.role)}</span>`:''}</span><button class="iconb" onclick="_askPplRemove('${p.id}')" title="Remove">✕</button></label>`).join(''):'<div style="color:var(--t4);font-size:12px">Nobody selected yet.</div>';
+  const remaining=[...window._askPplPool.values()].filter(p=>!window._askPplSel.has(p.id));
+  g('askPplAdd').innerHTML='<option value="">+ Add someone…</option>'+remaining.map(p=>`<option value="${p.id}">${esc(p.name)}${p.role?' · '+esc(p.role):''}</option>`).join('');
+  ssel('askPplAdd');}
 function askPeople(msg,people,preselected,opts={}){return new Promise(res=>{_askKind='people';_askCb=res;
   g('askTitle').textContent=opts.title||'Select people';g('askMsg').textContent=msg||'';
   g('askField').style.display='none';const box=g('askChoices');box.style.display='flex';
-  const pre=new Set(preselected||[]);
-  const rows=people.map(p=>`<label class="ckrow" data-nm="${esc((p.name+' '+(p.role||'')).toLowerCase())}"><input type="checkbox" value="${p.id}"${pre.has(p.id)?' checked':''}> ${esc(p.name)}${p.role?` <span style="color:var(--t3);font-size:11px">· ${esc(p.role)}</span>`:''}</label>`).join('')||'<div style="color:var(--t4);font-size:12px">No people yet.</div>';
-  box.innerHTML=(people.length>5?`<input id="askPplSearch" placeholder="Search people…" oninput="_filterAskPpl(this.value)">`:'')+
-    `<div id="askPplList" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto">${rows}</div>`;
+  window._askPplPool=new Map(people.map(p=>[p.id,p]));
+  window._askPplSel=new Set(preselected||[]);
+  window._askPplSel.forEach(id=>{if(!window._askPplPool.has(id))window._askPplPool.set(id,{id,name:pnameAny(id),role:''});});
+  box.innerHTML=`<div id="askPplSelected" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto"></div>
+    <div style="margin-top:8px"><select id="askPplAdd"></select></div>`;
+  g('askPplAdd').onchange=function(){_askPplAddPick(this.value);};
+  _askPplRender();
   g('askOk').style.display='';g('askOk').textContent=opts.ok||'Use selected';g('askOk').className='btn';g('askCancel').style.display='';
-  g('mAsk').classList.add('open');setTimeout(()=>{const s=g('askPplSearch');if(s)s.focus();},60);});}
+  g('mAsk').classList.add('open');});}
 
 /* ═══ MODALS ═══ */
 function closeM(){document.querySelectorAll('.ovl').forEach(o=>o.classList.remove('open'));}
