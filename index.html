@@ -635,7 +635,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
     <div class="fld"><label>Time</label><input type="time" id="mTime"></div>
     <div class="fld"><label>Duration (min)</label><input type="number" id="mDur" min="15" step="15" placeholder="60"></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="mDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','mDept')">+</button></div></div>
-    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="mCustSel" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','mCustSel')">+</button></div></div>
+    <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="mCustSel" style="flex:1" onchange="refreshMeetingContacts()"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','mCustSel')">+</button></div></div>
     <div class="fld"><label>Repeat</label><select id="mRepeat" onchange="meetingRepeatUI()"><option value="">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="monthly">Monthly</option></select></div>
     <div class="fld" id="fMRepeatN" style="display:none"><label>Occurrences (including this one)</label><input type="number" id="mRepeatN" min="2" max="52" value="8"></div>
   </div>
@@ -646,6 +646,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
     <div id="fMRepeatMonthWd" style="margin-top:6px;display:none;gap:8px"><select id="mRepeatMonthNth" style="width:auto"><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="-1">Last</option></select><select id="mRepeatMonthWdSel" style="width:auto"></select></div>
   </div>
   <div class="fld"><label>Attendees</label><input id="mAttSearch" placeholder="Search, or type a new name and press Enter to add" oninput="_filterMAtt(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();mAttAddNew(this.value);}" style="margin-bottom:6px"><div class="attlist" id="mAtt"></div></div>
+  <div class="fld"><label>Contacts (FPR)</label><div style="display:flex;gap:6px;margin-bottom:6px"><input id="mContactSearch" style="flex:1" placeholder="Search, or type a new contact name and press Enter to add" oninput="_filterMContacts(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();mContactAddNew(this.value);}"><button class="btn gh2 sm" type="button" onclick="mContactsSelectAll()">Select all as FPR</button></div><div class="attlist" id="mContacts"></div></div>
   </div>
   <div class="macts"><button class="btn dg sm" id="mDel" style="display:none" onclick="delMeeting()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveMeeting()">Save</button></div></div>
@@ -1426,7 +1427,7 @@ function meetingAgenda(m){return AG().filter(a=>a.status==='open'&&((m.attendee_
 function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';return vPlanner();}
   const ag=meetingAgenda(m);const acts=T().filter(t=>t.meeting_id===m.id);const decs=DC().filter(d=>d.meeting_id===m.id);
   return`<span class="backlink" onclick="nav('meetings')">← Meetings</span>`+
-  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
+  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${(m.contact_ids||[]).length?' '+m.contact_ids.map(id=>`<span class="pill a lnk" onclick="event.stopPropagation();openContact('${id}')" title="FPR">${esc(pnameAny(id))}</span>`).join(' '):''}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
     `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button><button class="btn gh2 sm" onclick="meetingSummary('${m.id}')">Summary</button>${STPILL(m)}`)+
   `<div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
     <div class="cb">${rteBar('mnText')}
@@ -1626,9 +1627,10 @@ function meetingSummaryText(m,present){const ids=present||m.attendee_ids||[];con
   if(m.notes){L.push('','NOTES',m.notes);}
   return L.join('\r\n');}
 async function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
-  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!m.customer_id||c.customer_id===m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
-  let present=m.attendee_ids||[];
-  const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;m.attendee_ids=chosen;m.updated_at=now();persist();
+  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!m.customer_id||c.customer_id===m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · FPR'}))];
+  let present=[...(m.attendee_ids||[]),...(m.contact_ids||[])];
+  const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;
+  m.attendee_ids=chosen.filter(id=>id==='me'||P().some(p=>p.id===id));m.contact_ids=chosen.filter(id=>CO().some(c=>c.id===id));m.updated_at=now();persist();
   openSummaryWindow(m.title+' — Minutes of Meeting',buildMeetingSummary(m,present),meetingSummaryText(m,present));}
 
 function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(window._mq||'').toLowerCase();
@@ -2741,6 +2743,7 @@ function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
   const selSet=new Set(editM?editM.attendee_ids||[]:['me']);
   g('mAtt').innerHTML=[{id:'me',name:myProfile.name||'Me'},...P().sort(byName)].map(p=>`<span class="attchip ${selSet.has(p.id)?'on':''}" data-id="${p.id}" onclick="this.classList.toggle('on')">${esc(p.name)}</span>`).join('');
   if(g('mAttSearch'))g('mAttSearch').value='';
+  refreshMeetingContacts(editM?.contact_ids||[]);
   g('mDel').style.display=editM?'':'none';g('mMeet').classList.add('open');setTimeout(()=>g('mTitle2').focus(),50);}
 function _filterMAtt(q){const f=(q||'').trim().toLowerCase();g('mAtt').querySelectorAll('.attchip').forEach(c=>{c.style.display=(!f||c.textContent.toLowerCase().includes(f))?'':'none';});}
 function mAttAddNew(raw){const nm=(raw||'').trim();if(!nm)return;
@@ -2751,10 +2754,33 @@ function mAttAddNew(raw){const nm=(raw||'').trim();if(!nm)return;
     g('mAtt').appendChild(chip);}
   chip.classList.add('on');chip.style.display='';
   const s=g('mAttSearch');if(s)s.value='';_filterMAtt('');}
+function getOrCreateContact(nm,customerId){if(!nm)return null;
+  const ex=CO().find(c=>c.name.toLowerCase()===nm.toLowerCase()&&(!customerId||c.customer_id===customerId));
+  if(ex)return ex.id;
+  const n=now();const c={id:uid(),customer_id:customerId||null,name:nm,role:'',phone:'',email:'',created_at:n,updated_at:n};
+  contacts.push(c);return c.id;}
+function refreshMeetingContacts(preselect){
+  const cid=g('mCustSel').value||'';
+  const keepOn=new Set(preselect||[...g('mContacts').querySelectorAll('.attchip.on')].map(c=>c.dataset.id));
+  const pool=CO().filter(c=>!cid||c.customer_id===cid).sort(byName);
+  g('mContacts').innerHTML=pool.length?pool.map(c=>`<span class="attchip ${keepOn.has(c.id)?'on':''}" data-id="${c.id}" onclick="this.classList.toggle('on')">${esc(c.name)}${c.role?' · '+esc(c.role):''}</span>`).join(''):'<span class="note">No contacts for this account yet — type a name above to add one.</span>';
+  if(g('mContactSearch'))g('mContactSearch').value='';}
+function _filterMContacts(q){const f=(q||'').trim().toLowerCase();g('mContacts').querySelectorAll('.attchip').forEach(c=>{c.style.display=(!f||c.textContent.toLowerCase().includes(f))?'':'none';});}
+function mContactAddNew(raw){const nm=(raw||'').trim();if(!nm)return;
+  let chip=[...g('mContacts').querySelectorAll('.attchip')].find(c=>c.textContent.trim().toLowerCase()===nm.toLowerCase());
+  if(!chip){const cid=g('mCustSel').value||null;const id=getOrCreateContact(nm,cid);persist();
+    const c=CO().find(x=>x.id===id);
+    chip=document.createElement('span');chip.className='attchip';chip.dataset.id=id;chip.textContent=c.name+(c.role?' · '+c.role:'');
+    chip.onclick=function(){this.classList.toggle('on');};
+    g('mContacts').appendChild(chip);}
+  chip.classList.add('on');chip.style.display='';
+  const s=g('mContactSearch');if(s)s.value='';_filterMContacts('');}
+function mContactsSelectAll(){const chips=[...g('mContacts').querySelectorAll('.attchip')].filter(c=>c.style.display!=='none');if(!chips.length)return;chips.forEach(c=>c.classList.add('on'));toast(chips.length+' contact(s) selected as FPR.');}
 function saveMeeting(){const title=g('mTitle2').value.trim();if(!title){toast('Title required.');return;}const n=now();
   const att=[...g('mAtt').querySelectorAll('.attchip.on')].map(c=>c.dataset.id);
+  const cts=[...g('mContacts').querySelectorAll('.attchip.on')].map(c=>c.dataset.id);
   const repeat=editM?editM.repeat||'':g('mRepeat').value;
-  const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,repeat,updated_at:n};
+  const d={title,date:g('mDate').value||today(),time:g('mTime').value,duration:+g('mDur').value||60,dept:g('mDept').value,customer_id:g('mCustSel').value||null,attendee_ids:att,contact_ids:cts,repeat,updated_at:n};
   if(editM)Object.assign(editM,d);
   else{const repGroup=repeat?uid():null;const first=Object.assign({id:uid(),status:'open',created_at:n,repeat_group:repGroup},d);meetings.push(first);
     if(repeat){const count=Math.min(52,Math.max(2,+g('mRepeatN').value||8));
