@@ -1735,6 +1735,18 @@ document.addEventListener('click',e=>{const m=g('newmenu');if(m&&!(e.target.clos
   if(!(e.target.closest&&e.target.closest('.rte-dd'))){['rteFgPop','rteHiPop'].forEach(id=>{const p=g(id);if(p)p.style.display='none';});}});
 // Tab / Shift-Tab inside a rich editor = indent / outdent (Word-style sub-bullets)
 document.addEventListener('keydown',e=>{const el=e.target;if(el&&el.classList&&el.classList.contains('rte')&&e.key==='Tab'){e.preventDefault();try{document.execCommand('styleWithCSS',false,true);}catch(_){}document.execCommand(e.shiftKey?'outdent':'indent',false,null);}});
+// Paste into a rich editor adopts the notes' own font — strip inline styles/fonts/colors from pasted content (Word/Outlook/web clippings all carry their own).
+function _sanitizePasteHtml(html){const tmp=document.createElement('div');tmp.innerHTML=html;
+  tmp.querySelectorAll('script,style,meta,link,img,head,title').forEach(n=>n.remove());
+  tmp.querySelectorAll('*').forEach(el=>{['style','class','lang','face','color','size','bgcolor','width','height'].forEach(a=>el.removeAttribute(a));});
+  return tmp.innerHTML;}
+document.addEventListener('paste',e=>{const el=e.target;if(!el||!el.classList||!el.classList.contains('rte'))return;
+  const cd=e.clipboardData||window.clipboardData;if(!cd)return;
+  e.preventDefault();
+  const html=cd.getData('text/html');
+  const insert=html?_sanitizePasteHtml(html):esc(cd.getData('text/plain')||'').replace(/\r?\n/g,'<br>');
+  try{document.execCommand('styleWithCSS',false,true);}catch(_){}
+  document.execCommand('insertHTML',false,insert);});
 function newDump(){openTask();const t=g('tTitle');if(t)t.placeholder='Park an idea — leave the date empty';toast('No date = stays in Brain dump until you schedule it.');}
 
 /* ═══ HELP / FAQ ═══ */
