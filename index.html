@@ -718,7 +718,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode';
+const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
 const g=id=>document.getElementById(id);
@@ -818,7 +818,10 @@ function locOn(ds){const hits=LOC().filter(x=>x.date<=ds);return hits.length?hit
 function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();if(ex){ex.city=city;ex.updated_at=n;}else locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});persist();}
 async function checkLocationConfirmation(){
   if(appMode!=='official')return;
-  const td=today();const last=lastLocEntry();
+  const td=today();
+  if(localStorage.getItem(LOC_CHECK_KEY)===td)return;
+  localStorage.setItem(LOC_CHECK_KEY,td);
+  const last=lastLocEntry();
   if(last&&last.date===td)return;
   if(!last){const v=await askText('Where are you based right now? You can change this anytime from the planner.',{title:'Set your location',placeholder:'e.g. Mumbai, Home office'});
     if(v&&v.trim())setLoc(td,v.trim());
