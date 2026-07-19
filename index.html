@@ -1344,6 +1344,13 @@ function weekLocSummary(mon){const days=[...Array(7)].map((_,i)=>addDays(mon,i))
   const runs=[];let i=0;while(i<cities.length){let j=i;while(j+1<cities.length&&cities[j+1]===cities[i])j++;runs.push({city:cities[i],from:days[i],to:days[j]});i=j+1;}
   const chips=runs.filter(r=>r.city!=='—').map(r=>`<span class="pill n">📍 ${esc(r.city)}${r.from!==r.to?' ('+new Date(r.from+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+'–'+new Date(r.to+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+')':''}</span>`).join(' ');
   return chips||'<span class="note">No location set for this week — <a onclick="openPlanPrompt(\'week\',plAnchor)">plan ahead ✈</a></span>';}
+async function clearWeekLocations(mon){
+  if(!await askConfirm('Clear locations for the week of '+fmtD(mon)+'? Every day goes back to "Set location" so you can plan each one fresh — this also stops last week\'s location carrying forward.',{title:'Clear week locations',ok:'Clear'}))return;
+  const end=addDays(mon,6);const n=now();
+  LOC().filter(l=>l.date>=mon&&l.date<=end).forEach(l=>{l.deleted=true;l.updated_at=n;});
+  setLoc(mon,'');
+  toast('Cleared — set each day\'s location as you plan.');
+  renderView();}
 function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
   const tally={};for(let day=1;day<=last;day++){const ds=mk+'-'+String(day).padStart(2,'0');const c=locOn(ds)||'—';tally[c]=(tally[c]||0)+1;}
   const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="pill n">📍 ${esc(c)} · ${n}d</span>`).join(' ');
@@ -1407,7 +1414,7 @@ function vPlanner(){const td=today();
         <button class="btn gh2 xs" style="margin-top:4px;width:100%" onclick="openMeeting(null,'${ds}')">+ Meeting (full)</button>
       </div></div>`;}).join('');
     body=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the three outcomes this week is for?')+
-      `<div style="margin:8px 0">${weekLocSummary(mon)}</div><div class="wgrid">${cols}</div>`;
+      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button></div><div class="wgrid">${cols}</div>`;
   }else{
     title='Meetings';
     const up=M().filter(m=>m.status!=='done'&&m.date>=td).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
