@@ -1351,6 +1351,22 @@ async function clearWeekLocations(mon){
   setLoc(mon,'');
   toast('Cleared — set each day\'s location as you plan.');
   renderView();}
+async function clearMonthLocations(mk){
+  const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+  if(!await askConfirm('Clear locations for '+d.toLocaleDateString('en-IN',{month:'long',year:'numeric'})+'? Every day goes back to "Set location" — this also stops the previous month\'s location carrying forward.',{title:'Clear month locations',ok:'Clear'}))return;
+  const n=now();
+  LOC().filter(l=>l.date>=first&&l.date<=last).forEach(l=>{l.deleted=true;l.updated_at=n;});
+  setLoc(first,'');
+  toast('Cleared — set locations fresh as you plan.');
+  renderView();}
+async function clearLocationsFromToday(){
+  const td=today();
+  if(!await askConfirm('Clear every location from today onward — across the whole calendar, not just what\'s on screen? Past history stays untouched, and you can set each day fresh from here.',{title:'Clear calendar locations',ok:'Clear all forward'}))return;
+  const n=now();
+  LOC().filter(l=>l.date>=td).forEach(l=>{l.deleted=true;l.updated_at=n;});
+  setLoc(td,'');
+  toast('Cleared — nothing carries forward until you set it again.');
+  renderView();}
 function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
   const tally={};for(let day=1;day<=last;day++){const ds=mk+'-'+String(day).padStart(2,'0');const c=locOn(ds)||'—';tally[c]=(tally[c]||0)+1;}
   const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="pill n">📍 ${esc(c)} · ${n}d</span>`).join(' ');
@@ -1392,7 +1408,7 @@ function vPlanner(){const td=today();
         ${items.slice(0,3).map(it=>{const ov=it.k==='t'&&it.o.due<td;return`<div class="mg-it ${ov?'ov':it.k}">${esc(it.s)}</div>`;}).join('')}
         ${items.length>3?`<div class="mg-more">+${items.length-3} more</div>`:''}</div>`;}).join('');
     body=planHtml('month',mk,'Goals — '+title,'What must this month deliver? Three to five goals.')+
-      `<div style="margin:8px 0">${monthLocSummary(mk)}</div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
+      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${monthLocSummary(mk)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearMonthLocations('${mk}')" title="Reset every day this month to no location">Clear month's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
@@ -1414,7 +1430,7 @@ function vPlanner(){const td=today();
         <button class="btn gh2 xs" style="margin-top:4px;width:100%" onclick="openMeeting(null,'${ds}')">+ Meeting (full)</button>
       </div></div>`;}).join('');
     body=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the three outcomes this week is for?')+
-      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button></div><div class="wgrid">${cols}</div>`;
+      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="wgrid">${cols}</div>`;
   }else{
     title='Meetings';
     const up=M().filter(m=>m.status!=='done'&&m.date>=td).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
