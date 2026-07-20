@@ -210,43 +210,28 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .mg-it.ov{background:var(--red-l);color:var(--red)}
 .mg-more{font-size:9.5px;color:var(--t4)}
 
-/* ═══ planner: week ═══ */
-.wgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
-.wcol{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);min-height:200px;display:flex;flex-direction:column;box-shadow:var(--sh)}
-.wcol.todaycol{border-color:var(--blue);border-top:3px solid var(--blue)}
-.wc-h{padding:7px 10px;border-bottom:1px solid var(--bdr);font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;background:var(--sub)}
-.wc-h .dn{font-size:14px;color:var(--t1)}
-.wcol.todaycol .wc-h .dn{color:var(--blue-d)}
-.wc-b{padding:6px 8px;flex:1}
-.wc-it{font-size:11.5px;padding:4px 7px;border-radius:4px;margin-bottom:4px;cursor:pointer;font-weight:500;background:var(--bg);border:1px solid var(--bdr)}
-.wc-it:hover{border-color:var(--blue-b)}
-.wc-it.m{background:var(--blue-l);color:var(--blue-d);border-color:transparent}
-.wc-it.c{background:var(--grn-l);color:var(--grn);border-color:transparent}
-.wc-it.ov{background:var(--red-l);color:var(--red);border-color:transparent}
-.wc-it.done{opacity:.5;text-decoration:line-through}
-.wc-add{border-top:1px solid var(--bdr);padding:6px}
-.wc-add input{width:100%;font-size:11.5px;padding:4px 7px;border-color:var(--bdr)}
-.wc-loc{padding:5px 8px 0}
-.wc-loc .pill{font-size:10.5px}
-.wtl{position:relative;margin:6px 8px 0;border:1px solid var(--bdr);border-radius:6px;background:#fff;overflow:hidden}
-.wtl-b{position:absolute;left:2px;right:2px;border-radius:2px;cursor:pointer}
-.wtl-b.m{background:var(--blue)}
-.wtl-b.c{background:var(--grn)}
-.wtl-b.done{opacity:.4}
-.wtl-now{position:absolute;left:0;right:0;height:1.5px;background:var(--red);z-index:5}
-.wtl-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--t4)}
-.wc-tasks-hdr{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;font-size:11.5px;font-weight:600;color:var(--t2);cursor:pointer;user-select:none}
-.wc-tasks-hdr:hover{color:var(--blue-d)}
-.wc-tasks-hdr .ar{color:var(--t4);font-size:10px}
-.wc-tasklist{padding:0 8px 6px;display:flex;flex-direction:column;gap:4px}
-.wc-trow{display:flex;align-items:center;gap:6px;font-size:11px}
-.wc-trow .tt{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wc-trow.ov .tt{color:var(--red)}
-.wc-trow input[type=date]{font-size:10px;padding:2px 3px;width:100px}
-.wc-top3{padding:0 2px}
-.wc-top3 .card{margin:6px 8px 0;box-shadow:none}
-.vtog.xs{display:inline-flex}
-.vtog.xs button{padding:3px 8px;font-size:10.5px}
+/* ═══ planner: week (hourly calendar) ═══ */
+.wcal-wrap{overflow-x:auto;border:1px solid var(--bdr);border-radius:var(--r);background:#fff;box-shadow:var(--sh)}
+.wcal-inner{display:flex;min-width:760px}
+.wcal-gutter{flex:0 0 54px;position:sticky;left:0;background:#fff;z-index:3;border-right:1px solid var(--bdr)}
+.wcal-gutter-head{height:80px;border-bottom:1px solid var(--bdr)}
+.wcal-hr{height:46px;font-size:10.5px;color:var(--t4);padding:3px 6px 0 0;text-align:right;font-weight:600;border-bottom:1px solid var(--bdr);box-sizing:border-box}
+.wcal-col{flex:1 1 0;min-width:104px;border-right:1px solid var(--bdr)}
+.wcal-col:last-child{border-right:0}
+.wcal-col.today{background:var(--blue-l)}
+.wcal-col-head{height:80px;box-sizing:border-box;border-bottom:1px solid var(--bdr);padding:6px 8px;display:flex;flex-direction:column;gap:4px;overflow:hidden;background:var(--sub)}
+.wcal-col.today .wcal-col-head{background:var(--blue-l)}
+.wcal-col-head .wch-top{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;font-weight:700;color:var(--t3);letter-spacing:.04em;text-transform:uppercase}
+.wcal-col-head .dn{font-size:14px;color:var(--t1)}
+.wcal-col.today .wch-top,.wcal-col.today .dn{color:var(--blue-d)}
+.wch-loc .pill{font-size:10px}
+.wch-tasks{font-size:11px;color:var(--t2);font-weight:600}
+.wch-tasks:hover{color:var(--blue-d)}
+.wcal-col-body{position:relative}
+.wcal-cell{height:46px;border-bottom:1px solid var(--bdr);cursor:pointer;box-sizing:border-box}
+.wcal-cell:hover{background:var(--blue-l)}
+.wcal-blocks-ov{position:absolute;inset:0;pointer-events:none}
+.wcal-blocks-ov .tl-b{pointer-events:auto;left:3px;right:3px}
 
 /* ═══ planner: day ═══ */
 .tl{position:relative;border:1px solid var(--bdr);border-radius:var(--r);background:#fff;overflow:hidden}
@@ -419,10 +404,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   .gh-search{order:3;flex-basis:100%;max-width:none}
   #navbar{top:env(safe-area-inset-top,0px)}
   .ovl{padding:20px 8px}
-  .addline input,.addline select,.wc-add input,.filters input,.filters select{font-size:16px}
+  .addline input,.addline select,.filters input,.filters select{font-size:16px}
   #main{padding:12px 10px}
-  .wgrid{grid-template-columns:1fr}
-  .wcol{min-height:auto}
   .mg-c{min-height:60px}
   .g2{grid-template-columns:1fr}
   .rowacts{opacity:1}
@@ -1036,7 +1019,6 @@ function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'')
   if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
   else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deptForOwner(r.owner),customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
   if(inp)inp.value='';persist();renderView();}
-function addQuickDay(ds,text,at){const n=now();tasks.push({id:uid(),type:'task',title:text,owner:'me',due:ds,original_due:ds,at:at||null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});persist();renderView();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
 
 /* ═══ TINY CHARTS (canvas) ═══ */
@@ -1284,25 +1266,23 @@ function saveJournal(key){const ta=g('jTa');if(!ta)return;const j=getJournal(key
 
 /* ═══ PLANNER ═══ */
 var plTab='day',plAnchor=today(),selDay=today();
-var wkExpanded={},wcMode={};
 function plShift(n){if(plTab==='month'){const d=new Date(plAnchor.slice(0,7)+'-15T12:00');d.setMonth(d.getMonth()+n);plAnchor=d.toISOString().slice(0,10);}
   else if(plTab==='week')plAnchor=addDays(plAnchor,n*7);
   else plAnchor=addDays(plAnchor,n);renderView();}
-const H0=7,H1=21,HPX=46,WPX=12;
+const H0=7,H1=21,HPX=46;
 function timedBlocks(ds){const out=[];
   M().filter(m=>m.date===ds&&m.time).forEach(m=>out.push({k:'m',id:m.id,t:m.time,dur:+m.duration||60,title:m.title,sub:(m.attendee_ids||[]).map(pname).join(', '),done:m.status==='done',go:`nav('meeting','${m.id}')`}));
   T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds).forEach(t=>out.push({k:'c',id:t.id,t:t.when.slice(11,16),dur:30,title:'Call: '+t.title,sub:cname(t.customer_id),done:t.status==='done',go:`openTask('${t.id}')`}));
   T().filter(t=>t.type!=='call'&&t.due===ds&&t.at).forEach(t=>out.push({k:'t',id:t.id,t:t.at,dur:+t.estimate_min||30,title:t.title,sub:t.dept,done:t.status==='done',go:`openTask('${t.id}')`}));
   return out;}
 function weekTimedBlocks(ds){return timedBlocks(ds).filter(b=>b.k!=='t');}
-function miniTimeline(ds,td){const blocks=weekTimedBlocks(ds);
-  const bh=(H1-H0)*WPX;
-  const grid=`background-image:repeating-linear-gradient(to bottom,var(--bdr) 0,var(--bdr) 1px,transparent 1px,transparent ${WPX*3}px)`;
+function weekGridBlocks(ds,td){const blocks=weekTimedBlocks(ds);
   const blockHtml=blocks.map(b=>{const[hh,mm]=b.t.split(':').map(Number);if(hh<H0||hh>=H1)return'';
-    const top=((hh-H0)*60+mm)/60*WPX;const hgt=Math.max(4,b.dur/60*WPX-1);
-    return`<div class="wtl-b ${b.k} ${b.done?'done':''}" style="top:${top}px;height:${hgt}px" onclick="${b.go}" title="${esc(b.t)} ${esc(b.title)}${b.sub?' · '+esc(b.sub):''}"></div>`;}).join('');
-  let nowLine='';if(ds===td){const nw=new Date();const mins=(nw.getHours()-H0)*60+nw.getMinutes();if(mins>0&&mins<(H1-H0)*60)nowLine=`<div class="wtl-now" style="top:${mins/60*WPX}px"></div>`;}
-  return`<div class="wtl" style="height:${bh}px;${grid}">${blockHtml}${nowLine}${!blocks.length?'<div class="wtl-empty">No meetings</div>':''}</div>`;}
+    const top=((hh-H0)*60+mm)/60*HPX;const hgt=Math.max(22,b.dur/60*HPX-3);
+    return`<div class="tl-b ${b.k} ${b.done?'done':''}" style="top:${top}px;height:${hgt}px" onclick="event.stopPropagation();${b.go}"><span class="num">${b.t}</span> ${esc(b.title)}${b.sub?`<span class="sub2"> · ${esc(b.sub)}</span>`:''}</div>`;}).join('');
+  let nowLine='';if(ds===td){const nw=new Date();const mins=(nw.getHours()-H0)*60+nw.getMinutes();if(mins>0&&mins<(H1-H0)*60)nowLine=`<div class="tl-now" style="top:${mins/60*HPX}px"></div>`;}
+  return blockHtml+nowLine;}
+function quickCreateMeeting(ds,time){openMeeting(null,ds,time);}
 function vDayPlanner(ds){const td=today();
   const blocks=timedBlocks(ds);
   const unplaced=T().filter(t=>t.type!=='call'&&t.due===ds&&!t.at&&t.status!=='done');
@@ -1373,14 +1353,6 @@ function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00
   return chips||'<span class="note">No location set for this month — <a onclick="openPlanPrompt(\'month\',plAnchor)">plan ahead ✈</a></span>';}
 function setTaskAt(id,val){const t=tasks.find(x=>x.id===id);if(t&&val){t.at=val;t.updated_at=now();persist();renderView();}}
 function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t.original_due)t.original_due=ds;t.updated_at=now();persist();renderView();}}
-function toggleWeekTasks(ds){wkExpanded[ds]=!wkExpanded[ds];renderView();}
-function addQuickMeeting(ds,title,time){if(!title)return;const n=now();
-  meetings.push({id:uid(),title,date:ds,time:time||'',duration:60,dept:'',customer_id:null,attendee_ids:['me'],status:'open',created_at:n,updated_at:n});
-  persist();renderView();toast('Meeting added.');}
-function wcSetMode(ds,m){wcMode[ds]=m;renderView();}
-function wcAddGo(ds){const inp=g('wcAddInp_'+ds);const v=(inp?inp.value:'').trim();if(!v)return;
-  if(wcMode[ds]==='meeting'){const t=g('wcAddTime_'+ds);addQuickMeeting(ds,v,t?t.value:'');}
-  else addQuickDay(ds,v);}
 function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
   tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
@@ -1412,25 +1384,23 @@ function vPlanner(){const td=today();
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
-    const cols=[...Array(7)].map((_,i)=>{const ds=addDays(mon,i);const d=new Date(ds+'T12:00');
+    let gutter='<div class="wcal-gutter-head"></div>';
+    for(let h=H0;h<H1;h++)gutter+=`<div class="wcal-hr">${h}:00</div>`;
+    const dayCols=[...Array(7)].map((_,i)=>{const ds=addDays(mon,i);const d=new Date(ds+'T12:00');
       const openT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done');
-      const doneT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status==='done');
-      const expanded=!!wkExpanded[ds];const mode=wcMode[ds]||'task';
-      return`<div class="wcol ${ds===td?'todaycol':''}">
-      <div class="wc-h"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span style="display:flex;gap:6px;align-items:center"><button class="iconb" style="font-size:10.5px" title="Open day" onclick="plTab='day';plAnchor='${ds}';renderView()">↗</button><span class="dn num">${d.getDate()}</span></span></div>
-      <div class="wc-loc"><span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span></div>
-      ${miniTimeline(ds,td)}
-      <div class="wc-tasks-hdr" onclick="toggleWeekTasks('${ds}')"><span>${openT.length} open task${openT.length===1?'':'s'}</span><span class="ar">${expanded?'▴':'▾'}</span></div>
-      ${expanded?`<div class="wc-tasklist">${openT.map(t=>{const ov=t.due<td;return`<div class="wc-trow ${ov?'ov':''}"><span class="tt" onclick="nav('task','${t.id}')">${esc(t.title)}</span><input type="date" value="${t.due||ds}" onchange="setTaskDue('${t.id}',this.value)"></div>`;}).join('')||'<div class="empty">Nothing open.</div>'}</div>`:''}
-      ${doneT.length?`<div class="wc-b" style="padding-top:0">${doneT.map(t=>`<div class="wc-it done" onclick="nav('task','${t.id}')">${esc(t.title)}</div>`).join('')}</div>`:''}
-      <div class="wc-top3">${planHtml('day',ds,'Top 3','What are the three outcomes today is for?',3)}</div>
-      <div class="wc-add">
-        <div class="vtog xs" style="margin:0 0 4px"><button class="${mode!=='meeting'?'on':''}" onclick="wcSetMode('${ds}','task')">Task</button><button class="${mode==='meeting'?'on':''}" onclick="wcSetMode('${ds}','meeting')">Meeting</button></div>
-        <div style="display:flex;gap:4px"><input id="wcAddInp_${ds}" style="flex:1" placeholder="${mode==='meeting'?'+ meeting title':'+ add task'}" onkeydown="if(event.key==='Enter'&&this.value.trim())wcAddGo('${ds}')">${mode==='meeting'?`<input type="time" id="wcAddTime_${ds}" style="width:80px">`:''}<button class="btn xs" onclick="wcAddGo('${ds}')">Add</button></div>
-        <button class="btn gh2 xs" style="margin-top:4px;width:100%" onclick="openMeeting(null,'${ds}')">+ Meeting (full)</button>
-      </div></div>`;}).join('');
-    body=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the three outcomes this week is for?')+
-      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="wgrid">${cols}</div>`;
+      let cells='';for(let h=H0;h<H1;h++)cells+=`<div class="wcal-cell" onclick="quickCreateMeeting('${ds}','${String(h).padStart(2,'0')}:00')" title="Click to schedule a meeting at ${h}:00"></div>`;
+      return`<div class="wcal-col ${ds===td?'today':''}">
+        <div class="wcal-col-head">
+          <div class="wch-top"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span class="dn num lnk" onclick="plTab='day';plAnchor='${ds}';renderView()" title="Open day">${d.getDate()}</span></div>
+          <div class="wch-loc"><span class="pill n lnk" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span></div>
+          <div class="wch-tasks lnk" onclick="plTab='day';plAnchor='${ds}';renderView()" title="Open day">${openT.length} task${openT.length===1?'':'s'}</div>
+        </div>
+        <div class="wcal-col-body" style="height:${(H1-H0)*HPX}px">${cells}<div class="wcal-blocks-ov">${weekGridBlocks(ds,td)}</div></div>
+      </div>`;}).join('');
+    const calendar=`<div class="wcal-wrap"><div class="wcal-inner"><div class="wcal-gutter">${gutter}</div>${dayCols}</div></div>`;
+    const priorities=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the 3-4 outcomes this week is for?',4);
+    body=`<div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div>
+      <div class="grid31">${calendar}${priorities}</div>`;
   }else{
     title='Meetings';
     const up=M().filter(m=>m.status!=='done'&&m.date>=td).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
@@ -1441,9 +1411,9 @@ function vPlanner(){const td=today();
   return pagehead('PLANNER',title,'',
     `<div class="pl-nav"><button class="btn gh2 sm" onclick="plShift(-1)">‹</button><span class="pl-title">${title}</span><button class="btn gh2 sm" onclick="plShift(1)">›</button>
     <button class="btn gh2 sm" onclick="plAnchor=today();selDay=today();renderView()">Today</button></div>
-    ${plTab==='meet'?`<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button>`:''}
+    <button class="btn sm" onclick="openMeeting(null,plTab==='month'?selDay:plAnchor)">+ Meeting</button><button class="btn gh2 sm" onclick="openTask(null,null,plTab==='month'?selDay:plAnchor)">+ Task</button>
     ${(plTab==='week'||plTab==='month')?`<button class="btn gh2 sm" onclick="openPlanPrompt('${plTab}','${plAnchor}')">Plan ahead ✈</button>`:''}
-    <button class="btn gh2 sm" onclick="openMeeting(null,plTab==='month'?selDay:plAnchor)">+ Meeting</button><button class="btn sm" onclick="openTask(null,null,plTab==='month'?selDay:plAnchor)">+ Task</button>`)+
+    ${(plTab==='meet'||plTab==='week')?`<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button>`:''}`)+
   tabs+body;}
 function dayPanel(ds){if(!ds)return'';const items=dayItems(ds);const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   return`<div style="height:12px"></div>${seccard(dn+` <span class="pill n lnk" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span>`,items.length,(items.map(it=>it.k==='m'?mrowHtml(it.o):trow(it.o,{star:false})).join('')),'Nothing planned. Use + Task above or open the day view.',`<button class="btn xs" onclick="plTab='day';plAnchor='${ds}';renderView()">Open day ↗</button>`)}`;}
@@ -2771,9 +2741,9 @@ function meetingRepeatUI(){const rep=g('mRepeat').value,on=!!rep&&!editM;const d
       const pos=weekdayPosition(ds);g('mRepeatMonthNth').value=pos.isLast?-1:pos.nth;fillWeekdaySelect('mRepeatMonthWdSel',pos.weekday);}
     g('fMRepeatMonthDay').style.display=mode==='date'?'flex':'none';
     g('fMRepeatMonthWd').style.display=mode==='weekday'?'flex':'none';}}
-function openMeeting(id,presetDate){editM=id?meetings.find(x=>x.id===id):null;
+function openMeeting(id,presetDate,presetTime){editM=id?meetings.find(x=>x.id===id):null;
   g('mMeetTitle').textContent=editM?'Edit Meeting':'New Meeting';
-  g('mTitle2').value=editM?.title||'';g('mDate').value=editM?.date||presetDate||today();g('mTime').value=editM?.time||'';g('mDur').value=editM?.duration||60;
+  g('mTitle2').value=editM?.title||'';g('mDate').value=editM?.date||presetDate||today();g('mTime').value=editM?.time||presetTime||'';g('mDur').value=editM?.duration||60;
   fillDept('mDept',editM?.dept||'');fillCust('mCustSel',editM?.customer_id||'');
   g('mRepeat').value=editM?.repeat||'';g('mRepeatN').value=8;g('mRepeat').disabled=!!editM;g('mRepeatMonthMode').value='date';
   g('mRepeatWd').dataset.forDate='';g('fMRepeatMonth').dataset.forDate='';
