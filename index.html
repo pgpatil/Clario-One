@@ -366,6 +366,19 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .macts{display:flex;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--bdr);gap:8px;background:var(--sub);border-radius:0 0 8px 8px;flex:0 0 auto}
 .macts .rr{display:flex;gap:8px;margin-left:auto}
+.summary-doc{font-size:13px;line-height:1.55;color:var(--t1)}
+.summary-doc h2{margin:0 0 4px;font-size:17px}
+.summary-doc h3{margin:16px 0 6px;border-bottom:1px solid var(--bdr);padding-bottom:3px;font-size:13px}
+.summary-doc ul,.summary-doc ol{margin:4px 0 4px 20px}
+.summary-doc li{margin:2px 0}
+@media print{
+  body>*:not(#mSummary){display:none!important}
+  #mSummary{position:static!important;background:none!important;padding:0!important;display:block!important}
+  #mSummary .modal{box-shadow:none!important;max-width:none!important;width:auto!important;max-height:none!important;margin:0}
+  #mSummary .mbody{overflow:visible!important}
+  #mSummary h3{display:none!important}
+  .noprint{display:none!important}
+}
 
 /* ═══ settings ═══ */
 .setcard{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:15px;margin-bottom:12px;box-shadow:var(--sh)}
@@ -693,6 +706,20 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
   <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
+</div></div>
+
+<!-- Summary modal (in-app — window.open() has no back/close chrome in an iOS standalone PWA) -->
+<div class="ovl" id="mSummary"><div class="modal" style="max-width:720px">
+  <h3 id="summaryTitle">Summary<button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+    <div class="noprint" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <button class="btn gh2 sm" type="button" onclick="printSummary()">Print / PDF</button>
+      <button class="btn gh2 sm" type="button" id="summaryCpy" onclick="copySummary()">Copy formatted</button>
+      <a class="btn gh2 sm" id="summaryMailto" href="#">Email (plain)</a>
+    </div>
+    <p class="note noprint">To email <b>with</b> bullets and formatting: click <b>Copy formatted</b>, then paste into a new Outlook mail. The Email button opens a plain-text mail (mail apps strip formatting from links).</p>
+    <div id="summaryDoc" class="summary-doc"></div>
+  </div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -1596,17 +1623,18 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   return pagehead('WORK','Tasks',list.length+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body;}
 
 function openSummaryWindow(title,html,plain){
-  const style='body{font-family:system-ui,Segoe UI,Arial;max-width:720px;margin:24px auto;padding:0 18px;color:#181818;line-height:1.5}h2{margin:0 0 4px}h3{margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}ul{margin:4px 0 4px 20px}ol{margin:4px 0 4px 20px}li{margin:2px 0}button{padding:6px 12px;margin-right:8px;font-size:13px;cursor:pointer}.hint{font-size:12px;color:#666;margin:8px 0 0}@media print{.noprint{display:none}}';
-  const mailto='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(plain);
-  const bodyHtml=html.replace(/<\/script/gi,'<\\/script');
-  const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+style+'</style></head><body>'
-    +'<div class="noprint" style="margin-bottom:6px"><button onclick="window.print()">Print / PDF</button><button id="cpy">Copy formatted</button><a href="'+mailto.replace(/"/g,'&quot;')+'"><button>Email (plain)</button></a></div>'
-    +'<div class="noprint hint">To email <b>with</b> bullets and formatting: click <b>Copy formatted</b>, then paste into a new Outlook mail. The Email button opens a plain-text mail (mail apps strip formatting from links).</div>'
-    +'<div id="doc">'+bodyHtml+'</div>'
-    +'<scr'+'ipt>document.getElementById("cpy").addEventListener("click",async function(){try{var node=document.getElementById("doc");var htmlBlob=new Blob([node.innerHTML],{type:"text/html"});var textBlob=new Blob([node.innerText],{type:"text/plain"});await navigator.clipboard.write([new ClipboardItem({"text/html":htmlBlob,"text/plain":textBlob})]);this.textContent="Copied ✓";}catch(e){try{var r=document.createRange();r.selectNode(document.getElementById("doc"));var sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.execCommand("copy");sel.removeAllRanges();this.textContent="Copied ✓";}catch(_){this.textContent="Copy failed — select & copy manually";}}});<\/scr'+'ipt>'
-    +'</body></html>';
-  const w=window.open('','_blank');
-  if(w){w.document.open();w.document.write(doc);w.document.close();}else{toast('Allow pop-ups to open the summary.');}}
+  g('summaryTitle').firstChild.textContent=title+' ';
+  g('summaryDoc').innerHTML=html;
+  g('summaryMailto').href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(plain);
+  const cpy=g('summaryCpy');cpy.textContent='Copy formatted';
+  g('mSummary').classList.add('open');}
+function printSummary(){window.print();}
+async function copySummary(){const node=g('summaryDoc');const btn=g('summaryCpy');
+  try{const htmlBlob=new Blob([node.innerHTML],{type:'text/html'});const textBlob=new Blob([node.innerText],{type:'text/plain'});
+    await navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]);
+    btn.textContent='Copied ✓';}
+  catch(e){try{const r=document.createRange();r.selectNode(node);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.execCommand('copy');sel.removeAllRanges();btn.textContent='Copied ✓';}
+    catch(_){btn.textContent='Copy failed — select & copy manually';}}}
 function pnameAny(id){const p=P().find(x=>x.id===id);if(p)return p.name;const c=CO().find(x=>x.id===id);return c?c.name:pname(id);}
 function attendeeCompanyOf(id){if(id==='me'||P().some(p=>p.id===id))return companyName||'Our Team';
   const c=CO().find(x=>x.id===id);if(c){const acct=CU().find(x=>x.id===c.customer_id);return acct?acct.name:'External';}
