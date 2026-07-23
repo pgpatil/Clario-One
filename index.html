@@ -39,7 +39,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 /* ═══ global header ═══ */
 #gh{height:auto;min-height:50px;padding-top:calc(env(safe-area-inset-top,0px));background:#fff;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:14px;padding:0 16px;position:sticky;top:0;z-index:40}
 .gh-brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;letter-spacing:-.2px;white-space:nowrap}
-.gh-logo{width:26px;height:26px;border-radius:6px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.gh-logo{width:26px;height:26px;border-radius:6px;display:block;object-fit:cover}
 .gh-search{flex:1;max-width:560px;position:relative}
 .gh-search input{width:100%;padding:7px 12px 7px 32px;background:var(--bg);border-color:transparent;border-radius:var(--r)}
 .gh-search input:focus{background:#fff;border-color:var(--blue)}
@@ -446,8 +446,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <div id="resumebar"><span id="resumeTxt"></span><button class="btn sm" onclick="resumeSync()">Resume sync</button><button class="btn gh2 sm" onclick="g('resumebar').classList.remove('show')">Not now</button></div>
 
 <header id="gh">
-  <button class="gh-sync" id="ghBack" onclick="history.back()" title="Back" style="display:none">←</button>
-  <div class="gh-brand lnk" onclick="nav('home')" title="Home"><div class="gh-logo">C1</div><span>Clario One</span></div>
+  <button class="gh-sync" id="ghBack" onclick="goBack()" title="Back" style="display:none">←</button>
+  <button class="gh-brand lnk" onclick="nav('home')" title="Home" type="button"><img class="gh-logo" src="icon-192.png" alt="Clario One" width="26" height="26"><span>Clario One</span></button>
   <div class="gh-search" id="ghSearchWrap"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
   <div class="gh-right">
     <div class="vtog" id="modeToggle"></div>
@@ -953,10 +953,16 @@ function toggleMore(e){if(e)e.stopPropagation();const m=g('moremenu');if(!m)retu
   if(willOpen){const b=g('moreBtn');if(b&&b.getBoundingClientRect){const r=b.getBoundingClientRect();m.style.top=(r.bottom+4)+'px';m.style.right=Math.max(6,window.innerWidth-r.right)+'px';m.style.left='auto';}}
   m.classList.toggle('on');}
 var _navDepth=0;
-async function nav(v,arg,_fromPop){
-  flushEditors();persist();view=v;viewArg=arg??null;
+var _navStack=[];
+async function nav(v,arg,_fromPop,_fromGoBack){
+  flushEditors();
+  if(!_fromGoBack&&(view!==v||viewArg!=(arg??null)))_navStack.push({view,arg:viewArg});
+  persist();view=v;viewArg=arg??null;
   if(!_fromPop){try{history.pushState({view:v,arg:viewArg},'',location.pathname+location.search);_navDepth++;}catch(e){}}
   renderView();}
+function goBack(){
+  if(_navStack.length){const prev=_navStack.pop();nav(prev.view,prev.arg,false,true);}
+  else nav('home');}
 window.addEventListener('popstate',e=>{
   if(e.state&&e.state.view){_navDepth=Math.max(0,_navDepth-1);nav(e.state.view,e.state.arg,true);}
   else{_navDepth=0;nav('home',null,true);}});
@@ -3015,7 +3021,7 @@ document.addEventListener('keydown',e=>{
 
 /* tool state reset when leaving decide */
 const _origNav=nav;
-nav=async function(v,arg,_fromPop){if(v!=='decide'){dTool=null;window._trId=null;window._mtx=null;window._pm=null;window._fw=null;window._pa=null;window._sw=null;}return _origNav(v,arg,_fromPop);};
+nav=async function(v,arg,_fromPop,_fromGoBack){if(v!=='decide'){dTool=null;window._trId=null;window._mtx=null;window._pm=null;window._fw=null;window._pa=null;window._sw=null;}return _origNav(v,arg,_fromPop,_fromGoBack);};
 
 /* ═══ BOOT ═══ */
 (function boot(){loadLS();applyModeUI();renderView();restoreFolder();gRestore();
