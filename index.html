@@ -778,19 +778,19 @@ function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.delet
   c.next_action=null;c.next_action_due=null;});
   if(m)persist();}
 
-const T=()=>tasks.filter(t=>!t.deleted&&t.scope!=='personal');
+const T=()=>tasks.filter(t=>!t.deleted&&!t.archived&&t.scope!=='personal');
 const TP=()=>tasks.filter(t=>!t.deleted&&t.scope==='personal');
 const P=()=>people.filter(p=>!p.deleted);
 const FA=()=>family.filter(f=>!f.deleted);
 const BD=()=>birthdays.filter(b=>!b.deleted);
 const AG=()=>agenda.filter(a=>!a.deleted);
-const M=()=>meetings.filter(m=>!m.deleted);
-const DC=()=>decisions.filter(d=>!d.deleted);
+const M=()=>meetings.filter(m=>!m.deleted&&!m.archived);
+const DC=()=>decisions.filter(d=>!d.deleted&&!d.archived);
 const CU=()=>customers.filter(c=>!c.deleted);
 const CO=()=>contacts.filter(c=>!c.deleted);
 const PL=()=>plans.filter(p=>!p.deleted);
 const DL=()=>deals.filter(d=>!d.deleted);
-const AC=()=>activities.filter(a=>!a.deleted);
+const AC=()=>activities.filter(a=>!a.deleted&&!a.archived);
 const TR=()=>toolruns.filter(t=>!t.deleted);
 const OP=()=>opps.filter(o=>!o.deleted);
 const LOC=()=>locations.filter(x=>!x.deleted);
@@ -837,7 +837,7 @@ function deptFilter(d){window._cd=d;cTab='mine';nav('commit');}
 const openMine=()=>T().filter(t=>t.status==='open'&&(t.owner==='me'||!t.owner));
 const waiting=()=>T().filter(t=>t.status==='waiting');
 const openDeals=()=>DL().filter(d=>d.stage!=='Won'&&d.stage!=='Lost');
-function logActivity(kind,text,customer_id,deal_id,contact_id,html){const n=now();activities.push({id:uid(),kind,text,html:html||null,customer_id:customer_id||null,deal_id:deal_id||null,contact_id:contact_id||null,at:n,created_at:n,updated_at:n});}
+function logActivity(kind,text,customer_id,deal_id,contact_id,html,person_id){const n=now();activities.push({id:uid(),kind,text,html:html||null,customer_id:customer_id||null,deal_id:deal_id||null,contact_id:contact_id||null,person_id:person_id||null,at:n,created_at:n,updated_at:n});}
 
 /* ═══ ENCRYPTION (optional AES-GCM on db.json) ═══ */
 let _encKey=null,_encMeta=null;
@@ -1542,18 +1542,25 @@ function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='o
   const w=waiting().filter(t=>t.owner===p.id).sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
   const doneRecent=T().filter(t=>t.owner===p.id&&t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||'')).slice(0,5);
   const decs=DC().filter(d=>(d.people_ids||[]).includes(p.id)).slice(-5).reverse();
+  const acts=AC().filter(a=>a.person_id===p.id).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,25);
   const nm=esc(p.name);
   return`<span class="backlink" onclick="nav('people')">← People</span>`+
   pagehead('PERSON',nm,`${esc(p.role||'')}${p.role&&p.dept?' · ':''}${esc(p.dept||'')}${(()=>{const ac=CU().filter(c=>(c.people_ids||[]).includes(p.id));return ac.length?' · '+ac.map(c=>esc(c.name)).join(', '):'';})()}`,
     `${p.phone?`<a class="btn gh2 sm" href="tel:${esc(p.phone)}">✆ Call</a>`:''}${p.email?`<a class="btn gh2 sm" href="mailto:${esc(p.email)}">✉ Email</a>`:''}<button class="btn gh2 sm" onclick="openPerson('${p.id}')">Edit</button><button class="btn sm" onclick="openTask(null,'${p.id}')">+ Delegate</button>`)+
-  `<div class="grid2"><div>
+  `<div class="grid31"><div>
   <div class="card"><div class="ch"><span>Agenda — raise next meeting</span><span class="n num">${ag.length}</span></div>
     ${ag.map(a=>`<div class="row"><button class="chk" onclick="agendaDone('${a.id}')"></button><div class="bd"><div class="tt" style="font-weight:500">${esc(a.text)}</div><div class="meta">added ${fmtD((a.created_at||now()).slice(0,10))}</div></div><div class="rowacts"><button class="iconb" onclick="agendaDel('${a.id}')">✕</button></div></div>`).join('')||`<div class="empty">Nothing parked for ${nm}.</div>`}
     <div class="addline"><input id="agInput" placeholder="Park an item to raise with ${nm}"><button class="btn sm" onclick="agendaAdd('${p.id}')">Add</button></div></div>
   ${decs.length?seccard('Recent decisions involving them',decs.length,decs.map(d=>`<div class="row"><div class="bd"><div class="tt" style="font-weight:500">${esc(d.what)}</div><div class="meta">${fmtD(d.date)}${d.review_date?' · review '+fmtD(d.review_date):''}</div></div></div>`).join(''),''):''}
-  </div><div>
   ${seccard('Waiting on '+nm,w.length,w.map(t=>trow(t)).join(''),'Nothing delegated and open.')}
   ${doneRecent.length?seccard('Recently completed',doneRecent.length,doneRecent.map(t=>trow(t,{star:false})).join(''),''):''}
+  </div><div>
+    <div class="card"><div class="ch"><span>Notes & calls</span></div>
+    <div class="cb" style="border-bottom:1px solid var(--bdr)">
+    ${rteBar('ppText')}
+    <div id="ppText" class="rte" contenteditable="true" data-ph="Write notes as points — save, then turn any point into a task…"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note',null,null,'${p.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call',null,null,'${p.id}')">Log as call</button></div></div>
+    <div class="cb"><div class="atl">${acts.map(a=>actItem(a,null,null,p.id)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet.</div>'}</div></div></div>
   </div></div>`;}
 function agendaAdd(pid){const i=g('agInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:pid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
 function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised';a.updated_at=now();persist();renderView();}}
@@ -1977,18 +1984,18 @@ function sanitizeHtml(html){const d=document.createElement('div');d.innerHTML=ht
   });})(d);
   return d.innerHTML;}
 function htmlToText(html){const d=document.createElement('div');d.innerHTML=html;return (d.textContent||'').replace(/\n{2,}/g,'\n').trim();}
-function capLog(kind,cid,did){const el=g('npText')||g('dpText');if(!el)return;const html=sanitizeHtml(el.innerHTML);const text=htmlToText(html);
+function capLog(kind,cid,did,pid){const el=g('npText')||g('dpText')||g('ppText');if(!el)return;const html=sanitizeHtml(el.innerHTML);const text=htmlToText(html);
   if(!text){toast('Type something first.');return;}
-  const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,at:n,created_at:n,updated_at:n});
+  const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,person_id:pid||null,at:n,created_at:n,updated_at:n});
   persist();renderView();toast(kind==='call'?'Call logged.':'Note saved.');}
 /* render one activity; note list-items get a per-line +task */
-function actItem(a,cid,did){const acts='<div class="at-acts"><button class="lit" title="Edit" onclick="editAct(\''+a.id+'\')">✎</button><button class="lit" title="Delete" onclick="delAct(\''+a.id+'\')">✕</button></div>';
+function actItem(a,cid,did,pid){const acts='<div class="at-acts"><button class="lit" title="Edit" onclick="editAct(\''+a.id+'\')">✎</button><button class="lit" title="Delete" onclick="delAct(\''+a.id+'\')">✕</button></div>';
   const link=a.task_id?' · <span class="lnk" onclick="event.stopPropagation();nav(\''+'task'+'\',\''+a.task_id+'\')">open task ↗</span>':a.meeting_id?' · <span class="lnk" onclick="event.stopPropagation();nav(\''+'meeting'+'\',\''+a.meeting_id+'\')">open meeting ↗</span>':'';
   const meta='<div class="at-m">'+a.kind+' · '+fmtDT(a.at)+(a.edited?' · edited':'')+link+'</div>';
   if(a.html){const d=document.createElement('div');d.innerHTML=a.html;
     d.querySelectorAll('li').forEach((li,i)=>{const txt=(li.textContent||'').trim();if(!txt)return;
       li.setAttribute('class','at-li');
-      li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\')">+ task</button>';});
+      li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\',\''+(pid||'')+'\')">+ task</button>';});
     return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t">'+d.innerHTML+'</div>'+meta+'</div>';}
   return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t" style="white-space:pre-wrap">'+esc(a.text)+'</div>'+meta+'</div>';}
 let editAc=null;
@@ -2002,8 +2009,8 @@ function saveActEdit(){if(!editAc)return;const ed=g('acEText');const html=saniti
   closeM();persist();renderView();toast('Entry updated.');}
 async function delAct(id){const a=activities.find(x=>x.id===id);if(a&&await askConfirm('Delete this log entry?',{ok:'Delete',danger:true})){a.deleted=true;a.updated_at=now();persist();renderView();toast('Deleted.');}}
 function acEcmd(c){document.execCommand(c,false,null);const e=g('acEText');if(e)e.focus();}
-function lineToTask(btn,cid,did){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
-  openTask(null,null,null,cid||null,'task',did||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
+function lineToTask(btn,cid,did,pid){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
+  openTask(null,pid||null,null,cid||null,'task',did||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
 async function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&await askConfirm('Remove '+x.name+'?',{ok:'Remove',danger:true})){x.deleted=true;x.updated_at=now();persist();renderView();toast('Removed.');}}
@@ -2339,6 +2346,9 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="chips">${locationsList.map((l,i)=>`<span class="chip">${esc(l)}<button onclick="locationsList.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newLocation" placeholder="Add a standard location — e.g. Mumbai, Home office" style="flex:1"><button class="btn sm" onclick="addLocation()">Add</button></div>
     <p class="note">Where you're usually based or travel to. Suggested whenever you set your day's location on the planner.</p></div>
+  <div class="setcard"><h4>Archive</h4>
+    <p class="note">Completed tasks, calls, meetings, decisions and logged notes older than 6 months can be archived — hidden from lists and searches to keep the app fast, without deleting anything. ${archivedCount()?archivedCount()+' record(s) currently archived.':''}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" onclick="runArchiveOld()">Archive records older than 6 months</button>${archivedCount()?`<button class="btn gh2 sm" onclick="restoreArchived()">Restore archived records</button>`:''}</div></div>
   <div class="setcard"><h4>Data</h4>
     <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button></div>
   <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
@@ -2351,6 +2361,32 @@ function saveCompanyName(){companyName=g('companyNameInp').value.trim();persist(
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
 function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.sort((a,b)=>a.localeCompare(b)).map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
+function monthsAgoDate(n){const d=new Date();d.setMonth(d.getMonth()-n);return d.toISOString().slice(0,10);}
+function archivableCounts(cutoff){
+  const tk=tasks.filter(t=>!t.deleted&&!t.archived&&t.status==='done'&&(t.completed_at||t.updated_at||t.created_at||'').slice(0,10)<cutoff).length;
+  const mt=meetings.filter(m=>!m.deleted&&!m.archived&&(m.status==='done'||m.status==='noshow')&&(m.date||(m.updated_at||'').slice(0,10))<cutoff).length;
+  const dc=decisions.filter(d=>!d.deleted&&!d.archived&&(d.date||(d.updated_at||'').slice(0,10))<cutoff).length;
+  const ac=activities.filter(a=>!a.deleted&&!a.archived&&(a.at||a.updated_at||'').slice(0,10)<cutoff).length;
+  return tk+mt+dc+ac;}
+function archiveOldRecords(cutoff){const n=now();let count=0;
+  tasks.filter(t=>!t.deleted&&!t.archived&&t.status==='done'&&(t.completed_at||t.updated_at||t.created_at||'').slice(0,10)<cutoff).forEach(t=>{t.archived=true;t.updated_at=n;count++;});
+  meetings.filter(m=>!m.deleted&&!m.archived&&(m.status==='done'||m.status==='noshow')&&(m.date||(m.updated_at||'').slice(0,10))<cutoff).forEach(m=>{m.archived=true;m.updated_at=n;count++;});
+  decisions.filter(d=>!d.deleted&&!d.archived&&(d.date||(d.updated_at||'').slice(0,10))<cutoff).forEach(d=>{d.archived=true;d.updated_at=n;count++;});
+  activities.filter(a=>!a.deleted&&!a.archived&&(a.at||a.updated_at||'').slice(0,10)<cutoff).forEach(a=>{a.archived=true;a.updated_at=n;count++;});
+  return count;}
+async function runArchiveOld(){const cutoff=monthsAgoDate(6);const preview=archivableCounts(cutoff);
+  if(!preview){toast('Nothing older than 6 months to archive.');return;}
+  if(!await askConfirm(preview+' completed record(s) older than 6 months (before '+fmtD(cutoff)+') will be archived — hidden from lists to keep the app fast, and fully recoverable anytime via Restore.',{title:'Archive old records',ok:'Archive'}))return;
+  const count=archiveOldRecords(cutoff);persist();renderView();toast(count+' record(s) archived.');}
+function archivedCount(){return tasks.filter(t=>t.archived&&!t.deleted).length+meetings.filter(m=>m.archived&&!m.deleted).length+decisions.filter(d=>d.archived&&!d.deleted).length+activities.filter(a=>a.archived&&!a.deleted).length;}
+async function restoreArchived(){const cnt=archivedCount();if(!cnt){toast('Nothing archived.');return;}
+  if(!await askConfirm('Restore all '+cnt+' archived record(s) back to active lists?',{title:'Restore archived records',ok:'Restore'}))return;
+  const n=now();
+  tasks.forEach(t=>{if(t.archived){t.archived=false;t.updated_at=n;}});
+  meetings.forEach(m=>{if(m.archived){m.archived=false;m.updated_at=n;}});
+  decisions.forEach(d=>{if(d.archived){d.archived=false;d.updated_at=n;}});
+  activities.forEach(a=>{if(a.archived){a.archived=false;a.updated_at=n;}});
+  persist();renderView();toast(cnt+' record(s) restored.');}
 
 function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._coAcct||'';
   let list=CO().filter(x=>(!q||(x.name+' '+(x.role||'')+' '+(x.phone||'')+' '+(x.email||'')+' '+cname(x.customer_id)).toLowerCase().includes(q))&&(!af||x.customer_id===af));
