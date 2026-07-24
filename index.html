@@ -1636,33 +1636,38 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
   return pagehead('WORK','Tasks',list.length+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body;}
 
+const SUMMARY_SIGNOFF='Please feel free to revert for any further clarifications';
 function openSummaryWindow(title,html,plain){
   g('summaryTitle').firstChild.textContent=title+' ';
   g('summaryDoc').innerHTML=html;
-  g('summaryMailto').href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(plain);
+  g('summaryMailto').href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(plain+'\r\n\r\n'+SUMMARY_SIGNOFF);
   const cpy=g('summaryCpy');cpy.textContent='Copy formatted';
   g('mSummary').classList.add('open');}
 function printSummary(){window.print();}
 async function copySummary(){const node=g('summaryDoc');const btn=g('summaryCpy');
-  try{const htmlBlob=new Blob([node.innerHTML],{type:'text/html'});const textBlob=new Blob([node.innerText],{type:'text/plain'});
-    await navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]);
-    btn.textContent='Copied ✓';}
-  catch(e){try{const r=document.createRange();r.selectNode(node);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.execCommand('copy');sel.removeAllRanges();btn.textContent='Copied ✓';}
-    catch(_){btn.textContent='Copy failed — select & copy manually';}}}
+  const signoff=document.createElement('p');signoff.textContent=SUMMARY_SIGNOFF;node.appendChild(signoff);
+  try{
+    try{const htmlBlob=new Blob([node.innerHTML],{type:'text/html'});const textBlob=new Blob([node.innerText],{type:'text/plain'});
+      await navigator.clipboard.write([new ClipboardItem({'text/html':htmlBlob,'text/plain':textBlob})]);
+      btn.textContent='Copied ✓';}
+    catch(e){try{const r=document.createRange();r.selectNode(node);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);document.execCommand('copy');sel.removeAllRanges();btn.textContent='Copied ✓';}
+      catch(_){btn.textContent='Copy failed — select & copy manually';}}
+  }finally{node.removeChild(signoff);}}
 function pnameAny(id){const p=P().find(x=>x.id===id);if(p)return p.name;const c=CO().find(x=>x.id===id);return c?c.name:pname(id);}
 function attendeeCompanyOf(id){if(id==='me'||P().some(p=>p.id===id))return companyName||'Our Team';
   const c=CO().find(x=>x.id===id);if(c){const acct=CU().find(x=>x.id===c.customer_id);return acct?acct.name:'External';}
   return'Other';}
-function attendeeSummaryLines(ids){return ids.map(id=>({company:attendeeCompanyOf(id),name:pnameAny(id)}))
-  .sort((a,b)=>a.company.localeCompare(b.company)||a.name.localeCompare(b.name))
-  .map(x=>x.company+' → '+x.name);}
+function attendeeSummaryLines(ids){const byCo={};
+  ids.forEach(id=>{const co=attendeeCompanyOf(id);(byCo[co]=byCo[co]||[]).push(pnameAny(id));});
+  return Object.keys(byCo).sort((a,b)=>a.localeCompare(b))
+    .map(co=>co+' → '+byCo[co].sort((a,b)=>a.localeCompare(b)).join(', '));}
 function buildMeetingSummary(m,present){const ids=present||m.attendee_ids||[];const attLines=attendeeSummaryLines(ids);
   const ag=AG().filter(a=>a.meeting_id===m.id||((m.attendee_ids||[]).includes(a.person_id)));
   const decs=DC().filter(d=>d.meeting_id===m.id);
   const acts=T().filter(t=>t.meeting_id===m.id);
   const esc2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   let h='<div style="font-size:11px;letter-spacing:.08em;color:#888;text-transform:uppercase">Minutes of Meeting</div><h2 style="margin:2px 0 4px">'+esc2(m.title)+'</h2>';
-  h+='<p><b>Date:</b> '+fmtD(m.date)+(m.time?' at '+m.time:'')+' &nbsp; <b>Status:</b> '+(m.status==='done'?'Held':m.status==='rescheduled'?'Rescheduled':m.status==='noshow'?'Not attended':'Open')+'</p>';
+  h+='<p><b>Date:</b> '+fmtD(m.date)+(m.time?' at '+m.time:'')+'</p>';
   h+='<h3>Attendees</h3>'+(attLines.length?'<ul>'+attLines.map(l=>'<li>'+esc2(l)+'</li>').join('')+'</ul>':'<p>—</p>');
   if(m.customer_id)h+='<p><b>Account:</b> '+esc2(cname(m.customer_id))+'</p>';
   h+='<h3>Agenda</h3>'+(ag.length?'<ul>'+ag.map(a=>'<li>'+esc2(a.text)+'</li>').join('')+'</ul>':'<p>—</p>');
@@ -1750,7 +1755,6 @@ function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&
   const meta=[];if(t.customer_id)meta.push('<b>Account:</b> '+esc2(cname(t.customer_id)));
   if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)meta.push('<b>Contact:</b> '+esc2(c.name));}
   if(dd)meta.push('<b>'+(t.type==='call'?'When':'Due')+':</b> '+fmtD(dd));
-  meta.push('<b>Status:</b> '+(t.status==='done'?'Done':t.status==='waiting'?'Waiting':'Open'));
   if(present&&present.length){const lines=attendeeSummaryLines(present);if(lines.length)meta.push('<b>Present:</b> '+esc2(lines.join('; ')));}
   h+='<p>'+meta.join(' &nbsp; ')+'</p>';
   h+='<h3>Notes</h3>'+(t.notes_html||(t.notes?'<p>'+esc2(t.notes).replace(/\n/g,'<br>')+'</p>':'<p>—</p>'));
@@ -1758,7 +1762,7 @@ function buildTaskSummary(t,present){const esc2=s=>String(s??'').replace(/&/g,'&
   return h;}
 function taskSummaryText(t,present){const dd=t.type==='call'?(t.when||'').slice(0,10):(t.due||'');const L=[(t.type==='call'?'CALL':'TASK')+': '+t.title];
   if(t.customer_id)L.push('Account: '+cname(t.customer_id));if(t.contact_id){const c=CO().find(x=>x.id===t.contact_id);if(c)L.push('Contact: '+c.name);}
-  if(dd)L.push((t.type==='call'?'When: ':'Due: ')+fmtD(dd));L.push('Status: '+(t.status==='done'?'Done':t.status||'open'));
+  if(dd)L.push((t.type==='call'?'When: ':'Due: ')+fmtD(dd));
   if(present&&present.length){const lines=attendeeSummaryLines(present);if(lines.length)L.push('Present: '+lines.join('; '));}
   L.push('','NOTES',t.notes||'-');return L.join('\r\n');}
 async function taskSummary(id){const t=T().find(x=>x.id===id)||tasks.find(x=>x.id===id);if(!t)return;
