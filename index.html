@@ -410,6 +410,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .toast.show{opacity:1}
 #resumebar{position:fixed;top:0;left:0;right:0;z-index:80;background:var(--blue-l);border-bottom:1px solid var(--blue);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap}
 #resumebar.show{display:flex}
+#reauthbar{position:fixed;top:0;left:0;right:0;z-index:81;background:var(--red-l);border-bottom:1px solid var(--red);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap;color:var(--red)}
+#reauthbar.show{display:flex}
 
 @media(max-width:840px){
   input,select,textarea{font-size:16px}
@@ -444,6 +446,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <body>
 
 <div id="resumebar"><span id="resumeTxt"></span><button class="btn sm" onclick="resumeSync()">Resume sync</button><button class="btn gh2 sm" onclick="g('resumebar').classList.remove('show')">Not now</button></div>
+<div id="reauthbar"><span>Your Microsoft sign-in expired — OneDrive sync is paused.</span><button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="g('reauthbar').classList.remove('show')">Dismiss</button></div>
 
 <header id="gh">
   <button class="gh-sync" id="ghBack" onclick="goBack()" title="Back" style="display:none">←</button>
@@ -1110,21 +1113,22 @@ const GRAPH_FILE='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario/db
 var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false,_gNeedsReauth=false;
 var _gCfg=null;try{_gCfg=JSON.parse(localStorage.getItem('cx_graph')||'null');}catch(e){}
 function gActive(){return!!(_msal&&_gAcct);}
+function setReauth(on){_gNeedsReauth=on;const b=g('reauthbar');if(b)b.classList.toggle('show',on);}
 function gInit(){if(!_gCfg||!_gCfg.clientId)return false;
   if(typeof msal==='undefined'){return false;}
-  if(!_msal)_msal=new msal.PublicClientApplication({auth:{clientId:_gCfg.clientId,authority:'https://login.microsoftonline.com/common',redirectUri:location.origin+location.pathname},cache:{cacheLocation:'localStorage'}});
+  if(!_msal)_msal=new msal.PublicClientApplication({auth:{clientId:_gCfg.clientId,authority:'https://login.microsoftonline.com/common',redirectUri:location.origin+location.pathname},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}});
   return true;}
 async function gRestore(){try{if(!gInit())return;const as=_msal.getAllAccounts();
   if(as.length){_gAcct=as[0];gStart();syncUI('ok','OneDrive · '+(_gAcct.username||'account'));await gPull(true);}}catch(e){}}
 async function gSignIn(){const inp=g('gClient');const id=(inp&&inp.value.trim())||(_gCfg&&_gCfg.clientId)||'';
   if(!id){toast('Paste the Azure client ID first.');return;}
-  _gCfg={clientId:id};localStorage.setItem('cx_graph',JSON.stringify(_gCfg));_msal=null;_gNeedsReauth=false;
+  _gCfg={clientId:id};localStorage.setItem('cx_graph',JSON.stringify(_gCfg));_msal=null;setReauth(false);
   if(!gInit()){toast('Sign-in library not loaded — needs internet on first load.');return;}
   try{const r=await _msal.loginPopup({scopes:['Files.ReadWrite'],prompt:'select_account'});
-    _gAcct=r.account;_gNeedsReauth=false;gStart();await gPull(true);await gSave();toast('Signed in as '+(_gAcct.username||'account'));renderView();}
+    _gAcct=r.account;setReauth(false);gStart();await gPull(true);await gSave();toast('Signed in as '+(_gAcct.username||'account'));renderView();}
   catch(e){toast('Sign-in failed: '+(e.errorCode||e.message||e));}}
 function gSignOut(){try{if(_msal&&_gAcct)_msal.logoutPopup({account:_gAcct}).catch(()=>{});}catch(e){}
-  _gAcct=null;_gNeedsReauth=false;clearInterval(_gTimer);syncUI(_fsDir?'ok':'', _fsDir?_fsDir.name:'Local only');renderView();}
+  _gAcct=null;setReauth(false);clearInterval(_gTimer);syncUI(_fsDir?'ok':'', _fsDir?_fsDir.name:'Local only');renderView();}
 /* Reconnect: interactive re-auth without a full sign-out, for when the cached
    session has gone stale (expired/revoked refresh token). Must only ever be
    called from a genuine user gesture (button click) — acquireTokenPopup is
@@ -1132,12 +1136,12 @@ function gSignOut(){try{if(_msal&&_gAcct)_msal.logoutPopup({account:_gAcct}).cat
    refresh fallback fell into from background timers. */
 async function gReconnect(){if(!_msal){toast('Not set up.');return;}
   try{const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite'],account:_gAcct||undefined,prompt:_gAcct?undefined:'select_account'});
-    _gAcct=r.account;_gNeedsReauth=false;gStart();syncUI('busy');await gPull(true);await gSave();toast('Reconnected to OneDrive.');renderView();}
+    _gAcct=r.account;setReauth(false);gStart();syncUI('busy');await gPull(true);await gSave();toast('Reconnected to OneDrive.');renderView();}
   catch(e){toast('Reconnect failed: '+(e.errorCode||e.message||e));}}
 function gAuthErr(e){return e&&(e.name==='InteractionRequiredAuthError'||/interaction_required|login_required|consent_required|no_tokens_found/.test(e.errorCode||''));}
 async function gToken(){try{return(await _msal.acquireTokenSilent({scopes:['Files.ReadWrite'],account:_gAcct})).accessToken;}
-  catch(e){if(gAuthErr(e)){_gNeedsReauth=true;syncUI('err','Sign-in expired — reconnect');}throw e;}}
-function gCheckAuthResp(r){if(r.status===401){_gNeedsReauth=true;syncUI('err','Sign-in expired — reconnect');return true;}return false;}
+  catch(e){if(gAuthErr(e)){setReauth(true);syncUI('err','Sign-in expired — reconnect');}throw e;}}
+function gCheckAuthResp(r){if(r.status===401){setReauth(true);syncUI('err','Sign-in expired — reconnect');return true;}return false;}
 async function gMeta(){const t=await gToken();const r=await fetch(GRAPH_FILE+'?select=lastModifiedDateTime',{headers:{Authorization:'Bearer '+t}});
   if(gCheckAuthResp(r))throw new Error('reauth');
   if(r.status===404)return null;if(!r.ok)throw new Error('meta '+r.status);return(await r.json()).lastModifiedDateTime||'';}
