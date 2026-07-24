@@ -20,7 +20,7 @@
 :root{
   --bg:#f3f2f2; --card:#ffffff; --sub:#fafaf9; --bdr:#e5e5e5; --bdr2:#c9c9c9;
   --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#767676;
-  --blue:#0176d3; --blue-d:#014486; --blue-l:#eef4ff; --blue-b:#aacbff;
+  --blue:#4e5d68; --blue-d:#333e46; --blue-l:#eff2f5; --blue-b:#b0bec8;
   --grn:#2e844a; --grn-l:#ebf7ee; --red:#ba0517; --red-l:#feefef;
   --amb:#dd7a01; --amb-d:#a75c00; --amb-l:#fef4e8; --pur:#9050e9; --pur-l:#f4ecfe; --ind:#5867e8;
   --steel:#332f2e;
@@ -32,7 +32,7 @@ html,body{height:100%}
 body{font-family:var(--font);font-size:13px;line-height:1.5;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased}
 button{font-family:var(--font);cursor:pointer;border:none;background:none;color:inherit;font-size:13px}
 input,select,textarea{font-family:var(--font);font-size:13px;color:var(--t1);background:#fff;border:1px solid var(--bdr2);border-radius:var(--rs);padding:7px 10px}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(1,118,211,.25)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(78,93,104,.25)}
 .num{font-variant-numeric:tabular-nums}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#c9c9c9;border-radius:3px}::-webkit-scrollbar-track{background:transparent}
@@ -1069,7 +1069,7 @@ function drawBars(cv,labels,values,color){const c=cv.getContext('2d');const W=cv
   const max=Math.max(...values,1);const n=values.length;const pad=30,bw=Math.min(70,(W-pad*2)/n*.62),step=(W-pad*2)/n;
   c.font='600 19px Inter';c.textAlign='center';
   values.forEach((v,i)=>{const x=pad+step*i+step/2;const h=(H-90)*(v/max);
-    c.fillStyle=color||'#0176d3';c.beginPath();c.roundRect(x-bw/2,H-52-h,bw,h,[6,6,0,0]);c.fill();
+    c.fillStyle=color||'#4e5d68';c.beginPath();c.roundRect(x-bw/2,H-52-h,bw,h,[6,6,0,0]);c.fill();
     c.fillStyle='#706e6b';c.fillText(String(labels[i]).slice(0,8),x,H-26);
     c.fillStyle='#181818';c.fillText(v?String(v):'',x,H-60-h);});}
 function drawPareto(cv,labels,values){const c=cv.getContext('2d');const W=cv.width=cv.clientWidth*2,H=cv.height=cv.clientHeight*2;c.clearRect(0,0,W,H);
@@ -1078,7 +1078,7 @@ function drawPareto(cv,labels,values){const c=cv.getContext('2d');const W=cv.wid
   let cum=0;const pts=[];
   c.font='600 18px Inter';c.textAlign='center';
   sv.forEach((v,i)=>{cum+=v;const x=pad+step*i+step/2;const h=(H-110)*(v/max);
-    c.fillStyle=cum/total<=.82?'#0176d3':'#c9c9c9';c.beginPath();c.roundRect(x-bw/2,H-64-h,bw,h,[5,5,0,0]);c.fill();
+    c.fillStyle=cum/total<=.82?'#4e5d68':'#c9c9c9';c.beginPath();c.roundRect(x-bw/2,H-64-h,bw,h,[5,5,0,0]);c.fill();
     c.fillStyle='#706e6b';c.fillText(String(sl[i]).slice(0,7),x,H-36);
     pts.push([x,40+(H-150)*(1-cum/total)]);});
   c.strokeStyle='#dd7a01';c.lineWidth=4;c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.stroke();
@@ -1102,7 +1102,7 @@ function drawQuad(cv,items){const c=cv.getContext('2d');const W=cv.width=cv.clie
   c.save();c.translate(20,H/2);c.rotate(-Math.PI/2);c.fillText('IMPACT →',0,0);c.restore();
   c.fillText('EFFORT →',W/2,H-12);
   items.forEach(o=>{const x=pad+(W-pad*2)*((o.effort-0.5)/5);const y=H-pad-(H-pad*2)*((o.impact-0.5)/5);
-    c.fillStyle=o.status==='done'?'#2e844a':o.impact>=4&&o.effort<=2?'#0176d3':'#706e6b';
+    c.fillStyle=o.status==='done'?'#2e844a':o.impact>=4&&o.effort<=2?'#4e5d68':'#706e6b';
     c.beginPath();c.arc(x,y,10,0,7);c.fill();
     c.font='600 16px Inter';c.fillStyle='#181818';c.textAlign='left';c.fillText(String(o.title).slice(0,16),x+14,y+5);c.font='700 18px Inter';});}
 /* ═══ ONEDRIVE ACCOUNT SYNC (Microsoft Graph) ═══ */
@@ -3001,7 +3001,7 @@ function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')qui
   const dc=g('deptCv');if(dc){const td=today();const m={};T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td).forEach(t=>{m[t.dept||'—']=(m[t.dept||'—']||0)+1;});
     const ks=Object.keys(m);if(ks.length)drawBars(dc,ks,ks.map(k=>m[k]),'#ba0517');else{const c=dc.getContext('2d');dc.width=dc.clientWidth*2;dc.height=dc.clientHeight*2;c.font='600 20px Inter';c.fillStyle='#939393';c.textAlign='center';c.fillText('No overdue items — clean board.',dc.width/2,dc.height/2);}}
   const sc=g('stageCv');if(sc){const vals=STAGES.slice(0,4).map(st=>Math.round(DL().filter(d=>d.stage===st).reduce((a,d)=>a+(+d.value||0),0)/1000));
-    drawBars(sc,STAGES.slice(0,4),vals,'#0176d3');}
+    drawBars(sc,STAGES.slice(0,4),vals,'#4e5d68');}
   wireSSelAll(g('main'));
 }
 document.addEventListener('keydown',e=>{
