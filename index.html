@@ -19,10 +19,11 @@
 <style>
 :root{
   --bg:#f3f2f2; --card:#ffffff; --sub:#fafaf9; --bdr:#e5e5e5; --bdr2:#c9c9c9;
-  --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#939393;
+  --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#767676;
   --blue:#0176d3; --blue-d:#014486; --blue-l:#eef4ff; --blue-b:#aacbff;
   --grn:#2e844a; --grn-l:#ebf7ee; --red:#ba0517; --red-l:#feefef;
-  --amb:#dd7a01; --amb-l:#fef4e8; --pur:#9050e9; --pur-l:#f4ecfe; --ind:#5867e8;
+  --amb:#dd7a01; --amb-d:#a75c00; --amb-l:#fef4e8; --pur:#9050e9; --pur-l:#f4ecfe; --ind:#5867e8;
+  --steel:#332f2e;
   --r:6px; --rs:4px; --sh:0 2px 4px rgba(24,24,24,.06);
   --font:'Inter',system-ui,-apple-system,sans-serif;
 }
@@ -113,7 +114,7 @@ table.t td.r,table.t th.r{text-align:right}
 .pill.b{background:var(--blue-l);color:var(--blue-d)}
 .pill.g{background:var(--grn-l);color:var(--grn)}
 .pill.r{background:var(--red-l);color:var(--red)}
-.pill.a{background:var(--amb-l);color:var(--amb)}
+.pill.a{background:var(--amb-l);color:var(--amb-d)}
 .pill.p{background:var(--pur-l);color:var(--pur)}
 .pill.n{background:var(--bg);color:var(--t2)}
 
@@ -405,7 +406,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .faq .fa{padding:0 14px 13px;font-size:12.5px;color:var(--t2);line-height:1.65}
 .faq .fa b{color:var(--t1)}
 .faq .fa code{background:var(--bg);border:1px solid var(--bdr);border-radius:3px;padding:0 5px;font-size:11.5px}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#181818;color:#fff;padding:9px 16px;border-radius:var(--r);font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .18s;z-index:95;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--steel);color:#fff;padding:9px 16px;border-radius:var(--r);font-size:12.5px;opacity:0;pointer-events:none;transition:opacity .18s;z-index:95;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw}
 .toast.show{opacity:1}
 #resumebar{position:fixed;top:0;left:0;right:0;z-index:80;background:var(--blue-l);border-bottom:1px solid var(--blue);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap}
 #resumebar.show{display:flex}
