@@ -1334,6 +1334,13 @@ function vDayPlanner(ds){const td=today();
   const blocks=timedBlocks(ds);
   const unplaced=T().filter(t=>t.type!=='call'&&t.due===ds&&!t.at&&t.status!=='done');
   const dump=T().filter(t=>t.type!=='call'&&!t.due&&t.status==='open'&&(t.owner==='me'||!t.owner));
+  const mineOpen=t=>t.type!=='call'&&t.status!=='done'&&t.due&&(t.owner==='me'||!t.owner);
+  const overdue=T().filter(t=>mineOpen(t)&&t.due<ds).sort((a,b)=>a.due.localeCompare(b.due));
+  const soon=T().filter(t=>mineOpen(t)&&t.due>ds&&t.due<=addDays(ds,7)).sort((a,b)=>a.due.localeCompare(b.due));
+  const oaRow=t=>`<div class="row"><span class="pri ${t.priority||'medium'}"></span><div class="bd"><div class="tt" style="font-size:12.5px">${esc(t.title)}</div><div class="meta"><span class="due ${t.due<td?'over':t.due===td?'today':''}">${fmtD(t.due)}</span><span class="num">${t.estimate_min||30}m</span>${t.customer_id?`<span class="pill n">${esc(cname(t.customer_id))}</span>`:''}${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}</div></div><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${ds}')" title="Move to this day">→ ${ds===td?'Today':'Day'}</button></div>`;
+  const oaSub=l=>`<div style="padding:6px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);font-weight:700">${l}</div>`;
+  const oaInner=(overdue.length?oaSub('Overdue')+overdue.map(oaRow).join(''):'')+(soon.length?oaSub('Next 7 days')+soon.map(oaRow).join(''):'');
+  const oaCard=`<div class="card"><div class="ch"><span>Overdue &amp; upcoming</span><span class="n num">${overdue.length+soon.length}</span></div><div class="scrolllist">${oaInner||'<div class="empty">Nothing overdue or due in the next 7 days.</div>'}</div></div>`;
   const meetMin=blocks.filter(b=>b.k==='m'&&!b.done).reduce((a,b)=>a+b.dur,0);
   const taskMin=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done').reduce((a,t)=>a+(+t.estimate_min||30),0);
   const planned=meetMin+taskMin,cap=480,pct=Math.min(100,Math.round(planned/cap*100));
@@ -1358,6 +1365,7 @@ function vDayPlanner(ds){const td=today();
         <div class="cb"><div class="capbar ${planned>cap?'over':''}"><div style="width:${pct}%"></div></div>
         ${planned>cap?`<div style="font-size:11.5px;color:var(--red);font-weight:700;margin-top:6px">Over capacity by ${Math.round((planned-cap)/60*10)/10}h — move something.</div>`:`<div style="font-size:11.5px;color:var(--t3);margin-top:6px">${Math.round((cap-planned)/60*10)/10}h free.</div>`}</div></div>
       ${seccard('To place on the day',unplaced.length,unplaced.map(t=>`<div class="row"><span class="pri ${t.priority}"></span><div class="bd"><div class="tt" style="font-size:12.5px">${esc(t.title)}</div><div class="meta"><span class="num">${t.estimate_min||30}m</span>${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}</div></div><input type="time" style="width:96px;padding:3px 5px;font-size:11.5px" onchange="setTaskAt('${t.id}',this.value)"></div>`).join(''),'Everything due today has a time.')}
+      ${oaCard}
       <div class="card"><div class="ch"><span>Brain dump — unscheduled <span class="n num">(${dump.length})</span></span></div>
       ${dump.slice(0,8).map(t=>`<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px;font-weight:500">${esc(t.title)}</div></div><div style="display:flex;gap:4px"><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${ds}')">This day</button><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${addDays(ds,1)}')">Next</button></div></div>`).join('')||'<div class="empty">Empty. Park ideas here — no date needed.</div>'}
       <div class="addline"><input id="dumpInp" placeholder="Park an idea — no date" onkeydown="if(event.key==='Enter')addDump()"><button class="btn sm" onclick="addDump()">Add</button></div></div>
