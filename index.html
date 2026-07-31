@@ -973,8 +973,8 @@ function flushEditors(){try{
   if(view==='task'&&viewArg){const t=tasks.find(x=>x.id===viewArg);const el=g('tnText');if(t&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(t.notes_html||'')){t.notes_html=h;t.notes=htmlToText(h);t.updated_at=now();if(typeof logTaskNotes==='function')logTaskNotes(t);}}}
   if(view==='meeting'&&viewArg){const m=meetings.find(x=>x.id===viewArg);const el=g('mnText');if(m&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(m.notes_html||'')){m.notes_html=h;m.notes=htmlToText(h);m.updated_at=now();if(typeof logMeetingNotes==='function')logMeetingNotes(m);}}}
 }catch(e){}}
-function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,0);}
-function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,y);}
+function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,0);}
+function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -984,7 +984,7 @@ function globalSearch(q){q=q.toLowerCase();const out=[];
   DL().filter(d=>d.name.toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
   P().filter(p=>p.name.toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push({k:'P',label:p.name,sub:p.role||'Person',go:()=>nav('people',p.id)}));
   M().filter(m=>m.title.toLowerCase().includes(q)).slice(0,3).forEach(m=>out.push({k:'M',label:m.title,sub:fmtD(m.date),go:()=>nav('meeting',m.id)}));
-  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>openContact(c.id)}));
+  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>nav('contact',c.id)}));
   OP().filter(o=>o.title.toLowerCase().includes(q)).slice(0,2).forEach(o=>out.push({k:'D',label:o.title,sub:'Improvement',go:()=>{dTool='impact';nav('decide');}}));
   DC().filter(d=>d.what.toLowerCase().includes(q)).slice(0,2).forEach(d=>out.push({k:'D',label:d.what,sub:'Decision · '+fmtD(d.date),go:()=>{dTool=null;nav('decide');}}));
   return out.slice(0,16);}
@@ -1478,7 +1478,7 @@ function meetingAgenda(m){return AG().filter(a=>a.status==='open'&&((m.attendee_
 function vMeeting(){const m=M().find(x=>x.id===viewArg);if(!m){plTab='meet';return vPlanner();}
   const ag=meetingAgenda(m);const acts=T().filter(t=>t.meeting_id===m.id);const decs=DC().filter(d=>d.meeting_id===m.id);
   return`<span class="backlink" onclick="nav('meetings')">← Meetings</span>`+
-  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${(m.contact_ids||[]).length?' '+m.contact_ids.map(id=>`<span class="pill a lnk" onclick="event.stopPropagation();openContact('${id}')" title="FPR">${esc(pnameAny(id))}</span>`).join(' '):''}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
+  pagehead('MEETING',esc(m.title),`${fmtD(m.date)}${m.time?' · '+m.time:''} · ${(m.attendee_ids||[]).map(id=>personLink(id,'pill b')).join(' ')||'No attendees'}${(m.contact_ids||[]).length?' '+m.contact_ids.map(id=>`<span class="pill a lnk" onclick="event.stopPropagation();nav('contact','${id}')" title="FPR">${esc(pnameAny(id))}</span>`).join(' '):''}${m.customer_id?' · '+custLink(m.customer_id):''}${m.dept?' · '+deptLink(m.dept):''}`,
     `<button class="btn gh2 sm" onclick="openMeeting('${m.id}')">Edit</button><button class="btn gh2 sm" onclick="meetingSummary('${m.id}')">Summary</button>${STPILL(m)}`)+
   `<div class="card"><div class="ch"><span>Minutes / discussion notes</span><button class="btn xs" onclick="saveMinutes('${m.id}')">Save notes</button></div>
     <div class="cb">${rteBar('mnText')}
@@ -2042,18 +2042,18 @@ function sanitizeHtml(html){const d=document.createElement('div');d.innerHTML=ht
   });})(d);
   return d.innerHTML;}
 function htmlToText(html){const d=document.createElement('div');d.innerHTML=html;return (d.textContent||'').replace(/\n{2,}/g,'\n').trim();}
-function capLog(kind,cid,did,pid){const el=g('npText')||g('dpText')||g('ppText');if(!el)return;const html=sanitizeHtml(el.innerHTML);const text=htmlToText(html);
+function capLog(kind,cid,did,pid,coid){const el=g('npText')||g('dpText')||g('ppText')||g('cpText');if(!el)return;const html=sanitizeHtml(el.innerHTML);const text=htmlToText(html);
   if(!text){toast('Type something first.');return;}
-  const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,person_id:pid||null,at:n,created_at:n,updated_at:n});
+  const n=now();activities.push({id:uid(),kind,text,html,customer_id:cid||null,deal_id:did||null,person_id:pid||null,contact_id:coid||null,at:n,created_at:n,updated_at:n});
   persist();renderView();toast(kind==='call'?'Call logged.':'Note saved.');}
 /* render one activity; note list-items get a per-line +task */
-function actItem(a,cid,did,pid){const acts='<div class="at-acts"><button class="lit" title="Edit" onclick="editAct(\''+a.id+'\')">✎</button><button class="lit" title="Delete" onclick="delAct(\''+a.id+'\')">✕</button></div>';
+function actItem(a,cid,did,pid,coid){const acts='<div class="at-acts"><button class="lit" title="Edit" onclick="editAct(\''+a.id+'\')">✎</button><button class="lit" title="Delete" onclick="delAct(\''+a.id+'\')">✕</button></div>';
   const link=a.task_id?' · <span class="lnk" onclick="event.stopPropagation();nav(\''+'task'+'\',\''+a.task_id+'\')">open task ↗</span>':a.meeting_id?' · <span class="lnk" onclick="event.stopPropagation();nav(\''+'meeting'+'\',\''+a.meeting_id+'\')">open meeting ↗</span>':'';
   const meta='<div class="at-m">'+a.kind+' · '+fmtDT(a.at)+(a.edited?' · edited':'')+link+'</div>';
   if(a.html){const d=document.createElement('div');d.innerHTML=a.html;
     d.querySelectorAll('li').forEach((li,i)=>{const txt=(li.textContent||'').trim();if(!txt)return;
       li.setAttribute('class','at-li');
-      li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\',\''+(pid||'')+'\')">+ task</button>';});
+      li.innerHTML='<span class="mk">'+li.innerHTML+'</span><button class="lit" onclick="lineToTask(this,\''+(cid||'')+'\',\''+(did||'')+'\',\''+(pid||'')+'\',\''+(coid||'')+'\')">+ task</button>';});
     return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t">'+d.innerHTML+'</div>'+meta+'</div>';}
   return '<div class="atl-it k-'+a.kind+'">'+acts+'<div class="at-t" style="white-space:pre-wrap">'+esc(a.text)+'</div>'+meta+'</div>';}
 let editAc=null;
@@ -2067,8 +2067,8 @@ function saveActEdit(){if(!editAc)return;const ed=g('acEText');const html=saniti
   closeM();persist();renderView();toast('Entry updated.');}
 async function delAct(id){const a=activities.find(x=>x.id===id);if(a&&await askConfirm('Delete this log entry?',{ok:'Delete',danger:true})){a.deleted=true;a.updated_at=now();persist();renderView();toast('Deleted.');}}
 function acEcmd(c){document.execCommand(c,false,null);const e=g('acEText');if(e)e.focus();}
-function lineToTask(btn,cid,did,pid){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
-  openTask(null,pid||null,null,cid||null,'task',did||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
+function lineToTask(btn,cid,did,pid,coid){const span=btn.parentElement.querySelector('.mk');const title=(span?span.textContent:'').trim().slice(0,120);if(!title)return;
+  openTask(null,pid||null,null,cid||null,'task',did||null,coid||null);setTimeout(()=>{const tt=g('tTitle');if(tt)tt.value=title;},60);}
 function contactAdd(cid){const nm=g('coName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
   contacts.push({id:uid(),customer_id:cid,name:nm,role:g('coRole').value.trim(),phone:g('coPhone').value.trim(),email:g('coEmail').value.trim(),created_at:n,updated_at:n});persist();renderView();}
 async function contactDel(id){const x=contacts.find(c=>c.id===id);if(x&&await askConfirm('Remove '+x.name+'?',{ok:'Remove',danger:true})){x.deleted=true;x.updated_at=now();persist();renderView();toast('Removed.');}}
@@ -2454,9 +2454,31 @@ function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._co
   const filters=`<div class="filters"><input placeholder="Search name, role, phone, email, account" value="${esc(window._coq||'')}" oninput="window._coq=this.value;clearTimeout(window._cot);window._cot=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px">
     <select data-ssel onchange="window._coAcct=this.value;renderView()"><option value="">All accounts</option>${accts.map(a=>`<option value="${a.id}"${af===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}</select>
     ${(q||af)?`<button class="btn gh2 sm" onclick="window._coq='';window._coAcct='';renderView()">Clear</button>`:''}</div>`;
-  const rows=list.map(x=>`<tr class="click" onclick="openContact('${x.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(x.name)}</td><td>${esc(x.role||'')}</td><td>${x.customer_id?`<span class="lnk" onclick="event.stopPropagation();nav('accounts','${x.customer_id}')">${esc(cname(x.customer_id))}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${x.phone?`<a href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">${esc(x.phone)}</a>`:''}</td><td>${x.email?`<a href="mailto:${esc(x.email)}" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</td></tr>`).join('');
+  const rows=list.map(x=>`<tr class="click" onclick="nav('contact','${x.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(x.name)}</td><td>${esc(x.role||'')}</td><td>${x.customer_id?`<span class="lnk" onclick="event.stopPropagation();nav('accounts','${x.customer_id}')">${esc(cname(x.customer_id))}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${x.phone?`<a href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">${esc(x.phone)}</a>`:''}</td><td>${x.email?`<a href="mailto:${esc(x.email)}" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</td></tr>`).join('');
   const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('contacts','name','Name')}${sortHead('contacts','role','Role')}${sortHead('contacts','account','Account')}${sortHead('contacts','phone','Phone')}${sortHead('contacts','email','Email')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No contacts match. Add one from any account, or via + New.</div></div>';
   return pagehead('CRM','Contacts',CO().length+' contact persons',`<button class="btn sm" onclick="openContact()">+ Contact</button>`)+filters+body;}
+function vContact(){const c=CO().find(x=>x.id===viewArg);if(!c){nav('contacts');return'';}
+  const nm=esc(c.name);
+  const acts=AC().filter(a=>a.contact_id===c.id).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,25);
+  const open=T().filter(t=>t.contact_id===c.id&&t.status!=='done').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+  const dealsFor=DL().filter(d=>d.contact_id===c.id);
+  const cid=c.customer_id||'';
+  const acctBit=c.customer_id?`<span class="lnk" onclick="nav('accounts','${c.customer_id}')">${esc(cname(c.customer_id))}</span>`:'<span style="color:var(--t4)">Not linked to an account</span>';
+  return`<span class="backlink" onclick="nav('contacts')">← Contacts</span>`+
+  pagehead('CONTACT',nm,`${esc(c.role||'')}${c.role?' · ':''}${acctBit}`,
+    `${c.phone?`<a class="btn gh2 sm" href="tel:${esc(c.phone)}">✆ Call</a>`:''}${c.email?`<a class="btn gh2 sm" href="mailto:${esc(c.email)}">✉ Email</a>`:''}<button class="btn gh2 sm" onclick="openContact('${c.id}')">Edit</button><button class="btn sm" onclick="openTask(null,null,null,'${cid}','task',null,'${c.id}')">+ Task</button>`)+
+  `<div class="grid31"><div>
+    ${seccard('Open items',open.length,open.map(t=>trow(t,{star:false})).join(''),'Nothing open for '+nm+'.')}
+    ${dealsFor.length?seccard('Deals',dealsFor.length,dealsFor.map(d=>`<div class="row click" onclick="nav('deal','${d.id}')"><div class="bd"><div class="tt" style="font-weight:500">${esc(d.name)}</div><div class="meta">${esc(d.stage)} · ${fmtMoney(d.value)}${d.customer_id?' · '+esc(cname(d.customer_id)):''}</div></div></div>`).join(''),''):''}
+    ${c.notes?`<div class="card"><div class="ch">Profile notes</div><div class="cb" style="font-size:12.5px;color:var(--t2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
+  </div><div>
+    <div class="card"><div class="ch"><span>Notes & calls</span></div>
+    <div class="cb" style="border-bottom:1px solid var(--bdr)">
+    ${rteBar('cpText')}
+    <div id="cpText" class="rte" contenteditable="true" data-ph="Write notes as points — save, then turn any point into a task…"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${cid}',null,null,'${c.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${cid}',null,null,'${c.id}')">Log as call</button></div></div>
+    <div class="cb"><div class="atl">${acts.map(a=>actItem(a,c.customer_id||null,null,null,c.id)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet.</div>'}</div></div></div>
+  </div></div>`;}
 /* ═══ BULK DATA — EXCEL/CSV TEMPLATES ═══ */
 function csvEsc(v){v=v==null?'':String(v);return/[",\n;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function toCsv(rows){return'\uFEFF'+rows.map(r=>r.map(csvEsc).join(',')).join('\r\n');}
@@ -2704,12 +2726,12 @@ function taskRepeatUI(){const rep=g('tRepeat').value,on=!!rep;const ds=taskAncho
       const pos=weekdayPosition(ds);g('tRepeatMonthNth').value=pos.isLast?-1:pos.nth;fillWeekdaySelect('tRepeatMonthWdSel',pos.weekday);}
     g('fTRepeatMonthDay').style.display=mode==='date'?'flex':'none';
     g('fTRepeatMonthWd').style.display=mode==='weekday'?'flex':'none';}}
-function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal){editT=id?tasks.find(x=>x.id===id):null;const t=editT;
+function openTask(id,presetOwner,presetDue,presetCust,presetType,presetDeal,presetContact){editT=id?tasks.find(x=>x.id===id):null;const t=editT;
   g('mTaskTitle').textContent=t?'Edit Item':'New Item';
   g('tTitle').value=t?.title||'';g('tType').value=t?.type||presetType||'task';
   fillOwner('tOwner',t?t.owner:presetOwner||'me');fillDept('tDept',t?.dept||deptForOwner(presetOwner||'me')||'');
   fillCust('tCust',t?.customer_id||presetCust||'');
-  fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||'');
+  fillContact('tContact',t?.customer_id||presetCust||null,t?.contact_id||presetContact||'');
   g('tPri').value=t?.priority||'medium';g('tDue').value=t?.due||presetDue||(t?'':today());g('tAt').value=t?.at||'';g('tEst').value=t?.estimate_min||(t?'':'5');g('tRepeat').value=t?.repeat||'';
   g('tFup').value=t?.follow_up||(t?'':defaultFollowUp(g('tDue').value||null));g('tFup').dataset.auto=t?.follow_up?'0':'1';
   g('tWhen').value=t?.when||'';g('tPhone').value=t?.phone||'';g('tStatus').value=t?.status||(presetOwner&&presetOwner!=='me'?'waiting':'open');
