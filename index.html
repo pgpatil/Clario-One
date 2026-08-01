@@ -577,6 +577,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   </div>
   <div id="fcFixedWrap" style="display:none">
     <div class="fld"><label>How often</label><select id="fcFreq" onchange="finCatFreqUI()"></select></div>
+    <div class="fld" id="fcYearWrap" style="display:none"><label>Due month</label><select id="fcYearMonth"></select></div>
     <div class="fld" id="fcMonthsWrap" style="display:none"><label>Which months</label><div id="fcMonths" class="attlist"></div></div>
   </div>
   <p class="note">Fixed commitments (EMI, fees, maintenance) are entered once and appear automatically in the months they're due. Planned amounts for other groups carry forward from the previous month and can be edited per month.</p>
@@ -632,6 +633,23 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   </div>
   <div class="macts"><button class="btn dg sm" id="ihDel" style="display:none" onclick="delInvHold()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveInvHold()">Save</button></div></div>
+</div></div>
+
+<!-- Loan modal -->
+<div class="ovl" id="mLoan"><div class="modal">
+  <h3 id="mLoanTitle">New Loan <button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Loan name <span class="req">*</span></label><input id="lnName" placeholder="e.g. Home loan, Car loan, Personal loan"></div>
+  <div class="fld"><label>Lender</label><input id="lnLender" placeholder="optional — e.g. HDFC, SBI"></div>
+  <div class="g2">
+    <div class="fld"><label>Monthly EMI (₹)</label><input type="number" id="lnEmi" placeholder="0"></div>
+    <div class="fld"><label>Interest rate (% p.a.)</label><input type="number" id="lnRate" step="any" placeholder="optional — e.g. 8.5"></div>
+  </div>
+  <div class="fld"><label>Outstanding balance (₹)</label><input type="number" id="lnOut" placeholder="0"></div>
+  <p class="note">"Pay EMI" reduces the outstanding by the principal part of one EMI (interest = balance × rate ÷ 12). Without a rate it subtracts the full EMI. Total outstanding is deducted from your net worth.</p>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="lnDel" style="display:none" onclick="delLoan()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveLoan()">Save</button></div></div>
 </div></div>
 
 <!-- Person modal -->
@@ -884,7 +902,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -898,7 +916,7 @@ var finMonth='';
 var finView='month';
 var invMonth='';
 var invView='overview';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -1333,15 +1351,16 @@ async function delPersonalTaskModal(){if(editPT&&await askConfirm('Delete this t
 
 /* ═══ PERSONAL — MONTHLY FINANCE PLANNER ═══ */
 const FIN_GROUPS=[['income','Income'],['fixed','Fixed commitments'],['expense','Variable expenses'],['savings','Savings & investments']];
-const FIN_FREQ=[['monthly','Monthly'],['quarterly','Quarterly (Jan/Apr/Jul/Oct)'],['halfyearly','Half-yearly (Jan/Jul)'],['custom','Specific months']];
+const FIN_FREQ=[['monthly','Monthly'],['quarterly','Quarterly (Jan/Apr/Jul/Oct)'],['halfyearly','Half-yearly (Jan/Jul)'],['yearly','Yearly (pick a month)'],['custom','Specific months']];
 const FIN_FREQ_MONTHS={quarterly:[1,4,7,10],halfyearly:[1,7]};
+function finMonthsFor(c){const f=c.freq||'monthly';if(f==='monthly')return [1,2,3,4,5,6,7,8,9,10,11,12];if(f==='custom'||f==='yearly')return c.months||[];return FIN_FREQ_MONTHS[f]||[];}
 const MON_ABBR=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function FCAT(){return fincats.filter(c=>!c.deleted);}
 function FTX(){return fintx.filter(t=>!t.deleted);}
 function finMonthNum(ym){return +ym.slice(5,7);}
 function finGroupLbl(g){return (FIN_GROUPS.find(x=>x[0]===g)||[])[1]||g;}
 function finFreqLbl(f){return (FIN_FREQ.find(x=>x[0]===f)||[])[1]||f;}
-function finDueIn(c,ym){if(c.group!=='fixed')return true;const f=c.freq||'monthly';if(f==='monthly')return true;const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.includes(finMonthNum(ym));}
+function finDueIn(c,ym){if(c.group!=='fixed')return true;return finMonthsFor(c).includes(finMonthNum(ym));}
 function finPlanRow(catId,ym){return finplan.find(p=>!p.deleted&&p.cat_id===catId&&p.month===ym);}
 function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
 function finActual(c,ym){const ov=finPlanRow(c.id,ym);if(ov&&ov.actual_override!=null)return +ov.actual_override||0;return FTX().filter(t=>t.cat_id===c.id&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);}
@@ -1383,9 +1402,9 @@ function finPayPlanned(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)retu
   const date=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.day||1,dim)).padStart(2,'0');
   fintx.push({id:uid(),cat_id:catId,month:ym,date,amount:rem,note:'As planned',created_at:n,updated_at:n});
   persist();reRender();toast('Paid '+fmtMoney(rem)+' as planned.');}
-function finDueCount(c){const f=c.freq||'monthly';return f==='monthly'?12:f==='custom'?(c.months||[]).length:(FIN_FREQ_MONTHS[f]||[]).length;}
+function finDueCount(c){return finMonthsFor(c).length;}
 function finAnnualTotal(c){return (+c.amount||0)*finDueCount(c);}
-function finDueMonthsLabel(c){const f=c.freq||'monthly';if(f==='monthly')return'Every month';const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
+function finDueMonthsLabel(c){if((c.freq||'monthly')==='monthly')return'Every month';const ms=finMonthsFor(c);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
 function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();reRender();}
 /* ═══ PERSONAL — CREDIT CARDS ═══ */
 function CARD(){return fincard.filter(c=>!c.deleted);}
@@ -1492,13 +1511,17 @@ function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;co
   g('fcFreq').innerHTML=FIN_FREQ.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
   g('fcName').value=c?.name||'';g('fcGroup').value=c?.group||presetGroup||'expense';g('fcAmount').value=(c&&c.amount)?c.amount:'';g('fcDay').value=(c&&c.day)?c.day:'';
   g('fcFreq').value=c?.freq||'monthly';
+  g('fcYearMonth').innerHTML=MON_ABBR.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+  g('fcYearMonth').value=(c&&c.freq==='yearly'&&(c.months||[]).length)?c.months[0]:( (new Date().getMonth()+1) );
   const sel=new Set(c?.months||[]);g('fcMonths').innerHTML=MON_ABBR.map((m,i)=>`<span class="attchip ${sel.has(i+1)?'on':''}" data-m="${i+1}" onclick="this.classList.toggle('on')">${m}</span>`).join('');
   g('fcDel').style.display=c?'':'none';finCatGroupUI();g('mFinCat').classList.add('open');setTimeout(()=>g('fcName').focus(),50);}
 function finCatGroupUI(){g('fcFixedWrap').style.display=g('fcGroup').value==='fixed'?'':'none';finCatFreqUI();}
-function finCatFreqUI(){g('fcMonthsWrap').style.display=(g('fcGroup').value==='fixed'&&g('fcFreq').value==='custom')?'':'none';}
+function finCatFreqUI(){const fixed=g('fcGroup').value==='fixed',f=g('fcFreq').value;g('fcMonthsWrap').style.display=(fixed&&f==='custom')?'':'none';g('fcYearWrap').style.display=(fixed&&f==='yearly')?'':'none';}
 function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name required.');return;}const n=now();
   const group=g('fcGroup').value;const freq=group==='fixed'?g('fcFreq').value:'';
-  const months=(group==='fixed'&&freq==='custom')?[...g('fcMonths').querySelectorAll('.attchip.on')].map(x=>+x.dataset.m).sort((a,b)=>a-b):[];
+  let months=[];
+  if(group==='fixed'&&freq==='custom')months=[...g('fcMonths').querySelectorAll('.attchip.on')].map(x=>+x.dataset.m).sort((a,b)=>a-b);
+  else if(group==='fixed'&&freq==='yearly')months=[+g('fcYearMonth').value];
   if(group==='fixed'&&freq==='custom'&&!months.length){toast('Pick at least one month.');return;}
   const dayRaw=parseInt(g('fcDay').value,10);const day=(dayRaw>=1&&dayRaw<=31)?dayRaw:null;
   const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,updated_at:n};
@@ -1537,31 +1560,33 @@ function invSetPrice(holdId,ym,raw){const h=IH().find(x=>x.id===holdId);if(!h)re
   persist();reRender();}
 function invPctStr(delta,base){if(!base)return'';const p=delta/base*100;return' ('+(p>=0?'+':'')+p.toFixed(1)+'%)';}
 function invMoveHtml(delta,base){if(!delta)return'<span class="num" style="color:var(--t4)">no change</span>';const up=delta>0;return`<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(delta))}${invPctStr(delta,base)}</span>`;}
-function invToggle(){return `<div class="vtog"><button class="${invView==='overview'?'on':''}" onclick="invView='overview';renderView()">Net worth</button><button class="${invView==='holdings'?'on':''}" onclick="invView='holdings';renderView()">Holdings</button><button class="${invView==='pf'?'on':''}" onclick="invView='pf';renderView()">PF accounts</button></div>`;}
+function invToggle(){const t=(v,l)=>`<button class="${invView===v?'on':''}" onclick="invView='${v}';renderView()">${l}</button>`;return `<div class="vtog">${t('overview','Net worth')}${t('holdings','Holdings')}${t('pf','PF accounts')}${t('loans','Loans')}</div>`;}
 function pfCorpus(){return PFA().reduce((a,r)=>a+pfRowTotal(r),0);}
-function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus();}
+function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus()-loanTotalOutstanding();}
 function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,pm=invPrevMonth(ym),td=today(),isCur=ym===monthKey(td);
-  const holds=IH();const pf=pfCorpus();const holdTot=invTotalAsOf(ym);const net=holdTot+pf;
-  const prevNet=invTotalAsOf(pm)+pf,delta=net-prevNet;
+  const holds=IH();const pf=pfCorpus();const debt=loanTotalOutstanding();const holdTot=invTotalAsOf(ym);
+  const assets=holdTot+pf;const net=assets-debt;
+  const prevAssets=invTotalAsOf(pm)+pf,prevNet=prevAssets-debt,delta=net-prevNet;
   const nav=`<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="invMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="invMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="invMonth=monthKey(today());renderView()">This month</button>`:''}</div>`;
-  if(!holds.length&&!PFA().length)return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+
-    `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:48ch;margin-left:auto;margin-right:auto">Add holdings (funds, stocks, gold/silver by weight, property, FDs…) and your PF accounts — your total net worth and asset allocation appear here.</div><button class="btn" onclick="invView='holdings';renderView();openInvHold()">+ Add investment</button></div></div>`;
+  if(!holds.length&&!PFA().length&&!LOAN().length)return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+
+    `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:48ch;margin-left:auto;margin-right:auto">Add holdings (funds, stocks, gold/silver by weight, property, FDs…), your PF accounts and any loans — your total net worth and asset allocation appear here.</div><button class="btn" onclick="invView='holdings';renderView();openInvHold()">+ Add investment</button></div></div>`;
   const byKind={},qtyKind={};
   holds.forEach(h=>{const k=h.kind||'Other';const v=invValueAsOf(h.id,ym)||0;byKind[k]=(byKind[k]||0)+v;if(invIsWeight(h)){qtyKind[k]=qtyKind[k]||{};qtyKind[k][h.unit]=(qtyKind[k][h.unit]||0)+(+h.qty||0);}});
   const alloc=Object.entries(byKind).filter(([k,v])=>v).sort((a,b)=>b[1]-a[1]);
   if(pf>0)alloc.push(['Provident Fund',pf]);
   const qlbl=k=>{const q=qtyKind[k];return q?' · '+Object.entries(q).map(([u,n])=>n+' '+u).join(' + '):'';};
-  const rows=alloc.map(([k,v])=>{const pct=net?Math.round(v/net*100):0;return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(k)}${(k==='Gold'||k==='Silver')?`<span class="num" style="color:var(--t3);font-weight:500">${qlbl(k)}</span>`:''}</div>
+  const rows=alloc.map(([k,v])=>{const pct=assets?Math.round(v/assets*100):0;return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(k)}${(k==='Gold'||k==='Silver')?`<span class="num" style="color:var(--t3);font-weight:500">${qlbl(k)}</span>`:''}</div>
       <div class="capbar" style="margin-top:6px"><div style="width:${pct}%"></div></div></div>
-      <div style="text-align:right;min-width:96px;flex:0 0 auto"><b class="num">${fmtMoney(v)}</b><div class="num" style="font-size:11px;color:var(--t3)">${pct}%</div></div></div>`;}).join('')||'<div class="empty">Nothing recorded for this month yet.</div>';
+      <div style="text-align:right;min-width:96px;flex:0 0 auto"><b class="num">${fmtMoney(v)}</b><div class="num" style="font-size:11px;color:var(--t3)">${pct}%</div></div></div>`;}).join('')||'<div class="empty">No assets recorded for this month yet.</div>';
   return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+nav+
-    `<div class="kpis"><div class="kpi blue"><div class="kl">Net worth</div><div class="kv num" style="font-size:22px">${fmtMoney(net)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(holdTot)} holdings + ${fmtMoney(pf)} PF</div></div>
-      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet?((delta>=0?'+':'')+(delta/prevNet*100).toFixed(1)+'%'):'—'}</div></div></div>`+
+    `<div class="kpis"><div class="kpi blue"><div class="kl">Net worth</div><div class="kv num" style="font-size:22px">${fmtMoney(net)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(assets)} assets${debt>0?` − ${fmtMoney(debt)} debt`:''}</div></div>
+      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet>0?((delta>=0?'+':'−')+(Math.abs(delta)/prevNet*100).toFixed(1)+'%'):'—'}</div></div>${debt>0?`<div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(debt)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(loanTotalEmi())}/mo EMI</div></div>`:''}</div>`+
     `<div class="card"><div class="ch"><span>Asset allocation</span><span class="n num">${alloc.length}</span></div>${rows}</div>
-    <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your total PF corpus. Use the Holdings and PF accounts tabs to update the figures.</p>`;}
+    <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your PF corpus, minus total outstanding debt. Update figures on the Holdings, PF accounts and Loans tabs.</p>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
   if(invView==='overview')return vInvOverview();
   if(invView==='pf')return vInvPf();
+  if(invView==='loans')return vInvLoans();
   const holds=IH().sort((a,b)=>a.name.localeCompare(b.name));
   if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month',invToggle())+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">Add your holdings (mutual funds, stocks, gold/silver by weight, property, FDs…), then update their value each month. Clario saves each month's figure and shows the movement.</div><button class="btn" onclick="openInvHold()">+ Add investment</button></div></div>`;
@@ -1630,6 +1655,43 @@ function vInvPf(){const rows=PFA().slice().sort((a,b)=>(a.company||'').localeCom
       <div class="pfwrap"><table class="pftbl"><thead><tr><th>Company</th><th>Employee</th><th>Employer</th><th>Bonus</th><th>Total</th><th></th></tr></thead>
       <tbody>${body}</tbody>${rows.length?`<tfoot><tr><td>Total</td><td class="num">${fmtMoney(tE)}</td><td class="num">${fmtMoney(tEm)}</td><td class="num">${fmtMoney(tB)}</td><td class="num">${fmtMoney(grand)}</td><td></td></tr></tfoot>`:''}</table></div></div>
       <p class="note" style="padding:0 4px">Each company's total is the sum of employee, employer and bonus contributions. Update the figures from your PF passbook whenever you like.</p>`;}
+/* ═══ PERSONAL — INVESTMENTS: LOANS & DEBT ═══ */
+function LOAN(){return loans.filter(x=>!x.deleted);}
+function loanTotalOutstanding(){return LOAN().reduce((a,l)=>a+(+l.outstanding||0),0);}
+function loanTotalEmi(){return LOAN().reduce((a,l)=>a+(+l.emi||0),0);}
+let editLoan=null;
+function openLoan(id){editLoan=id?loans.find(x=>x.id===id):null;const l=editLoan;
+  g('mLoanTitle').firstChild.textContent=(l?'Edit Loan':'New Loan')+' ';
+  g('lnName').value=l?.name||'';g('lnLender').value=l?.lender||'';g('lnEmi').value=(l&&l.emi)?l.emi:'';g('lnRate').value=(l&&l.rate)?l.rate:'';g('lnOut').value=(l&&l.outstanding)?l.outstanding:'';
+  g('lnDel').style.display=l?'':'none';g('mLoan').classList.add('open');setTimeout(()=>g('lnName').focus(),50);}
+function saveLoan(){const name=g('lnName').value.trim();if(!name){toast('Loan name required.');return;}const n=now();
+  const d={name,lender:g('lnLender').value.trim(),emi:+g('lnEmi').value||0,rate:+g('lnRate').value||0,outstanding:+g('lnOut').value||0,updated_at:n};
+  if(editLoan)Object.assign(editLoan,d);else loans.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();reRender();toast('Loan saved.');}
+async function delLoan(){if(editLoan&&await askConfirm('Delete "'+editLoan.name+'"?',{ok:'Delete',danger:true})){editLoan.deleted=true;editLoan.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
+function loanSetOutstanding(id,val){const l=loans.find(x=>x.id===id);if(!l)return;l.outstanding=+val||0;l.updated_at=now();persist();reRender();}
+function loanPayEmi(id){const l=LOAN().find(x=>x.id===id);if(!l)return;const out=+l.outstanding||0,emi=+l.emi||0;
+  if(out<=0){toast('This loan is already cleared.');return;}
+  if(emi<=0){toast('Set the EMI amount first.');return;}
+  const interest=(+l.rate>0)?out*(+l.rate)/1200:0;
+  let principal=emi-interest;
+  if(principal<=0){toast('EMI doesn\'t cover the monthly interest — check the EMI/rate.');return;}
+  principal=Math.min(principal,out);
+  l.outstanding=Math.round((out-principal)*100)/100;l.updated_at=now();persist();reRender();
+  toast('EMI recorded — '+fmtMoney(Math.round(principal))+' off principal'+(interest>0?', '+fmtMoney(Math.round(interest))+' interest':'')+'.');}
+function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>(b.outstanding||0)-(a.outstanding||0));
+  const totOut=loanTotalOutstanding(),totEmi=loanTotalEmi();
+  const body=rows.map(l=>{const out=+l.outstanding||0,emi=+l.emi||0,cleared=out<=0;
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':''}</div>
+      <div class="meta"><span class="num">EMI ${fmtMoney(emi)}/mo</span>${out>0?` · <span class="num" style="color:var(--red);font-weight:600">${fmtMoney(out)} outstanding</span>`:''}</div></div>
+      <div class="fr-ctl"><input type="number" value="${out||''}" placeholder="balance ₹" title="Outstanding balance" onchange="loanSetOutstanding('${l.id}',this.value)">
+      <div class="fr-acts"><button class="btn xs" title="Record one EMI — reduces the balance by the principal portion" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button><button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
+    ||'<div class="empty">No loans yet. Add home / car / personal loans to track EMIs and your total outstanding debt.</div>';
+  return pagehead('PERSONAL','Investments','Loans & debt — EMIs and outstanding balances',invToggle())+
+    `<div class="kpis"><div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(totOut)}</div><div class="num" style="font-size:10px;color:var(--t3)">${rows.length} loan${rows.length===1?'':'s'}</div></div>
+      <div class="kpi"><div class="kl">Total EMI / month</div><div class="kv num" style="font-size:19px">${fmtMoney(totEmi)}</div></div></div>`+
+    `<div class="card"><div class="ch"><span>Loans</span><button class="btn sm" onclick="openLoan()">+ Add loan</button></div>${body}</div>
+    <p class="note" style="padding:0 4px">Total outstanding debt is subtracted from your net worth. "Pay EMI" pays down the principal (interest = balance × rate ÷ 12); update the balance directly anytime. EMIs are also budgeted as fixed commitments on the Money tab.</p>`;}
 async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
   const n=now();family.push({id:uid(),name:v,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
 let editFA=null;
