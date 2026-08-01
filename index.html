@@ -425,7 +425,18 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .fin-bank .fb-row label{color:var(--t3)}
 .fin-bank input{width:150px;padding:5px 9px;text-align:right;font-size:13px;border:1px solid var(--bdr2);border-radius:var(--rs)}
 .fin-bank .fb-close{border-top:1px solid var(--bdr);padding-top:9px;margin-top:1px;font-weight:800;font-size:14px}
+.pfwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pftbl{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px}
+.pftbl th,.pftbl td{padding:7px 8px;border-bottom:1px solid var(--bdr);text-align:right;white-space:nowrap}
+.pftbl th{font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.02em;background:var(--sub)}
+.pftbl th:first-child,.pftbl td:first-child{text-align:left}
+.pftbl input{width:96px;padding:5px 7px;text-align:right;border:1px solid var(--bdr2);border-radius:var(--rs);font-size:12.5px}
+.pftbl input.pf-co{width:130px;text-align:left}
+.pftbl .pf-tot{font-weight:800}
+.pftbl tfoot td{font-weight:800;border-top:2px solid var(--bdr);border-bottom:none}
 @media(max-width:840px){
+  .pftbl input{font-size:16px;width:88px;padding:7px 7px}
+  .pftbl input.pf-co{width:120px}
   input,select,textarea{font-size:16px}
   #gh{position:static;height:auto;min-height:0;flex-wrap:wrap;gap:6px 8px;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top,0px))}
   .gh-search{order:3;flex-basis:100%;max-width:none}
@@ -608,9 +619,16 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <h3 id="mInvHoldTitle">New Investment <button class="mx" type="button" onclick="closeM()">✕</button></h3>
   <div class="mbody">
   <div class="fld"><label>Name <span class="req">*</span></label><input id="ihName" placeholder="e.g. HDFC Flexi Cap, PPF, Zerodha stocks"></div>
-  <div class="fld"><label>Type</label><select id="ihKind"></select></div>
+  <div class="fld"><label>Type</label><select id="ihKind" onchange="invHoldKindUI()"></select></div>
+  <div id="ihWeightWrap" style="display:none">
+    <div class="g2">
+      <div class="fld"><label>Quantity held</label><input type="number" id="ihQty" step="any" placeholder="e.g. 24"></div>
+      <div class="fld"><label>Unit</label><select id="ihUnit"><option value="gms">grams (gms)</option><option value="kg">kilograms (kg)</option></select></div>
+    </div>
+    <p class="note">For gold/silver you enter the quantity here, then just update the market price per unit each month — Clario calculates the value (quantity × price).</p>
+  </div>
   <div class="fld"><label>Note</label><input id="ihNote" placeholder="optional — folio no., account, etc."></div>
-  <p class="note">Update this holding's current value each month on the Investments tab. Every month's value is saved so you can see the month-on-month movement.</p>
+  <p class="note" id="ihNoteHelp">Update this holding's current value each month on the Investments tab. Every month's value is saved so you can see the month-on-month movement.</p>
   </div>
   <div class="macts"><button class="btn dg sm" id="ihDel" style="display:none" onclick="delInvHold()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveInvHold()">Save</button></div></div>
@@ -865,7 +883,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -878,7 +896,8 @@ var personalTab='tasks';
 var finMonth='';
 var finView='month';
 var invMonth='';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx'];
+var invView='holdings';
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -1496,7 +1515,10 @@ function saveFinTx(){const amt=+g('ftAmount').value;if(!amt){toast('Enter an amo
 async function finDelTx(id){const t=fintx.find(x=>x.id===id);if(t&&await askConfirm('Delete this payment?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();}}
 
 /* ═══ PERSONAL — INVESTMENTS (monthly value tracking) ═══ */
-const INV_KINDS=['Equity','Debt / Fixed income','Gold','Real estate','Cash / FD','Other'];
+const INV_KINDS=['Equity','Debt / Fixed income','Gold','Silver','Real estate','Cash / FD','Other'];
+const INV_WEIGHT_KINDS=['Gold','Silver'];
+function invIsWeight(h){return !!(h&&h.unit);}
+function invUnitLbl(u){return u==='kg'?'kg':'gms';}
 function IH(){return invhold.filter(h=>!h.deleted);}
 function IV(){return invval.filter(v=>!v.deleted);}
 function invPrevMonth(ym){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);}
@@ -1507,26 +1529,37 @@ function invTotalAsOf(ym){return IH().reduce((a,h)=>a+(invValueAsOf(h.id,ym)||0)
 function invSetValue(holdId,ym,raw){const n=now();if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
   else{let r=invExact(holdId,ym);if(r){r.value=+raw;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,value:+raw,created_at:n,updated_at:n});}
   persist();reRender();}
+function invPriceAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v.month<=ym&&v.price!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].price||0):null;}
+function invSetPrice(holdId,ym,raw){const h=IH().find(x=>x.id===holdId);if(!h)return;const n=now();const qty=+h.qty||0;
+  if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
+  else{const price=+raw,value=qty*price;let r=invExact(holdId,ym);if(r){r.price=price;r.qty=qty;r.value=value;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,price,qty,value,created_at:n,updated_at:n});}
+  persist();reRender();}
 function invPctStr(delta,base){if(!base)return'';const p=delta/base*100;return' ('+(p>=0?'+':'')+p.toFixed(1)+'%)';}
 function invMoveHtml(delta,base){if(!delta)return'<span class="num" style="color:var(--t4)">no change</span>';const up=delta>0;return`<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(delta))}${invPctStr(delta,base)}</span>`;}
+function invToggle(){return `<div class="vtog"><button class="${invView==='holdings'?'on':''}" onclick="invView='holdings';renderView()">Holdings</button><button class="${invView==='pf'?'on':''}" onclick="invView='pf';renderView()">PF accounts</button></div>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
+  if(invView==='pf')return vInvPf();
   const holds=IH().sort((a,b)=>a.name.localeCompare(b.name));
-  if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month','')+
-    `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">Add your holdings (mutual funds, stocks, PPF/EPF, gold, property, FDs…), then update their value each month. Clario saves each month's figure and shows the movement.</div><button class="btn" onclick="openInvHold()">+ Add investment</button></div></div>`;
+  if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month',invToggle())+
+    `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">Add your holdings (mutual funds, stocks, gold/silver by weight, property, FDs…), then update their value each month. Clario saves each month's figure and shows the movement.</div><button class="btn" onclick="openInvHold()">+ Add investment</button></div></div>`;
   const isCur=ym===monthKey(td);
   const total=invTotalAsOf(ym),prevTotal=invTotalAsOf(pm),delta=total-prevTotal;
   const row=h=>{const cur=invValueAsOf(h.id,ym),prev=invValueAsOf(h.id,pm),d=(cur||0)-(prev||0),ex=invExact(h.id,ym);
-    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(h.name)}${h.kind?` <span class="pill n">${esc(h.kind)}</span>`:''}${cur!=null&&!ex?' <span class="pill n" title="Carried from an earlier month — update to log this month">carried</span>':''}</div>
-      <div class="meta">${cur==null?'<span style="color:var(--t4)">not set yet</span>':invMoveHtml(d,prev||0)+' vs '+finMonthLabel(pm)}</div></div>
+    const wt=invIsWeight(h),ul=invUnitLbl(h.unit),price=wt?invPriceAsOf(h.id,ym):null,qty=+h.qty||0;
+    const qtyChip=wt?` <span class="num" style="color:var(--t3)">${qty}${ul}</span>`:'';
+    const priceMeta=wt&&price!=null?` · <span class="num" style="color:var(--t3)">@ ${fmtMoney(price)}/${ul}</span>`:'';
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(h.name)}${h.kind?` <span class="pill n">${esc(h.kind)}</span>`:''}${qtyChip}${cur!=null&&!ex?' <span class="pill n" title="Carried from an earlier month — update to log this month">carried</span>':''}</div>
+      <div class="meta">${cur==null?'<span style="color:var(--t4)">not set yet</span>':(wt?`<span class="num">value ${fmtMoney(cur)}</span> · `:'')+invMoveHtml(d,prev||0)+' vs '+finMonthLabel(pm)+priceMeta}</div></div>
       <div class="fr-ctl">
-        <input type="number" value="${cur!=null?cur:''}" placeholder="value ₹" onchange="invSetValue('${h.id}','${ym}',this.value)">
+        ${wt?`<input type="number" step="any" value="${price!=null?price:''}" placeholder="₹/${ul}" title="Market price per ${ul} — value = ${qty}${ul} × price" onchange="invSetPrice('${h.id}','${ym}',this.value)">`
+            :`<input type="number" value="${cur!=null?cur:''}" placeholder="value ₹" onchange="invSetValue('${h.id}','${ym}',this.value)">`}
         <div class="fr-acts"><button class="iconb" title="Edit holding" onclick="openInvHold('${h.id}')">⚙</button></div>
       </div></div>`;};
   // history: months that have any value entry, up to selected month, last 12
   const months=[...new Set(IV().filter(v=>v.month<=ym).map(v=>v.month))].sort().slice(-12);
   const histRows=months.slice().reverse().map(mo=>{const t=invTotalAsOf(mo),pv=invTotalAsOf(invPrevMonth(mo)),dd=t-pv;
     return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${finMonthLabel(mo)}</div></div><div style="display:flex;gap:12px;align-items:center"><b class="num">${fmtMoney(t)}</b><span style="min-width:130px;text-align:right">${invMoveHtml(dd,pv)}</span></div></div>`;}).join('');
-  return pagehead('PERSONAL','Investments',finMonthLabel(ym),`<button class="btn sm" onclick="openInvHold()">+ Investment</button>`)+
+  return pagehead('PERSONAL','Investments',finMonthLabel(ym),invToggle()+`<button class="btn sm" onclick="openInvHold()">+ Investment</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="invMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="invMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="invMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis"><div class="kpi blue"><div class="kl">Portfolio value</div><div class="kv num" style="font-size:19px">${fmtMoney(total)}</div></div>
       <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevTotal?((delta>=0?'+':'')+ (delta/prevTotal*100).toFixed(1)+'%'):'—'}</div></div></div>`+
@@ -1537,12 +1570,43 @@ function openInvHold(id){editIH=id?invhold.find(x=>x.id===id):null;const h=editI
   g('mInvHoldTitle').firstChild.textContent=(h?'Edit Investment':'New Investment')+' ';
   g('ihKind').innerHTML='<option value="">— type —</option>'+INV_KINDS.map(k=>`<option value="${k}">${k}</option>`).join('');
   g('ihName').value=h?.name||'';g('ihKind').value=h?.kind||'';g('ihNote').value=h?.note||'';
+  g('ihQty').value=(h&&h.qty)?h.qty:'';g('ihUnit').value=h?.unit||'gms';
+  invHoldKindUI();
   g('ihDel').style.display=h?'':'none';g('mInvHold').classList.add('open');setTimeout(()=>g('ihName').focus(),50);}
+function invHoldKindUI(){const w=INV_WEIGHT_KINDS.includes(g('ihKind').value);g('ihWeightWrap').style.display=w?'':'none';g('ihNoteHelp').style.display=w?'none':'';}
 function saveInvHold(){const name=g('ihName').value.trim();if(!name){toast('Name required.');return;}const n=now();
-  const d={name,kind:g('ihKind').value,note:g('ihNote').value.trim(),updated_at:n};
+  const kind=g('ihKind').value;const isW=INV_WEIGHT_KINDS.includes(kind);
+  const unit=isW?g('ihUnit').value:'';const qty=isW?(+g('ihQty').value||0):0;
+  const d={name,kind,unit,qty,note:g('ihNote').value.trim(),updated_at:n};
   if(editIH)Object.assign(editIH,d);else invhold.push(Object.assign({id:uid(),created_at:n},d));
+  // If quantity changed on a weight holding, refresh the currently-viewed month's value so it reflects the new qty
+  if(editIH&&isW){const ym=invMonth||monthKey(today());const r=invExact(editIH.id,ym);if(r&&r.price!=null){r.qty=qty;r.value=qty*(+r.price||0);r.updated_at=n;}}
   closeM();persist();reRender();toast('Investment saved.');}
 async function delInvHold(){if(editIH&&await askConfirm('Delete "'+editIH.name+'"? Its value history stays in the data.',{ok:'Delete',danger:true})){editIH.deleted=true;editIH.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
+/* ═══ PERSONAL — INVESTMENTS: PF ACCOUNTS ═══ */
+function PFA(){return invpf.filter(x=>!x.deleted);}
+function pfRowTotal(r){return (+r.employee||0)+(+r.employer||0)+(+r.bonus||0);}
+function pfAdd(){const n=now();invpf.push({id:uid(),company:'',employee:0,employer:0,bonus:0,created_at:n,updated_at:n});persist();reRender();}
+function pfSet(id,field,val){const r=invpf.find(x=>x.id===id);if(!r)return;r[field]=(field==='company')?val.trim():(+val||0);r.updated_at=now();persist();reRender();}
+async function pfDel(id){const r=invpf.find(x=>x.id===id);if(r&&await askConfirm('Delete this PF account?',{ok:'Delete',danger:true})){r.deleted=true;r.updated_at=now();persist();reRender();toast('Deleted.');}}
+function vInvPf(){const rows=PFA().slice().sort((a,b)=>(a.company||'').localeCompare(b.company||''));
+  const tE=rows.reduce((a,r)=>a+(+r.employee||0),0),tEm=rows.reduce((a,r)=>a+(+r.employer||0),0),tB=rows.reduce((a,r)=>a+(+r.bonus||0),0),grand=tE+tEm+tB;
+  const body=rows.map(r=>`<tr>
+      <td><input class="pf-co" value="${esc(r.company||'')}" placeholder="Company" onchange="pfSet('${r.id}','company',this.value)"></td>
+      <td><input type="number" value="${r.employee||''}" placeholder="0" onchange="pfSet('${r.id}','employee',this.value)"></td>
+      <td><input type="number" value="${r.employer||''}" placeholder="0" onchange="pfSet('${r.id}','employer',this.value)"></td>
+      <td><input type="number" value="${r.bonus||''}" placeholder="0" onchange="pfSet('${r.id}','bonus',this.value)"></td>
+      <td class="num pf-tot">${fmtMoney(pfRowTotal(r))}</td>
+      <td><button class="iconb" title="Delete company" onclick="pfDel('${r.id}')">✕</button></td></tr>`).join('')
+    ||`<tr><td colspan="6"><div class="empty">No PF accounts yet. Add a company row to track employee, employer and bonus contributions.</div></td></tr>`;
+  return pagehead('PERSONAL','Investments','Provident fund — company-wise contributions',invToggle())+
+    `<div class="kpis"><div class="kpi blue"><div class="kl">Total PF corpus</div><div class="kv num" style="font-size:19px">${fmtMoney(grand)}</div><div class="num" style="font-size:10px;color:var(--t3)">${rows.length} account${rows.length===1?'':'s'}</div></div>
+      <div class="kpi"><div class="kl">Employee</div><div class="kv num" style="font-size:15px">${fmtMoney(tE)}</div></div>
+      <div class="kpi"><div class="kl">Employer</div><div class="kv num" style="font-size:15px">${fmtMoney(tEm)}</div></div></div>`+
+    `<div class="card"><div class="ch"><span>PF accounts</span><button class="btn sm" onclick="pfAdd()">+ Add company</button></div>
+      <div class="pfwrap"><table class="pftbl"><thead><tr><th>Company</th><th>Employee</th><th>Employer</th><th>Bonus</th><th>Total</th><th></th></tr></thead>
+      <tbody>${body}</tbody>${rows.length?`<tfoot><tr><td>Total</td><td class="num">${fmtMoney(tE)}</td><td class="num">${fmtMoney(tEm)}</td><td class="num">${fmtMoney(tB)}</td><td class="num">${fmtMoney(grand)}</td><td></td></tr></tfoot>`:''}</table></div></div>
+      <p class="note" style="padding:0 4px">Each company's total is the sum of employee, employer and bonus contributions. Update the figures from your PF passbook whenever you like.</p>`;}
 async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
   const n=now();family.push({id:uid(),name:v,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
 let editFA=null;
