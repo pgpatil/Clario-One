@@ -860,6 +860,7 @@ var stateUpdatedAt=now();
 var appMode=localStorage.getItem(MODE_KEY)||'official';
 var personalTab='tasks';
 var finMonth='';
+var finView='month';
 var invMonth='';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
@@ -1337,8 +1338,35 @@ function finSetOpening(ym,raw){const n=now();let r=finBalRow(ym);
   else if(r){r.opening=+raw;r.updated_at=n;}
   else finbal.push({id:uid(),month:ym,opening:+raw,created_at:n,updated_at:n});
   persist();renderView();}
+function finPayPlanned(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)return;const planned=finPlanned(c,ym);
+  if(planned<=0){toast('Set a planned amount first.');return;}
+  const n=now();const r=finPlanRow(catId,ym);if(r&&r.actual_override!=null){r.actual_override=null;r.updated_at=n;}
+  const paid=FTX().filter(t=>t.cat_id===catId&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);
+  const rem=planned-paid;if(rem<=0){toast('Already paid as planned.');persist();renderView();return;}
+  const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
+  const date=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.day||1,dim)).padStart(2,'0');
+  fintx.push({id:uid(),cat_id:catId,month:ym,date,amount:rem,note:'As planned',created_at:n,updated_at:n});
+  persist();renderView();toast('Paid '+fmtMoney(rem)+' as planned.');}
+function finDueCount(c){const f=c.freq||'monthly';return f==='monthly'?12:f==='custom'?(c.months||[]).length:(FIN_FREQ_MONTHS[f]||[]).length;}
+function finAnnualTotal(c){return (+c.amount||0)*finDueCount(c);}
+function finDueMonthsLabel(c){const f=c.freq||'monthly';if(f==='monthly')return'Every month';const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
+function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();renderView();}
+function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((a,b)=>a.name.localeCompare(b.name));
+  const annual=list.reduce((a,c)=>a+finAnnualTotal(c),0);
+  const rows=list.map(c=>`<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span></div>
+    <div class="meta">📅 ${esc(finDueMonthsLabel(c))} · <span class="num">annual ${fmtMoney(finAnnualTotal(c))}</span></div></div>
+    <div class="fr-ctl"><input type="number" value="${c.amount||''}" placeholder="amount ₹" title="Amount per payment" onchange="finSetCommitAmount('${c.id}',this.value)">
+    <div class="fr-acts"><button class="iconb" title="Edit schedule / name" onclick="openFinCat('${c.id}')">⚙</button></div></div></div>`).join('')
+    ||'<div class="empty">No fixed commitments yet. Add EMIs, fees, LIC & insurance premiums — each with its own frequency and amount.</div>';
+  return pagehead('PERSONAL','Money','Fixed commitments — set once, flow into every due month',finMoneyToggle())+
+    `<div class="kpis"><div class="kpi blue"><div class="kl">Annual commitments</div><div class="kv num" style="font-size:19px">${fmtMoney(annual)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(Math.round(annual/12))}/mo average</div></div>
+      <div class="kpi"><div class="kl">Items</div><div class="kv num" style="font-size:19px">${list.length}</div></div></div>`+
+    `<div class="card"><div class="ch"><span>Recurring commitments</span><button class="btn sm" onclick="openFinCat(null,'fixed')">+ Add commitment</button></div>${rows}</div>
+    <p class="note" style="padding:0 4px">Each commitment appears automatically in the months it's due on the monthly plan, at the amount set here. To make one occurrence differ (e.g. a higher school-fee term), open that month and edit its planned amount there.</p>`;}
+function finMoneyToggle(){return `<div class="vtog"><button class="${finView==='month'?'on':''}" onclick="finView='month';renderView()">Monthly plan</button><button class="${finView==='commit'?'on':''}" onclick="finView='commit';renderView()">Fixed commitments</button></div>`;}
 function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMonth,td=today();
   const cats=FCAT();
+  if(cats.length&&finView==='commit')return vFinCommitments();
   if(!cats.length)return pagehead('PERSONAL','Money','Plan the month, track actuals','')+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
   const active=cats.filter(c=>finDueIn(c,ym));
@@ -1356,12 +1384,12 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
       <div class="fr-ctl">
         <input type="number" value="${p||''}" placeholder="plan ₹" onchange="finSetPlan('${c.id}','${ym}',this.value)">
-        <div class="fr-acts"><button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
+        <div class="fr-acts">${c.group!=='income'?`<button class="btn xs" title="Log a payment of the planned amount (${fmtMoney(rem>0?rem:p)})" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`:''}<button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
       </div></div>`;};
   const addLbl={income:'income',fixed:'commitment',expense:'expense',savings:'savings'};
   const section=(title,list,gkey)=>`<div class="card"><div class="ch"><span>${title}</span><span class="n num">plan ${fmtMoney(sumP(list))} · actual ${fmtMoney(sumA(list))}</span></div>${list.map(row).join('')||`<div class="empty">Nothing here for ${finMonthLabel(ym)}.</div>`}<div class="addline"><button class="btn sm" onclick="openFinCat(null,'${gkey}')">+ Add ${addLbl[gkey]}</button></div></div>`;
   const tx=FTX().filter(t=>t.month===ym).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
+  return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
