@@ -587,6 +587,22 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="macts"><div></div><div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveFinTx()">Log payment</button></div></div>
 </div></div>
 
+<!-- Credit card modal -->
+<div class="ovl" id="mFinCard"><div class="modal">
+  <h3 id="mFinCardTitle">New Credit card <button class="mx" type="button" onclick="closeM()">✕</button></h3>
+  <div class="mbody">
+  <div class="fld"><label>Card name <span class="req">*</span></label><input id="ccName" placeholder="e.g. HDFC Regalia, Amex Platinum"></div>
+  <div class="g2">
+    <div class="fld"><label>Last 4 digits</label><input id="ccLast4" inputmode="numeric" maxlength="4" placeholder="optional"></div>
+    <div class="fld"><label>Payment due day</label><input type="number" id="ccDue" min="1" max="31" placeholder="e.g. 18 — optional"></div>
+  </div>
+  <div class="fld"><label>Credit limit (₹)</label><input type="number" id="ccLimit" placeholder="optional"></div>
+  <p class="note">Enter each month's statement amount and mark it paid on the Money tab. Card payments reduce your bank closing balance for the month.</p>
+  </div>
+  <div class="macts"><button class="btn dg sm" id="ccDel" style="display:none" onclick="delFinCard()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveFinCard()">Save</button></div></div>
+</div></div>
+
 <!-- Investment holding modal -->
 <div class="ovl" id="mInvHold"><div class="modal">
   <h3 id="mInvHoldTitle">New Investment <button class="mx" type="button" onclick="closeM()">✕</button></h3>
@@ -849,7 +865,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -862,7 +878,7 @@ var personalTab='tasks';
 var finMonth='';
 var finView='month';
 var invMonth='';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -1325,7 +1341,7 @@ function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:
 function ymAdd(ym,n){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);}
 function finBalRow(ym){return finbal.find(b=>!b.deleted&&b.month===ym);}
 function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
-function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
+function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym);}
 function finOpening(ym){const r=finBalRow(ym);if(r)return +r.opening||0;
   const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>a.month.localeCompare(b.month));
   if(!priors.length)return 0;
@@ -1351,6 +1367,51 @@ function finDueCount(c){const f=c.freq||'monthly';return f==='monthly'?12:f==='c
 function finAnnualTotal(c){return (+c.amount||0)*finDueCount(c);}
 function finDueMonthsLabel(c){const f=c.freq||'monthly';if(f==='monthly')return'Every month';const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
 function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();renderView();}
+/* ═══ PERSONAL — CREDIT CARDS ═══ */
+function CARD(){return fincard.filter(c=>!c.deleted);}
+function CARDTX(){return fincardtx.filter(t=>!t.deleted);}
+function cardRow(cardId,ym){return CARDTX().find(t=>t.card_id===cardId&&t.month===ym);}
+function cardStatement(cardId,ym){const r=cardRow(cardId,ym);return r?(+r.statement||0):0;}
+function cardPaid(cardId,ym){const r=cardRow(cardId,ym);return r?(+r.paid||0):0;}
+function cardOutstanding(cardId,ym){return cardStatement(cardId,ym)-cardPaid(cardId,ym);}
+function cardUpsert(cardId,ym,patch){let r=cardRow(cardId,ym);const n=now();if(r)Object.assign(r,patch,{updated_at:n});else fincardtx.push(Object.assign({id:uid(),card_id:cardId,month:ym,statement:0,paid:0,created_at:n,updated_at:n},patch));}
+function cardSetStatement(cardId,ym,val){cardUpsert(cardId,ym,{statement:+val||0});persist();renderView();}
+function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});persist();renderView();}
+function cardPayFull(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const st=cardStatement(cardId,ym);
+  if(st<=0){toast('Enter the statement amount first.');return;}
+  const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
+  const pd=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.due_day||dim,dim)).padStart(2,'0');
+  cardUpsert(cardId,ym,{paid:st,paid_date:pd});persist();renderView();toast('Paid '+fmtMoney(st)+' — '+c.name+'.');}
+function cardBilledTotal(ym){return CARD().reduce((a,c)=>a+cardStatement(c.id,ym),0);}
+function cardPaidTotal(ym){return CARD().reduce((a,c)=>a+cardPaid(c.id,ym),0);}
+function cardOutstandingTotal(ym){return CARD().reduce((a,c)=>a+cardOutstanding(c.id,ym),0);}
+function cardLabel(c){return esc(c.name)+(c.last4?` <span class="num" style="color:var(--t3)">•• ${esc(c.last4)}</span>`:'');}
+let editCard=null;
+function openFinCard(id){editCard=id?fincard.find(x=>x.id===id):null;const c=editCard;
+  g('mFinCardTitle').firstChild.textContent=(c?'Edit Credit card':'New Credit card')+' ';
+  g('ccName').value=c?.name||'';g('ccLast4').value=c?.last4||'';g('ccDue').value=(c&&c.due_day)?c.due_day:'';g('ccLimit').value=(c&&c.limit)?c.limit:'';
+  g('ccDel').style.display=c?'':'none';g('mFinCard').classList.add('open');setTimeout(()=>g('ccName').focus(),50);}
+function saveFinCard(){const name=g('ccName').value.trim();if(!name){toast('Card name required.');return;}const n=now();
+  const dueRaw=parseInt(g('ccDue').value,10);const due_day=(dueRaw>=1&&dueRaw<=31)?dueRaw:null;
+  const d={name,last4:g('ccLast4').value.replace(/\D/g,'').slice(-4),due_day,limit:+g('ccLimit').value||0,updated_at:n};
+  if(editCard)Object.assign(editCard,d);else fincard.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();renderView();toast('Card saved.');}
+async function delFinCard(){if(editCard&&await askConfirm('Delete "'+editCard.name+'"? Its statement history stays saved.',{ok:'Delete',danger:true})){editCard.deleted=true;editCard.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
+function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>a.name.localeCompare(b.name));
+  const billed=cardBilledTotal(ym),paid=cardPaidTotal(ym),out=cardOutstandingTotal(ym);
+  const [yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();
+  const dueStr=c=>{if(!c.due_day)return'';const d=Math.min(c.due_day,dim);return new Date(ym+'-'+String(d).padStart(2,'0')+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});};
+  const rows=cards.map(c=>{const st=cardStatement(c.id,ym),pd=cardPaid(c.id,ym),o=st-pd,full=st>0&&o<=0,ds=dueStr(c);
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${cardLabel(c)} ${full?'<span class="pill g">paid</span>':(pd>0?'<span class="pill n">part</span>':(st>0?'<span class="pill r">due</span>':''))}</div>
+      <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 due ${ds}</span> · `:''}<span class="num">paid ${fmtMoney(pd)}</span>${st>0?` · <span class="num" style="${o>0?'color:var(--red);font-weight:700':'color:var(--grn)'}">${o>0?fmtMoney(o)+' outstanding':'cleared'}</span>`:''}</div></div>
+      <div class="fr-ctl"><input type="number" value="${st||''}" placeholder="statement ₹" title="This month's total bill" onchange="cardSetStatement('${c.id}','${ym}',this.value)">
+      <div class="fr-acts"><button class="btn xs" title="Mark the full statement paid" onclick="cardPayFull('${c.id}','${ym}')">✓ pay full</button><button class="iconb" title="Enter amount paid" onclick="cardEditPaid('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit card" onclick="openFinCard('${c.id}')">⚙</button></div></div></div>`;}).join('')
+    ||'<div class="empty">No cards yet. Add your credit cards to track each month\'s bill and payment.</div>';
+  const totLine=cards.length?`<span class="n num">billed ${fmtMoney(billed)} · paid ${fmtMoney(paid)}${out>0?` · <span style="color:var(--red);font-weight:700">${fmtMoney(out)} due</span>`:''}</span>`:'';
+  return `<div class="card"><div class="ch"><span>💳 Credit cards</span>${totLine}</div>${rows}<div class="addline"><button class="btn sm" onclick="openFinCard()">+ Add credit card</button></div></div>`;}
+async function cardEditPaid(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const cur=cardPaid(cardId,ym);
+  const v=await askText('Amount paid on '+c.name+' — '+finMonthLabel(ym)+'.',{title:'Amount paid',type:'number',value:cur?String(cur):'',ok:'Set'});
+  if(v===null)return;cardSetPaid(cardId,ym,v.trim()===''?0:+v);}
 function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((a,b)=>a.name.localeCompare(b.name));
   const annual=list.reduce((a,c)=>a+finAnnualTotal(c),0);
   const rows=list.map(c=>`<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span></div>
@@ -1373,7 +1434,8 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>((a.day||99)-(b.day||99))||a.name.localeCompare(b.name));
   const sumP=l=>l.reduce((a,c)=>a+finPlanned(c,ym),0),sumA=l=>l.reduce((a,c)=>a+finActual(c,ym),0);
   const inc=byG('income'),fix=byG('fixed'),exp=byG('expense'),sav=byG('savings');
-  const pInc=sumP(inc),aInc=sumA(inc),pOut=sumP(fix)+sumP(exp),aOut=sumA(fix)+sumA(exp),pSav=sumP(sav),aSav=sumA(sav);
+  const pInc=sumP(inc),aInc=sumA(inc),pOut=sumP(fix)+sumP(exp),aOutCat=sumA(fix)+sumA(exp),pSav=sumP(sav),aSav=sumA(sav);
+  const cardPd=cardPaidTotal(ym),aOut=aOutCat+cardPd;
   const pSurp=pInc-pOut-pSav,aSurp=aInc-aOut-aSav;
   const [yy,mm]=ym.split('-').map(Number);const isCur=ym===monthKey(td);const dleft=isCur?new Date(yy,mm,0).getDate()-new Date().getDate():0;
   const kpi=(lbl,p,a,cls)=>`<div class="kpi ${cls||''}"><div class="kl">${lbl}</div><div class="kv num" style="font-size:18px">${fmtMoney(a)}</div><div class="num" style="font-size:10px;color:var(--t3)">plan ${fmtMoney(p)}</div></div>`;
@@ -1392,11 +1454,13 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
+    vFinCardsSection(ym)+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
       return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="fin-bank">
         <div class="fb-row"><label>Opening balance</label><input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" title="Editable — carries forward from last month's closing"></div>
         <div class="fb-row"><span>+ Income received</span><b class="num" style="color:var(--grn)">${fmtMoney(aInc)}</b></div>
-        <div class="fb-row"><span>− Outflow (paid)</span><b class="num" style="color:var(--red)">${fmtMoney(aOut+aSav)}</b></div>
+        <div class="fb-row"><span>− Expenses & commitments</span><b class="num" style="color:var(--red)">${fmtMoney(aOutCat+aSav)}</b></div>
+        ${cardPd>0?`<div class="fb-row"><span>− Credit card payments</span><b class="num" style="color:var(--red)">${fmtMoney(cardPd)}</b></div>`:''}
         <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
