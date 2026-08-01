@@ -577,6 +577,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   </div>
   <div id="fcFixedWrap" style="display:none">
     <div class="fld"><label>How often</label><select id="fcFreq" onchange="finCatFreqUI()"></select></div>
+    <div class="fld" id="fcYearWrap" style="display:none"><label>Due month</label><select id="fcYearMonth"></select></div>
     <div class="fld" id="fcMonthsWrap" style="display:none"><label>Which months</label><div id="fcMonths" class="attlist"></div></div>
   </div>
   <p class="note">Fixed commitments (EMI, fees, maintenance) are entered once and appear automatically in the months they're due. Planned amounts for other groups carry forward from the previous month and can be edited per month.</p>
@@ -1350,15 +1351,16 @@ async function delPersonalTaskModal(){if(editPT&&await askConfirm('Delete this t
 
 /* ═══ PERSONAL — MONTHLY FINANCE PLANNER ═══ */
 const FIN_GROUPS=[['income','Income'],['fixed','Fixed commitments'],['expense','Variable expenses'],['savings','Savings & investments']];
-const FIN_FREQ=[['monthly','Monthly'],['quarterly','Quarterly (Jan/Apr/Jul/Oct)'],['halfyearly','Half-yearly (Jan/Jul)'],['custom','Specific months']];
+const FIN_FREQ=[['monthly','Monthly'],['quarterly','Quarterly (Jan/Apr/Jul/Oct)'],['halfyearly','Half-yearly (Jan/Jul)'],['yearly','Yearly (pick a month)'],['custom','Specific months']];
 const FIN_FREQ_MONTHS={quarterly:[1,4,7,10],halfyearly:[1,7]};
+function finMonthsFor(c){const f=c.freq||'monthly';if(f==='monthly')return [1,2,3,4,5,6,7,8,9,10,11,12];if(f==='custom'||f==='yearly')return c.months||[];return FIN_FREQ_MONTHS[f]||[];}
 const MON_ABBR=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function FCAT(){return fincats.filter(c=>!c.deleted);}
 function FTX(){return fintx.filter(t=>!t.deleted);}
 function finMonthNum(ym){return +ym.slice(5,7);}
 function finGroupLbl(g){return (FIN_GROUPS.find(x=>x[0]===g)||[])[1]||g;}
 function finFreqLbl(f){return (FIN_FREQ.find(x=>x[0]===f)||[])[1]||f;}
-function finDueIn(c,ym){if(c.group!=='fixed')return true;const f=c.freq||'monthly';if(f==='monthly')return true;const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.includes(finMonthNum(ym));}
+function finDueIn(c,ym){if(c.group!=='fixed')return true;return finMonthsFor(c).includes(finMonthNum(ym));}
 function finPlanRow(catId,ym){return finplan.find(p=>!p.deleted&&p.cat_id===catId&&p.month===ym);}
 function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
 function finActual(c,ym){const ov=finPlanRow(c.id,ym);if(ov&&ov.actual_override!=null)return +ov.actual_override||0;return FTX().filter(t=>t.cat_id===c.id&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);}
@@ -1400,9 +1402,9 @@ function finPayPlanned(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)retu
   const date=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.day||1,dim)).padStart(2,'0');
   fintx.push({id:uid(),cat_id:catId,month:ym,date,amount:rem,note:'As planned',created_at:n,updated_at:n});
   persist();reRender();toast('Paid '+fmtMoney(rem)+' as planned.');}
-function finDueCount(c){const f=c.freq||'monthly';return f==='monthly'?12:f==='custom'?(c.months||[]).length:(FIN_FREQ_MONTHS[f]||[]).length;}
+function finDueCount(c){return finMonthsFor(c).length;}
 function finAnnualTotal(c){return (+c.amount||0)*finDueCount(c);}
-function finDueMonthsLabel(c){const f=c.freq||'monthly';if(f==='monthly')return'Every month';const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
+function finDueMonthsLabel(c){if((c.freq||'monthly')==='monthly')return'Every month';const ms=finMonthsFor(c);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
 function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();reRender();}
 /* ═══ PERSONAL — CREDIT CARDS ═══ */
 function CARD(){return fincard.filter(c=>!c.deleted);}
@@ -1509,13 +1511,17 @@ function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;co
   g('fcFreq').innerHTML=FIN_FREQ.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
   g('fcName').value=c?.name||'';g('fcGroup').value=c?.group||presetGroup||'expense';g('fcAmount').value=(c&&c.amount)?c.amount:'';g('fcDay').value=(c&&c.day)?c.day:'';
   g('fcFreq').value=c?.freq||'monthly';
+  g('fcYearMonth').innerHTML=MON_ABBR.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+  g('fcYearMonth').value=(c&&c.freq==='yearly'&&(c.months||[]).length)?c.months[0]:( (new Date().getMonth()+1) );
   const sel=new Set(c?.months||[]);g('fcMonths').innerHTML=MON_ABBR.map((m,i)=>`<span class="attchip ${sel.has(i+1)?'on':''}" data-m="${i+1}" onclick="this.classList.toggle('on')">${m}</span>`).join('');
   g('fcDel').style.display=c?'':'none';finCatGroupUI();g('mFinCat').classList.add('open');setTimeout(()=>g('fcName').focus(),50);}
 function finCatGroupUI(){g('fcFixedWrap').style.display=g('fcGroup').value==='fixed'?'':'none';finCatFreqUI();}
-function finCatFreqUI(){g('fcMonthsWrap').style.display=(g('fcGroup').value==='fixed'&&g('fcFreq').value==='custom')?'':'none';}
+function finCatFreqUI(){const fixed=g('fcGroup').value==='fixed',f=g('fcFreq').value;g('fcMonthsWrap').style.display=(fixed&&f==='custom')?'':'none';g('fcYearWrap').style.display=(fixed&&f==='yearly')?'':'none';}
 function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name required.');return;}const n=now();
   const group=g('fcGroup').value;const freq=group==='fixed'?g('fcFreq').value:'';
-  const months=(group==='fixed'&&freq==='custom')?[...g('fcMonths').querySelectorAll('.attchip.on')].map(x=>+x.dataset.m).sort((a,b)=>a-b):[];
+  let months=[];
+  if(group==='fixed'&&freq==='custom')months=[...g('fcMonths').querySelectorAll('.attchip.on')].map(x=>+x.dataset.m).sort((a,b)=>a-b);
+  else if(group==='fixed'&&freq==='yearly')months=[+g('fcYearMonth').value];
   if(group==='fixed'&&freq==='custom'&&!months.length){toast('Pick at least one month.');return;}
   const dayRaw=parseInt(g('fcDay').value,10);const day=(dayRaw>=1&&dayRaw<=31)?dayRaw:null;
   const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,updated_at:n};
