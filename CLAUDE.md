@@ -21,12 +21,12 @@ Accent color is a desaturated cool slate (`--blue` family — name is legacy, no
 --card:#ffffff      (currently unused as a token — cards hardcode #fff instead; fix if touching cards broadly)
 --sub:#fafaf9       table heads, addline bars
 --bdr / --bdr2       hairline borders / input borders
---t1..--t4          text, darkest to lightest (--t4 is #767676 — was #939393, raised for WCAG AA, don't lower it back)
+--t1..--t4          text, darkest to lightest (--t4 is #6b6b6b — history: #939393 → #767676 → #6b6b6b, darkened each time for WCAG AA; #767676 still failed on the --bg/--sub greys, #6b6b6b passes. Don't lighten it back)
 --blue / --blue-d / --blue-l / --blue-b   primary accent ladder (slate, not blue) — buttons, links, focus rings, nav-active, KPI accents
---grn / --grn-l     success / done / calls
+--grn / --grn-d / --grn-l     success / done / calls. --grn-d is the text-on-tint variant for pills (--grn fails contrast on --grn-l)
 --red / --red-l     errors, overdue, delete
---amb / --amb-d / --amb-l   warnings, "waiting" status, medium priority, notes. --amb-d exists specifically for text-on-tint (pills) because --amb itself fails contrast on --amb-l
---pur / --pur-l     accounts (search badge only), meeting-log dot
+--amb / --amb-d / --amb-l   warnings, "waiting" status, medium priority, notes. --amb-d is the text-on-tint variant (pills, and small amber status text on white) because --amb itself fails contrast on --amb-l and is only ~3.06 on white (OK for large KPI numbers/stars only)
+--pur / --pur-d / --pur-l     accounts (search badge only), meeting-log dot. --pur-d is the text-on-tint variant for pills (--pur fails contrast on --pur-l)
 --ind                #5867e8, meeting badge in global search only — tokenized to avoid a raw hex, deliberately NOT unified with the calendar/log "meeting=blue" color (would collide with the search Task badge, which is also blue — search result-type badges are their own 5-color legend, not meant to match the calendar's event-type colors)
 --steel               #332f2e, sampled directly from the logo's shadow tone; used narrowly (currently just the toast background) as the one deliberate "logo material in the UI" touchpoint — don't expand this broadly without checking contrast, it was scoped small on purpose
 ```

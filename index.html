@@ -19,10 +19,10 @@
 <style>
 :root{
   --bg:#f3f2f2; --card:#ffffff; --sub:#fafaf9; --bdr:#e5e5e5; --bdr2:#c9c9c9;
-  --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#767676;
+  --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#6b6b6b;
   --blue:#0f72c2; --blue-d:#074b83; --blue-l:#ecf4fb; --blue-b:#a8cae6;
-  --grn:#2e844a; --grn-l:#ebf7ee; --red:#ba0517; --red-l:#feefef;
-  --amb:#dd7a01; --amb-d:#a75c00; --amb-l:#fef4e8; --pur:#9050e9; --pur-l:#f4ecfe; --ind:#5867e8;
+  --grn:#2e844a; --grn-d:#1d6b38; --grn-l:#ebf7ee; --red:#ba0517; --red-l:#feefef;
+  --amb:#dd7a01; --amb-d:#a75c00; --amb-l:#fef4e8; --pur:#9050e9; --pur-d:#6d34c4; --pur-l:#f4ecfe; --ind:#5867e8;
   --steel:#332f2e;
   --r:6px; --rs:4px; --sh:0 2px 4px rgba(24,24,24,.06);
   --font:'Inter',system-ui,-apple-system,sans-serif;
@@ -112,10 +112,10 @@ table.t tr.click:hover{background:var(--blue-l)}
 table.t td.r,table.t th.r{text-align:right}
 .pill{font-size:11px;border-radius:10px;padding:1px 8px;font-weight:600;white-space:nowrap}
 .pill.b{background:var(--blue-l);color:var(--blue-d)}
-.pill.g{background:var(--grn-l);color:var(--grn)}
+.pill.g{background:var(--grn-l);color:var(--grn-d)}
 .pill.r{background:var(--red-l);color:var(--red)}
 .pill.a{background:var(--amb-l);color:var(--amb-d)}
-.pill.p{background:var(--pur-l);color:var(--pur)}
+.pill.p{background:var(--pur-l);color:var(--pur-d)}
 .pill.n{background:var(--bg);color:var(--t2)}
 
 /* ═══ rows ═══ */
@@ -318,7 +318,7 @@ canvas{display:block;max-width:100%}
 .pcard .pr{font-size:11.5px;color:var(--t3);margin-bottom:8px}
 .pstats{display:flex;gap:10px;font-size:11.5px;color:var(--t3);flex-wrap:wrap}
 .pstats b{color:var(--t1);font-weight:700}
-.pstats .warn b{color:var(--amb)}
+.pstats .warn b{color:var(--amb-d)}
 .pstats .bad b{color:var(--red)}
 .dl{display:grid;grid-template-columns:110px 1fr;gap:3px 10px;font-size:12.5px;padding:12px 14px}
 .dl dt{color:var(--t3)}
@@ -836,7 +836,8 @@ const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:
 const g=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const now=()=>new Date().toISOString();
-const today=()=>new Date().toISOString().slice(0,10);
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const jss=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
@@ -896,7 +897,7 @@ var personalTab='tasks';
 var finMonth='';
 var finView='month';
 var invMonth='';
-var invView='holdings';
+var invView='overview';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;stateUpdatedAt=s.updatedAt||now();}
@@ -1158,7 +1159,7 @@ function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,tim
   const td=today();
   if(/\btoday\b/i.test(txt))r.due=td;else if(/\btomorrow\b/i.test(txt))r.due=addDays(td,1);else if(/\bnext week\b/i.test(txt))r.due=addDays(td,7);
   const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  days.forEach((d,i)=>{if(new RegExp('\\b'+d+'\\b','i').test(txt)){const dt=new Date();dt.setDate(dt.getDate()+((i-dt.getDay()+7)%7||7));r.due=dt.toISOString().slice(0,10);}});
+  days.forEach((d,i)=>{if(new RegExp('\\b'+d+'\\b','i').test(txt)){const dt=new Date();dt.setDate(dt.getDate()+((i-dt.getDay()+7)%7||7));r.due=ymd(dt);}});
   const tm=txt.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if(tm){let h=+tm[1],mi=tm[2]?+tm[2]:0;if(tm[3].toLowerCase()==='pm'&&h<12)h+=12;if(tm[3].toLowerCase()==='am'&&h===12)h=0;r.time=String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
   r.title=txt.replace(/^call\s+/i,'').replace(/@\w[\w]*/g,'').replace(/\btoday\b|\btomorrow\b|\bnext week\b/gi,'').replace(new RegExp('\\b('+days.join('|')+')\\b','gi'),'').replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,'').replace(/!high|!low|urgent/gi,'').replace(/\s+/g,' ').trim().replace(/\s+(by|on|to)$/i,'')||txt;
@@ -1536,8 +1537,30 @@ function invSetPrice(holdId,ym,raw){const h=IH().find(x=>x.id===holdId);if(!h)re
   persist();reRender();}
 function invPctStr(delta,base){if(!base)return'';const p=delta/base*100;return' ('+(p>=0?'+':'')+p.toFixed(1)+'%)';}
 function invMoveHtml(delta,base){if(!delta)return'<span class="num" style="color:var(--t4)">no change</span>';const up=delta>0;return`<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(delta))}${invPctStr(delta,base)}</span>`;}
-function invToggle(){return `<div class="vtog"><button class="${invView==='holdings'?'on':''}" onclick="invView='holdings';renderView()">Holdings</button><button class="${invView==='pf'?'on':''}" onclick="invView='pf';renderView()">PF accounts</button></div>`;}
+function invToggle(){return `<div class="vtog"><button class="${invView==='overview'?'on':''}" onclick="invView='overview';renderView()">Net worth</button><button class="${invView==='holdings'?'on':''}" onclick="invView='holdings';renderView()">Holdings</button><button class="${invView==='pf'?'on':''}" onclick="invView='pf';renderView()">PF accounts</button></div>`;}
+function pfCorpus(){return PFA().reduce((a,r)=>a+pfRowTotal(r),0);}
+function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus();}
+function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,pm=invPrevMonth(ym),td=today(),isCur=ym===monthKey(td);
+  const holds=IH();const pf=pfCorpus();const holdTot=invTotalAsOf(ym);const net=holdTot+pf;
+  const prevNet=invTotalAsOf(pm)+pf,delta=net-prevNet;
+  const nav=`<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="invMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="invMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="invMonth=monthKey(today());renderView()">This month</button>`:''}</div>`;
+  if(!holds.length&&!PFA().length)return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+
+    `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:48ch;margin-left:auto;margin-right:auto">Add holdings (funds, stocks, gold/silver by weight, property, FDs…) and your PF accounts — your total net worth and asset allocation appear here.</div><button class="btn" onclick="invView='holdings';renderView();openInvHold()">+ Add investment</button></div></div>`;
+  const byKind={},qtyKind={};
+  holds.forEach(h=>{const k=h.kind||'Other';const v=invValueAsOf(h.id,ym)||0;byKind[k]=(byKind[k]||0)+v;if(invIsWeight(h)){qtyKind[k]=qtyKind[k]||{};qtyKind[k][h.unit]=(qtyKind[k][h.unit]||0)+(+h.qty||0);}});
+  const alloc=Object.entries(byKind).filter(([k,v])=>v).sort((a,b)=>b[1]-a[1]);
+  if(pf>0)alloc.push(['Provident Fund',pf]);
+  const qlbl=k=>{const q=qtyKind[k];return q?' · '+Object.entries(q).map(([u,n])=>n+' '+u).join(' + '):'';};
+  const rows=alloc.map(([k,v])=>{const pct=net?Math.round(v/net*100):0;return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(k)}${(k==='Gold'||k==='Silver')?`<span class="num" style="color:var(--t3);font-weight:500">${qlbl(k)}</span>`:''}</div>
+      <div class="capbar" style="margin-top:6px"><div style="width:${pct}%"></div></div></div>
+      <div style="text-align:right;min-width:96px;flex:0 0 auto"><b class="num">${fmtMoney(v)}</b><div class="num" style="font-size:11px;color:var(--t3)">${pct}%</div></div></div>`;}).join('')||'<div class="empty">Nothing recorded for this month yet.</div>';
+  return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+nav+
+    `<div class="kpis"><div class="kpi blue"><div class="kl">Net worth</div><div class="kv num" style="font-size:22px">${fmtMoney(net)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(holdTot)} holdings + ${fmtMoney(pf)} PF</div></div>
+      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet?((delta>=0?'+':'')+(delta/prevNet*100).toFixed(1)+'%'):'—'}</div></div></div>`+
+    `<div class="card"><div class="ch"><span>Asset allocation</span><span class="n num">${alloc.length}</span></div>${rows}</div>
+    <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your total PF corpus. Use the Holdings and PF accounts tabs to update the figures.</p>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
+  if(invView==='overview')return vInvOverview();
   if(invView==='pf')return vInvPf();
   const holds=IH().sort((a,b)=>a.name.localeCompare(b.name));
   if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month',invToggle())+
@@ -1769,7 +1792,7 @@ async function clearWeekLocations(mon){
   toast('Cleared — set each day\'s location as you plan.');
   renderView();}
 async function clearMonthLocations(mk){
-  const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+  const first=mk+'-01';const d=new Date(first+'T12:00');const last=ymd(new Date(d.getFullYear(),d.getMonth()+1,0));
   if(!await askConfirm('Clear locations for '+d.toLocaleDateString('en-IN',{month:'long',year:'numeric'})+'? Every day goes back to "Set location" — this also stops the previous month\'s location carrying forward.',{title:'Clear month locations',ok:'Clear'}))return;
   const n=now();
   LOC().filter(l=>l.date>=first&&l.date<=last).forEach(l=>{l.deleted=true;l.updated_at=n;});
@@ -1965,7 +1988,7 @@ function vPeople(){
     +`<div class="filters">${viewToggle('people',view)}</div>`;
   if(!P().length)return head+'<div class="card"><div class="empty">Add the people you delegate to and meet with.</div></div>';
   if(view==='list'){
-    const rows=list.map(p=>{const s=stat(p);return`<tr class="click" onclick="nav('people','${p.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(p.name)}</td><td>${esc(p.role||'')}</td><td>${esc(p.dept||'')}</td><td class="r num">${s.ag||'—'}</td><td class="r num" style="${s.w?'font-weight:700':''}">${s.w||'—'}</td><td class="r num">${s.oldest>7?`<span style="color:var(--amb)">${s.oldest}d</span>`:s.oldest?s.oldest+'d':'—'}</td></tr>`;}).join('');
+    const rows=list.map(p=>{const s=stat(p);return`<tr class="click" onclick="nav('people','${p.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(p.name)}</td><td>${esc(p.role||'')}</td><td>${esc(p.dept||'')}</td><td class="r num">${s.ag||'—'}</td><td class="r num" style="${s.w?'font-weight:700':''}">${s.w||'—'}</td><td class="r num">${s.oldest>7?`<span style="color:var(--amb-d)">${s.oldest}d</span>`:s.oldest?s.oldest+'d':'—'}</td></tr>`;}).join('');
     return head+`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('people','name','Name')}${sortHead('people','role','Role')}${sortHead('people','dept','Department')}<th class="r">Agenda</th>${sortHead('people','waiting','Waiting','r')}${sortHead('people','oldest','Oldest','r')}</tr>${rows}</table></div>`;
   }
   const cards=list.map(p=>{const s=stat(p);
@@ -2336,7 +2359,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     `<button class="btn gh2 sm" onclick="openCust('${c.id}')">Edit</button><button class="btn gh2 sm" onclick="openTask(null,null,null,'${c.id}','call')">+ Call</button><button class="btn gh2 sm" onclick="openDeal(null,'${c.id}')">+ Deal</button><button class="btn sm" onclick="openTask(null,null,null,'${c.id}')">+ Task</button>`)+
   nextActionCard(c)+
   `${c.cadence?`<div class="card" style="border-left:4px solid ${supplyLapsed(c)?'var(--red)':supplyDue(c)?'var(--amb)':'var(--grn)'}"><div class="ch"><span>Supply — ${esc(c.cadence)}</span>${c.last_order?`<span class="due ${supplyLapsed(c)?'over':''}">last order ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d ago</span>`:'<span class="pill a">no order logged</span>'}</div>
-    <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;font-size:12.5px;color:var(--t2)">${esc(c.supply_note||'')}${supplyLapsed(c)?' <b style="color:var(--red)">— overdue to reorder</b>':supplyDue(c)?' <b style="color:var(--amb)">— due to reorder</b>':''}</div><button class="btn sm" onclick="logOrderToday('${c.id}')">Log order today</button></div></div>`:''}
+    <div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1;font-size:12.5px;color:var(--t2)">${esc(c.supply_note||'')}${supplyLapsed(c)?' <b style="color:var(--red)">— overdue to reorder</b>':supplyDue(c)?' <b style="color:var(--amb-d)">— due to reorder</b>':''}</div><button class="btn sm" onclick="logOrderToday('${c.id}')">Log order today</button></div></div>`:''}
   <div class="grid31"><div>
     ${dls.length?seccard('Deals',dls.length,`<table class="t"><tr><th>Deal</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${dls.map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d.name)}</td><td><span class="pill ${d.stage==='Won'?'g':d.stage==='Lost'?'r':'b'}">${d.stage}</span></td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${fmtD(d.close_date)}</td></tr>`).join('')}</table>`,''):''}
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
@@ -2485,7 +2508,7 @@ function vPipeline(){const td=today();
       return`<div class="kcard ${stale?'stale':''}" draggable="true" data-id="${d.id}" title="${stale?'No activity '+ageDays(la)+' days':''}">
       <div class="kn" onclick="nav('deal','${d.id}')">${esc(d.name)}</div>
       <div class="km"><span>${esc(cname(d.customer_id)||'—')}</span><b class="num">${fmtMoney(d.value)}</b></div>
-      <div class="km"><span class="num">${d.close_date?fmtD(d.close_date):''}${d.close_date&&d.close_date<td&&st!=='Won'&&st!=='Lost'?' ⚠':''}</span>${stale?'<span style="color:var(--amb);font-weight:700">stale</span>':''}</div>
+      <div class="km"><span class="num">${d.close_date?fmtD(d.close_date):''}${d.close_date&&d.close_date<td&&st!=='Won'&&st!=='Lost'?' ⚠':''}</span>${stale?'<span style="color:var(--amb-d);font-weight:700">stale</span>':''}</div>
       <div style="display:flex;gap:4px;margin-top:6px"><button class="btn gh2 xs" title="Previous stage" onclick="moveDealStep('${d.id}',-1)">‹</button><button class="btn gh2 xs" style="flex:1" onclick="nav('deal','${d.id}')">Open</button><button class="btn gh2 xs" title="Next stage" onclick="moveDealStep('${d.id}',1)">›</button></div></div>`;}).join('');
     return`<div class="kcol" data-stage="${st}"><div class="kc-h"><span>${st} <span style="color:var(--t3);font-weight:600">(${list.length})</span></span><span class="kv2 num">${fmtMoney(val)}</span></div><div class="kc-b">${cards||'<div style="color:var(--t4);font-size:11px;text-align:center;padding:8px">Drop here</div>'}</div></div>`;}).join('');
   return pagehead('CRM','Pipeline',`Open ${fmtMoney(total)} · Weighted forecast <b>${fmtMoney(fc)}</b> · drag cards between stages`,`<button class="btn sm" onclick="openDeal()">+ Deal</button>`)+
@@ -2650,7 +2673,7 @@ function vSwot(){const s=swState();
   <div class="sq"><h5 style="color:var(--grn)">Strengths</h5><textarea onchange="_sw.S=this.value">${esc(s.S)}</textarea></div>
   <div class="sq"><h5 style="color:var(--red)">Weaknesses</h5><textarea onchange="_sw.W=this.value">${esc(s.W)}</textarea></div>
   <div class="sq"><h5 style="color:var(--blue)">Opportunities</h5><textarea onchange="_sw.O=this.value">${esc(s.O)}</textarea></div>
-  <div class="sq"><h5 style="color:var(--amb)">Threats</h5><textarea onchange="_sw.T=this.value">${esc(s.T)}</textarea></div></div>
+  <div class="sq"><h5 style="color:var(--amb-d)">Threats</h5><textarea onchange="_sw.T=this.value">${esc(s.T)}</textarea></div></div>
   <div style="margin-top:12px"><button class="btn sm" onclick="trSave('swot',_sw.title||'SWOT',_sw)">Save exercise</button></div>
   </div></div>`;}
 /* impact/effort backlog */
@@ -2680,7 +2703,7 @@ function vDash(){const td=today();
     <div class="card"><div class="ch">Throughput — 8 weeks</div><div class="cb"><canvas id="trendCv" style="width:100%;height:220px"></canvas></div></div>
     <div class="card"><div class="ch">Overdue by department</div><div class="cb"><canvas id="deptCv" style="width:100%;height:220px"></canvas></div></div>
     ${seccard('Department scorecard',Object.keys(byDept).length,`<table class="t"><tr><th>Department</th><th class="r">Open</th><th class="r">Overdue</th><th class="r">Oldest slip</th></tr>${Object.entries(byDept).sort((a,b)=>b[1].over-a[1].over).map(([d,v])=>`<tr class="click" onclick="deptFilter('${jss(d)}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d)}</td><td class="r num">${v.open}</td><td class="r num" style="${v.over?'color:var(--red);font-weight:700':''}">${v.over}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'No open items.')}
-    ${seccard('Delegation health',Object.keys(byP).length,`<table class="t"><tr><th>Person</th><th class="r">Waiting</th><th class="r">Past f/u</th><th class="r">Oldest</th></tr>${Object.entries(byP).sort((a,b)=>b[1].past-a[1].past).map(([pid,v])=>`<tr class="click" onclick="nav('people','${pid}')"><td style="font-weight:600;color:var(--blue-d)">${esc(pname(pid))}</td><td class="r num">${v.n}</td><td class="r num" style="${v.past?'color:var(--amb);font-weight:700':''}">${v.past}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'Nothing delegated.')}
+    ${seccard('Delegation health',Object.keys(byP).length,`<table class="t"><tr><th>Person</th><th class="r">Waiting</th><th class="r">Past f/u</th><th class="r">Oldest</th></tr>${Object.entries(byP).sort((a,b)=>b[1].past-a[1].past).map(([pid,v])=>`<tr class="click" onclick="nav('people','${pid}')"><td style="font-weight:600;color:var(--blue-d)">${esc(pname(pid))}</td><td class="r num">${v.n}</td><td class="r num" style="${v.past?'color:var(--amb-d);font-weight:700':''}">${v.past}</td><td class="r num">${v.oldest?v.oldest+'d':'—'}</td></tr>`).join('')}</table>`,'Nothing delegated.')}
     </div>`;
   }else{
     const open=openDeals();const total=open.reduce((a,d)=>a+(+d.value||0),0);
@@ -2806,7 +2829,7 @@ function saveCompanyName(){companyName=g('companyNameInp').value.trim();persist(
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
 function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.sort((a,b)=>a.localeCompare(b)).map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
 async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
-function monthsAgoDate(n){const d=new Date();d.setMonth(d.getMonth()-n);return d.toISOString().slice(0,10);}
+function monthsAgoDate(n){const d=new Date();d.setMonth(d.getMonth()-n);return ymd(d);}
 function archivableCounts(cutoff){
   const tk=tasks.filter(t=>!t.deleted&&!t.archived&&t.status==='done'&&(t.completed_at||t.updated_at||t.created_at||'').slice(0,10)<cutoff).length;
   const mt=meetings.filter(m=>!m.deleted&&!m.archived&&(m.status==='done'||m.status==='noshow')&&(m.date||(m.updated_at||'').slice(0,10))<cutoff).length;
