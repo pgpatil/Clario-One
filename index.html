@@ -544,6 +544,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="g2">
     <div class="fld"><label>Group</label><select id="fcGroup" onchange="finCatGroupUI()"></select></div>
     <div class="fld"><label>Planned amount (₹)</label><input type="number" id="fcAmount" placeholder="0"></div>
+    <div class="fld"><label>Expected day of month</label><input type="number" id="fcDay" min="1" max="31" placeholder="e.g. 5 — optional"></div>
   </div>
   <div id="fcFixedWrap" style="display:none">
     <div class="fld"><label>How often</label><select id="fcFreq" onchange="finCatFreqUI()"></select></div>
@@ -1323,7 +1324,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   if(!cats.length)return pagehead('PERSONAL','Money','Plan the month, track actuals','')+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
   const active=cats.filter(c=>finDueIn(c,ym));
-  const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>a.name.localeCompare(b.name));
+  const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>((a.day||99)-(b.day||99))||a.name.localeCompare(b.name));
   const sumP=l=>l.reduce((a,c)=>a+finPlanned(c,ym),0),sumA=l=>l.reduce((a,c)=>a+finActual(c,ym),0);
   const inc=byG('income'),fix=byG('fixed'),exp=byG('expense'),sav=byG('savings');
   const pInc=sumP(inc),aInc=sumA(inc),pOut=sumP(fix)+sumP(exp),aOut=sumA(fix)+sumA(exp),pSav=sumP(sav),aSav=sumA(sav);
@@ -1331,9 +1332,10 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const [yy,mm]=ym.split('-').map(Number);const isCur=ym===monthKey(td);const dleft=isCur?new Date(yy,mm,0).getDate()-new Date().getDate():0;
   const kpi=(lbl,p,a,cls)=>`<div class="kpi ${cls||''}"><div class="kl">${lbl}</div><div class="kv num" style="font-size:18px">${fmtMoney(a)}</div><div class="num" style="font-size:10px;color:var(--t3)">plan ${fmtMoney(p)}</div></div>`;
   const bar=(p,a)=>{const pct=p>0?Math.min(100,Math.round(a/p*100)):(a>0?100:0);return `<div class="capbar ${p>0&&a>p?'over':''}" style="margin-top:5px"><div style="width:${pct}%"></div></div>`;};
-  const row=c=>{const p=finPlanned(c,ym),a=finActual(c,ym),rem=p-a,ov=finPlanRow(c.id,ym),hasOv=ov&&ov.actual_override!=null;
+  const dateStr=c=>{if(!c.day)return'';const dim=new Date(yy,mm,0).getDate();const d=Math.min(c.day,dim);return new Date(ym+'-'+String(d).padStart(2,'0')+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});};
+  const row=c=>{const p=finPlanned(c,ym),a=finActual(c,ym),rem=p-a,ov=finPlanRow(c.id,ym),hasOv=ov&&ov.actual_override!=null,ds=dateStr(c);
     return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c.name)}${c.group==='fixed'&&(c.freq||'monthly')!=='monthly'?` <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>`:''}${hasOv?' <span class="pill n" title="Actual entered directly">manual</span>':''}</div>
-      <div class="meta"><span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
+      <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
       <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
         <input type="number" value="${p||''}" placeholder="plan" onchange="finSetPlan('${c.id}','${ym}',this.value)" style="width:94px;padding:3px 6px;font-size:12px;text-align:right">
         <div style="display:flex;gap:2px"><button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
@@ -1358,7 +1360,7 @@ function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;co
   g('mFinCatTitle').firstChild.textContent=(c?'Edit Category':'New Category')+' ';
   g('fcGroup').innerHTML=FIN_GROUPS.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
   g('fcFreq').innerHTML=FIN_FREQ.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
-  g('fcName').value=c?.name||'';g('fcGroup').value=c?.group||presetGroup||'expense';g('fcAmount').value=(c&&c.amount)?c.amount:'';
+  g('fcName').value=c?.name||'';g('fcGroup').value=c?.group||presetGroup||'expense';g('fcAmount').value=(c&&c.amount)?c.amount:'';g('fcDay').value=(c&&c.day)?c.day:'';
   g('fcFreq').value=c?.freq||'monthly';
   const sel=new Set(c?.months||[]);g('fcMonths').innerHTML=MON_ABBR.map((m,i)=>`<span class="attchip ${sel.has(i+1)?'on':''}" data-m="${i+1}" onclick="this.classList.toggle('on')">${m}</span>`).join('');
   g('fcDel').style.display=c?'':'none';finCatGroupUI();g('mFinCat').classList.add('open');setTimeout(()=>g('fcName').focus(),50);}
@@ -1368,7 +1370,8 @@ function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name 
   const group=g('fcGroup').value;const freq=group==='fixed'?g('fcFreq').value:'';
   const months=(group==='fixed'&&freq==='custom')?[...g('fcMonths').querySelectorAll('.attchip.on')].map(x=>+x.dataset.m).sort((a,b)=>a-b):[];
   if(group==='fixed'&&freq==='custom'&&!months.length){toast('Pick at least one month.');return;}
-  const d={name,group,amount:+g('fcAmount').value||0,freq,months,updated_at:n};
+  const dayRaw=parseInt(g('fcDay').value,10);const day=(dayRaw>=1&&dayRaw<=31)?dayRaw:null;
+  const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,updated_at:n};
   if(editFC)Object.assign(editFC,d);else fincats.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();toast('Category saved.');}
 async function delFinCat(){if(editFC&&await askConfirm('Delete "'+editFC.name+'"? Logged payments stay in history.',{ok:'Delete',danger:true})){editFC.deleted=true;editFC.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
