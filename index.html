@@ -1326,10 +1326,10 @@ function finPlanRow(catId,ym){return finplan.find(p=>!p.deleted&&p.cat_id===catI
 function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
 function finActual(c,ym){const ov=finPlanRow(c.id,ym);if(ov&&ov.actual_override!=null)return +ov.actual_override||0;return FTX().filter(t=>t.cat_id===c.id&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);}
 function finUpsertPlan(catId,ym,patch){let r=finPlanRow(catId,ym);const n=now();if(r)Object.assign(r,patch,{updated_at:n});else finplan.push(Object.assign({id:uid(),cat_id:catId,month:ym,planned:null,actual_override:null,created_at:n,updated_at:n},patch));}
-function finSetPlan(catId,ym,val){finUpsertPlan(catId,ym,{planned:(val===''||val==null)?null:+val});persist();renderView();}
+function finSetPlan(catId,ym,val){finUpsertPlan(catId,ym,{planned:(val===''||val==null)?null:+val});persist();reRender();}
 async function finSetActual(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)return;const r=finPlanRow(catId,ym);const cur=r&&r.actual_override!=null?r.actual_override:'';
   const v=await askText('Set actual for '+c.name+' — '+finMonthLabel(ym)+'. Leave blank to go back to summing logged payments.',{title:'Set actual amount',type:'number',value:String(cur),ok:'Set'});
-  if(v===null)return;finUpsertPlan(catId,ym,{actual_override:v.trim()===''?null:+v});persist();renderView();}
+  if(v===null)return;finUpsertPlan(catId,ym,{actual_override:v.trim()===''?null:+v});persist();reRender();}
 function finMonthShift(n){if(!finMonth)finMonth=monthKey(today());const d=new Date(finMonth+'-01T12:00');d.setMonth(d.getMonth()+n);finMonth=d.toISOString().slice(0,7);renderView();}
 function finMonthLabel(ym){return new Date(ym+'-01T12:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});}
 function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:uid(),name,group,amount:0,freq:group==='fixed'?'monthly':'',months:[],created_at:n,updated_at:n},extra||{});
@@ -1353,20 +1353,20 @@ function finSetOpening(ym,raw){const n=now();let r=finBalRow(ym);
   if(raw===''||raw==null){if(r){r.deleted=true;r.updated_at=n;}}
   else if(r){r.opening=+raw;r.updated_at=n;}
   else finbal.push({id:uid(),month:ym,opening:+raw,created_at:n,updated_at:n});
-  persist();renderView();}
+  persist();reRender();}
 function finPayPlanned(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)return;const planned=finPlanned(c,ym);
   if(planned<=0){toast('Set a planned amount first.');return;}
   const n=now();const r=finPlanRow(catId,ym);if(r&&r.actual_override!=null){r.actual_override=null;r.updated_at=n;}
   const paid=FTX().filter(t=>t.cat_id===catId&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);
-  const rem=planned-paid;if(rem<=0){toast('Already paid as planned.');persist();renderView();return;}
+  const rem=planned-paid;if(rem<=0){toast('Already paid as planned.');persist();reRender();return;}
   const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
   const date=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.day||1,dim)).padStart(2,'0');
   fintx.push({id:uid(),cat_id:catId,month:ym,date,amount:rem,note:'As planned',created_at:n,updated_at:n});
-  persist();renderView();toast('Paid '+fmtMoney(rem)+' as planned.');}
+  persist();reRender();toast('Paid '+fmtMoney(rem)+' as planned.');}
 function finDueCount(c){const f=c.freq||'monthly';return f==='monthly'?12:f==='custom'?(c.months||[]).length:(FIN_FREQ_MONTHS[f]||[]).length;}
 function finAnnualTotal(c){return (+c.amount||0)*finDueCount(c);}
 function finDueMonthsLabel(c){const f=c.freq||'monthly';if(f==='monthly')return'Every month';const ms=f==='custom'?(c.months||[]):(FIN_FREQ_MONTHS[f]||[]);return ms.length?ms.slice().sort((a,b)=>a-b).map(m=>MON_ABBR[m-1]).join(', '):'No months set';}
-function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();renderView();}
+function finSetCommitAmount(catId,val){const c=fincats.find(x=>x.id===catId);if(!c)return;c.amount=+val||0;c.updated_at=now();persist();reRender();}
 /* ═══ PERSONAL — CREDIT CARDS ═══ */
 function CARD(){return fincard.filter(c=>!c.deleted);}
 function CARDTX(){return fincardtx.filter(t=>!t.deleted);}
@@ -1375,13 +1375,13 @@ function cardStatement(cardId,ym){const r=cardRow(cardId,ym);return r?(+r.statem
 function cardPaid(cardId,ym){const r=cardRow(cardId,ym);return r?(+r.paid||0):0;}
 function cardOutstanding(cardId,ym){return cardStatement(cardId,ym)-cardPaid(cardId,ym);}
 function cardUpsert(cardId,ym,patch){let r=cardRow(cardId,ym);const n=now();if(r)Object.assign(r,patch,{updated_at:n});else fincardtx.push(Object.assign({id:uid(),card_id:cardId,month:ym,statement:0,paid:0,created_at:n,updated_at:n},patch));}
-function cardSetStatement(cardId,ym,val){cardUpsert(cardId,ym,{statement:+val||0});persist();renderView();}
-function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});persist();renderView();}
+function cardSetStatement(cardId,ym,val){cardUpsert(cardId,ym,{statement:+val||0});persist();reRender();}
+function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});persist();reRender();}
 function cardPayFull(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const st=cardStatement(cardId,ym);
   if(st<=0){toast('Enter the statement amount first.');return;}
   const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
   const pd=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.due_day||dim,dim)).padStart(2,'0');
-  cardUpsert(cardId,ym,{paid:st,paid_date:pd});persist();renderView();toast('Paid '+fmtMoney(st)+' — '+c.name+'.');}
+  cardUpsert(cardId,ym,{paid:st,paid_date:pd});persist();reRender();toast('Paid '+fmtMoney(st)+' — '+c.name+'.');}
 function cardBilledTotal(ym){return CARD().reduce((a,c)=>a+cardStatement(c.id,ym),0);}
 function cardPaidTotal(ym){return CARD().reduce((a,c)=>a+cardPaid(c.id,ym),0);}
 function cardOutstandingTotal(ym){return CARD().reduce((a,c)=>a+cardOutstanding(c.id,ym),0);}
@@ -1395,8 +1395,8 @@ function saveFinCard(){const name=g('ccName').value.trim();if(!name){toast('Card
   const dueRaw=parseInt(g('ccDue').value,10);const due_day=(dueRaw>=1&&dueRaw<=31)?dueRaw:null;
   const d={name,last4:g('ccLast4').value.replace(/\D/g,'').slice(-4),due_day,limit:+g('ccLimit').value||0,updated_at:n};
   if(editCard)Object.assign(editCard,d);else fincard.push(Object.assign({id:uid(),created_at:n},d));
-  closeM();persist();renderView();toast('Card saved.');}
-async function delFinCard(){if(editCard&&await askConfirm('Delete "'+editCard.name+'"? Its statement history stays saved.',{ok:'Delete',danger:true})){editCard.deleted=true;editCard.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
+  closeM();persist();reRender();toast('Card saved.');}
+async function delFinCard(){if(editCard&&await askConfirm('Delete "'+editCard.name+'"? Its statement history stays saved.',{ok:'Delete',danger:true})){editCard.deleted=true;editCard.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
 function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>a.name.localeCompare(b.name));
   const billed=cardBilledTotal(ym),paid=cardPaidTotal(ym),out=cardOutstandingTotal(ym);
   const [yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();
@@ -1483,8 +1483,8 @@ function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name 
   const dayRaw=parseInt(g('fcDay').value,10);const day=(dayRaw>=1&&dayRaw<=31)?dayRaw:null;
   const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,updated_at:n};
   if(editFC)Object.assign(editFC,d);else fincats.push(Object.assign({id:uid(),created_at:n},d));
-  closeM();persist();renderView();toast('Category saved.');}
-async function delFinCat(){if(editFC&&await askConfirm('Delete "'+editFC.name+'"? Logged payments stay in history.',{ok:'Delete',danger:true})){editFC.deleted=true;editFC.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
+  closeM();persist();reRender();toast('Category saved.');}
+async function delFinCat(){if(editFC&&await askConfirm('Delete "'+editFC.name+'"? Logged payments stay in history.',{ok:'Delete',danger:true})){editFC.deleted=true;editFC.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
 function openFinTx(catId){window._ftCat=catId;const c=FCAT().find(x=>x.id===catId);
   g('mFinTxTitle').firstChild.textContent='Log payment — '+(c?c.name:'')+' ';
   g('ftAmount').value='';g('ftNote').value='';
@@ -1492,8 +1492,8 @@ function openFinTx(catId){window._ftCat=catId;const c=FCAT().find(x=>x.id===catI
   g('mFinTx').classList.add('open');setTimeout(()=>g('ftAmount').focus(),50);}
 function saveFinTx(){const amt=+g('ftAmount').value;if(!amt){toast('Enter an amount.');return;}const date=g('ftDate').value||today();const n=now();
   fintx.push({id:uid(),cat_id:window._ftCat,date,month:monthKey(date),amount:amt,note:g('ftNote').value.trim(),created_at:n,updated_at:n});
-  closeM();persist();renderView();toast('Payment logged.');}
-async function finDelTx(id){const t=fintx.find(x=>x.id===id);if(t&&await askConfirm('Delete this payment?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();renderView();}}
+  closeM();persist();reRender();toast('Payment logged.');}
+async function finDelTx(id){const t=fintx.find(x=>x.id===id);if(t&&await askConfirm('Delete this payment?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();}}
 
 /* ═══ PERSONAL — INVESTMENTS (monthly value tracking) ═══ */
 const INV_KINDS=['Equity','Debt / Fixed income','Gold','Real estate','Cash / FD','Other'];
@@ -1506,7 +1506,7 @@ function invValueAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v
 function invTotalAsOf(ym){return IH().reduce((a,h)=>a+(invValueAsOf(h.id,ym)||0),0);}
 function invSetValue(holdId,ym,raw){const n=now();if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
   else{let r=invExact(holdId,ym);if(r){r.value=+raw;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,value:+raw,created_at:n,updated_at:n});}
-  persist();renderView();}
+  persist();reRender();}
 function invPctStr(delta,base){if(!base)return'';const p=delta/base*100;return' ('+(p>=0?'+':'')+p.toFixed(1)+'%)';}
 function invMoveHtml(delta,base){if(!delta)return'<span class="num" style="color:var(--t4)">no change</span>';const up=delta>0;return`<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(delta))}${invPctStr(delta,base)}</span>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
@@ -1541,8 +1541,8 @@ function openInvHold(id){editIH=id?invhold.find(x=>x.id===id):null;const h=editI
 function saveInvHold(){const name=g('ihName').value.trim();if(!name){toast('Name required.');return;}const n=now();
   const d={name,kind:g('ihKind').value,note:g('ihNote').value.trim(),updated_at:n};
   if(editIH)Object.assign(editIH,d);else invhold.push(Object.assign({id:uid(),created_at:n},d));
-  closeM();persist();renderView();toast('Investment saved.');}
-async function delInvHold(){if(editIH&&await askConfirm('Delete "'+editIH.name+'"? Its value history stays in the data.',{ok:'Delete',danger:true})){editIH.deleted=true;editIH.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
+  closeM();persist();reRender();toast('Investment saved.');}
+async function delInvHold(){if(editIH&&await askConfirm('Delete "'+editIH.name+'"? Its value history stays in the data.',{ok:'Delete',danger:true})){editIH.deleted=true;editIH.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
 async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
   const n=now();family.push({id:uid(),name:v,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
 let editFA=null;
