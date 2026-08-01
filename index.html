@@ -413,6 +413,18 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 #reauthbar{position:fixed;top:0;left:0;right:0;z-index:81;background:var(--red-l);border-bottom:1px solid var(--red);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap;color:var(--red)}
 #reauthbar.show{display:flex}
 
+/* ═══ personal finance rows (responsive) ═══ */
+.finrow{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bdr)}
+.finrow:last-child{border-bottom:0}
+.finrow .fr-bd{flex:1;min-width:0}
+.finrow .fr-ctl{display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex:0 0 auto}
+.finrow .fr-ctl input{width:104px;padding:4px 7px;font-size:12.5px;text-align:right;border:1px solid var(--bdr2);border-radius:var(--rs)}
+.finrow .fr-acts{display:flex;gap:3px}
+.fin-bank{padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.fin-bank .fb-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fin-bank .fb-row label{color:var(--t3)}
+.fin-bank input{width:150px;padding:5px 9px;text-align:right;font-size:13px;border:1px solid var(--bdr2);border-radius:var(--rs)}
+.fin-bank .fb-close{border-top:1px solid var(--bdr);padding-top:9px;margin-top:1px;font-weight:800;font-size:14px}
 @media(max-width:840px){
   input,select,textarea{font-size:16px}
   #gh{position:static;height:auto;min-height:0;flex-wrap:wrap;gap:6px 8px;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top,0px))}
@@ -427,6 +439,12 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   .gh-search{max-width:none}
   .gh-brand span{display:block}
   .dl{grid-template-columns:90px 1fr}
+  .finrow{flex-wrap:wrap}
+  .finrow .fr-ctl{width:100%;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+  .finrow .fr-ctl input{flex:1;width:auto;font-size:16px;padding:8px 10px}
+  .finrow .fr-acts{gap:6px}
+  .finrow .fr-acts .btn,.finrow .fr-acts .iconb{padding:8px 12px;font-size:14px}
+  .fin-bank input{font-size:16px;width:46%}
 }
 @media(pointer:coarse){
   .btn.xs{padding:6px 11px}
@@ -1334,11 +1352,11 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const bar=(p,a)=>{const pct=p>0?Math.min(100,Math.round(a/p*100)):(a>0?100:0);return `<div class="capbar ${p>0&&a>p?'over':''}" style="margin-top:5px"><div style="width:${pct}%"></div></div>`;};
   const dateStr=c=>{if(!c.day)return'';const dim=new Date(yy,mm,0).getDate();const d=Math.min(c.day,dim);return new Date(ym+'-'+String(d).padStart(2,'0')+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});};
   const row=c=>{const p=finPlanned(c,ym),a=finActual(c,ym),rem=p-a,ov=finPlanRow(c.id,ym),hasOv=ov&&ov.actual_override!=null,ds=dateStr(c);
-    return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c.name)}${c.group==='fixed'&&(c.freq||'monthly')!=='monthly'?` <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>`:''}${hasOv?' <span class="pill n" title="Actual entered directly">manual</span>':''}</div>
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)}${c.group==='fixed'&&(c.freq||'monthly')!=='monthly'?` <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>`:''}${hasOv?' <span class="pill n" title="Actual entered directly">manual</span>':''}</div>
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
-      <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
-        <input type="number" value="${p||''}" placeholder="plan" onchange="finSetPlan('${c.id}','${ym}',this.value)" style="width:94px;padding:3px 6px;font-size:12px;text-align:right">
-        <div style="display:flex;gap:2px"><button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
+      <div class="fr-ctl">
+        <input type="number" value="${p||''}" placeholder="plan ₹" onchange="finSetPlan('${c.id}','${ym}',this.value)">
+        <div class="fr-acts"><button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
       </div></div>`;};
   const addLbl={income:'income',fixed:'commitment',expense:'expense',savings:'savings'};
   const section=(title,list,gkey)=>`<div class="card"><div class="ch"><span>${title}</span><span class="n num">plan ${fmtMoney(sumP(list))} · actual ${fmtMoney(sumA(list))}</span></div>${list.map(row).join('')||`<div class="empty">Nothing here for ${finMonthLabel(ym)}.</div>`}<div class="addline"><button class="btn sm" onclick="openFinCat(null,'${gkey}')">+ Add ${addLbl[gkey]}</button></div></div>`;
@@ -1347,11 +1365,11 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
-      return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="cb" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12.5px">
-        <label style="display:flex;align-items:center;gap:6px">Opening <input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" style="width:120px;padding:3px 6px;font-size:12px;text-align:right" title="Editable — carries forward from last month's closing"></label>
-        <span class="num" style="color:var(--grn)">+ income ${fmtMoney(aInc)}</span>
-        <span class="num" style="color:var(--red)">− outflow ${fmtMoney(aOut+aSav)}</span>
-        <span style="margin-left:auto">= <b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'};font-size:14px">Closing ${fmtMoney(closing)}</b></span>
+      return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="fin-bank">
+        <div class="fb-row"><label>Opening balance</label><input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" title="Editable — carries forward from last month's closing"></div>
+        <div class="fb-row"><span>+ Income received</span><b class="num" style="color:var(--grn)">${fmtMoney(aInc)}</b></div>
+        <div class="fb-row"><span>− Outflow (paid)</span><b class="num" style="color:var(--red)">${fmtMoney(aOut+aSav)}</b></div>
+        <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
     (tx.length?`<div class="card"><div class="ch"><span>Payments logged — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num">${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('')}</div></div>`:'');}
@@ -1406,11 +1424,11 @@ function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invM
   const isCur=ym===monthKey(td);
   const total=invTotalAsOf(ym),prevTotal=invTotalAsOf(pm),delta=total-prevTotal;
   const row=h=>{const cur=invValueAsOf(h.id,ym),prev=invValueAsOf(h.id,pm),d=(cur||0)-(prev||0),ex=invExact(h.id,ym);
-    return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(h.name)}${h.kind?` <span class="pill n">${esc(h.kind)}</span>`:''}${cur!=null&&!ex?' <span class="pill n" title="Carried from an earlier month — update to log this month">carried</span>':''}</div>
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(h.name)}${h.kind?` <span class="pill n">${esc(h.kind)}</span>`:''}${cur!=null&&!ex?' <span class="pill n" title="Carried from an earlier month — update to log this month">carried</span>':''}</div>
       <div class="meta">${cur==null?'<span style="color:var(--t4)">not set yet</span>':invMoveHtml(d,prev||0)+' vs '+finMonthLabel(pm)}</div></div>
-      <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
-        <input type="number" value="${cur!=null?cur:''}" placeholder="value" onchange="invSetValue('${h.id}','${ym}',this.value)" style="width:120px;padding:3px 6px;font-size:12px;text-align:right">
-        <button class="iconb" title="Edit holding" onclick="openInvHold('${h.id}')">⚙</button>
+      <div class="fr-ctl">
+        <input type="number" value="${cur!=null?cur:''}" placeholder="value ₹" onchange="invSetValue('${h.id}','${ym}',this.value)">
+        <div class="fr-acts"><button class="iconb" title="Edit holding" onclick="openInvHold('${h.id}')">⚙</button></div>
       </div></div>`;};
   // history: months that have any value entry, up to selected month, last 12
   const months=[...new Set(IV().filter(v=>v.month<=ym).map(v=>v.month))].sort().slice(-12);
