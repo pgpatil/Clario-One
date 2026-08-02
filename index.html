@@ -89,6 +89,8 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .ph-l .sub{font-size:12.5px;color:var(--t3);margin-top:1px}
 .ph-r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .btn{background:var(--blue);color:#fff;font-weight:600;padding:7px 14px;border-radius:var(--rs)}
+.btn:disabled,.iconb:disabled{opacity:.45;cursor:default;pointer-events:none}
+.btn.done{background:var(--grn-l);color:var(--grn-d);border:1px solid var(--grn-l)}
 .btn:hover{background:var(--blue-d)}
 .btn.gh2{background:#fff;color:var(--blue);border:1px solid var(--bdr2);font-weight:500}
 .btn.gh2:hover{background:var(--blue-l)}
@@ -1576,6 +1578,7 @@ function cardSetStatement(cardId,ym,val){cardUpsert(cardId,ym,{statement:+val||0
 function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});loanAutoPayForCard(cardId,ym);persist();reRender();}
 function cardPayFull(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const st=cardStatement(cardId,ym);
   if(st<=0){toast('Enter the statement amount first.');return;}
+  if(cardPaid(cardId,ym)>=st){toast('This bill is already settled.');return;}
   const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
   const pd=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.due_day||dim,dim)).padStart(2,'0');
   cardUpsert(cardId,ym,{paid:st,paid_date:pd});
@@ -1604,7 +1607,7 @@ function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>a.name.localeCompar
     return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${cardLabel(c)} ${full?'<span class="pill g">paid</span>':(pd>0?'<span class="pill n">part</span>':(st>0?'<span class="pill r">due</span>':''))}</div>
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 due ${ds}</span> · `:''}<span class="num">paid ${fmtMoney(pd)}</span>${st>0?` · <span class="num" style="${o>0?'color:var(--red);font-weight:700':'color:var(--grn)'}">${o>0?fmtMoney(o)+' outstanding':'cleared'}</span>`:''}</div></div>
       <div class="fr-ctl"><input type="number" value="${st||''}" placeholder="statement ₹" title="This month's total bill" onchange="cardSetStatement('${c.id}','${ym}',this.value)">
-      <div class="fr-acts"><button class="btn xs" title="Mark the full statement paid" onclick="cardPayFull('${c.id}','${ym}')">✓ pay full</button><button class="iconb" title="Enter amount paid" onclick="cardEditPaid('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit card" onclick="openFinCard('${c.id}')">⚙</button></div></div></div>`;}).join('')
+      <div class="fr-acts">${full?`<button class="btn xs done" disabled title="This month's bill is settled">✓ paid</button>`:`<button class="btn xs" ${st<=0?'disabled title="Enter the statement amount first"':'title="Mark the full statement paid"'} onclick="cardPayFull('${c.id}','${ym}')">✓ pay full</button>`}<button class="iconb" title="Enter amount paid" onclick="cardEditPaid('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit card" onclick="openFinCard('${c.id}')">⚙</button></div></div></div>`;}).join('')
     ||'<div class="empty">No cards yet. Add your credit cards to track each month\'s bill and payment.</div>';
   const totLine=cards.length?`<span class="n num">billed ${fmtMoney(billed)} · paid ${fmtMoney(paid)}${out>0?` · <span style="color:var(--red);font-weight:700">${fmtMoney(out)} due</span>`:''}</span>`:'';
   return `<div class="card"><div class="ch"><span>💳 Credit cards</span>${totLine}</div>${rows}<div class="addline"><button class="btn sm" onclick="openFinCard()">+ Add credit card</button></div></div>`;}
@@ -1719,7 +1722,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
       <div class="fr-ctl">
         <input type="number" value="${p||''}" placeholder="plan ₹" onchange="finSetPlan('${c.id}','${ym}',this.value)">
-        <div class="fr-acts">${c.group!=='income'?`<button class="btn xs" title="Log a payment of the planned amount (${fmtMoney(rem>0?rem:p)})" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`:''}<button class="btn gh2 xs" title="${c.group==='income'?'Log income received':'Log a payment'}" onclick="openFinTx('${c.id}')">${c.group==='income'?'＋ receive':'＋ pay'}</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
+        <div class="fr-acts">${c.group!=='income'?(p>0&&rem<=0?`<button class="btn xs done" disabled title="Planned amount already covered">✓ done</button>`:`<button class="btn xs" ${p<=0?'disabled title="Set a planned amount first"':`title="Log a payment of the planned amount (${fmtMoney(rem)})"`} onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`):''}<button class="btn gh2 xs" title="${c.group==='income'?'Log income received':'Log a payment'}" onclick="openFinTx('${c.id}')">${c.group==='income'?'＋ receive':'＋ pay'}</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
       </div></div>`;};
   const addLbl={income:'income',fixed:'commitment',expense:'expense',savings:'savings'};
   const section=(title,list,gkey)=>{const col=!!_finCollapse[gkey];
@@ -1990,10 +1993,11 @@ async function delLoan(){if(editLoan&&await askConfirm('Delete "'+editLoan.name+
 function loanSetOutstanding(id,val){const l=loans.find(x=>x.id===id);if(!l)return;l.outstanding=+val||0;l.updated_at=now();persist();reRender();}
 function loanPayEmi(id,ym){const l=LOAN().find(x=>x.id===id);if(!l)return;const emi=+l.emi||0;ym=ym||monthKey(today());
   if(emi<=0){toast('Set the EMI amount first.');return;}
+  if(l.last_paid_ym===ym){toast('This month\'s EMI is already recorded.');return;}  // don't pay the same month twice
   if(loanHasSchedule(l)&&loanRemaining(l,ym)<=0){toast('This loan is fully paid.');return;}
   if(!loanHasSchedule(l)&&loanOutstanding(l)<=0){toast('This loan is already cleared.');return;}
   const sp=loanNextSplit(l,ym);
-  if(loanRecordEmi(l,ym,false)){persist();reRender();
+  if(loanRecordEmi(l,ym,true)){persist();reRender();
     toast('EMI recorded — '+fmtMoney(sp.principal)+' off principal'+(sp.interest>0?', '+fmtMoney(sp.interest)+' interest':'')+'.');}}
 function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>loanOutstanding(b)-loanOutstanding(a));
   const totOut=loanTotalOutstanding(),totEmi=loanTotalEmi();const cym=monthKey(today());
@@ -2009,7 +2013,7 @@ function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>loanOutstanding(b)-lo
     const sub=(sched&&out>0)?`<div class="meta" style="color:var(--t4)">next EMI: ${fmtMoney(sp.principal)} principal + ${fmtMoney(sp.interest)} interest</div>`:'';
     return `<div class="finrow loanrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':paidThis?' <span class="pill g">paid '+MON_ABBR[+cym.slice(5,7)-1]+'</span>':''}</div>
       <div class="meta"><span class="num">${meta.join(' · ')}</span></div>${sub}</div>
-      <div class="fr-ctl"><div class="fr-acts">${cleared?'':`<button class="btn xs" title="Record one EMI toward this loan" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
+      <div class="fr-ctl"><div class="fr-acts">${cleared?'':paidThis?`<button class="btn xs done" disabled title="This month's EMI is already recorded">✓ paid</button><button class="btn gh2 xs" title="Undo this month's EMI" onclick="loanUnpay('${l.id}','${cym}')">↺</button>`:`<button class="btn xs" title="Record one EMI toward this loan" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
     ||'<div class="empty">No loans yet. Add home / car / personal loans to track EMIs and your total outstanding debt.</div>';
   return pagehead('PERSONAL','Investments','Loans & debt — EMIs and outstanding balances',invToggle())+
     `<div class="kpis"><div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(totOut)}</div><div class="num" style="font-size:10px;color:var(--t3)">${rows.length} loan${rows.length===1?'':'s'}</div></div>
