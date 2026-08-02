@@ -595,6 +595,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
     <div class="fld"><label>How often</label><select id="fcFreq" onchange="finCatFreqUI()"></select></div>
     <div class="fld" id="fcYearWrap" style="display:none"><label>Due month</label><select id="fcYearMonth"></select></div>
     <div class="fld" id="fcMonthsWrap" style="display:none"><label>Which months</label><div id="fcMonths" class="attlist"></div></div>
+    <div class="fld" id="fcLoanWrap"><label>Already tracked as a loan?</label><select id="fcLoan"></select>
+      <p class="note" style="margin-top:6px">Link this to a loan if it's the same real payment. The loan then owns the amount — this category stops being counted again in the month's expenses.</p></div>
   </div>
   <p class="note">Fixed commitments (EMI, fees, maintenance) are entered once and appear automatically in the months they're due. Planned amounts for other groups carry forward from the previous month and can be edited per month.</p>
   </div>
@@ -1089,6 +1091,43 @@ async function saveToFile(){if(!_fsDir)return;if(_fsSaving){_fsQ=true;return;}_f
     _fsLastM=await fMtime();syncUI('ok',_fsDir.name);
   }catch(e){syncUI('err');if(e.message!=='no pass')toast('Save failed: '+e.message);}
   finally{_fsSaving=false;if(_fsQ){_fsQ=false;saveToFile();}}}
+/* ═══ MONTHLY SNAPSHOTS ═══
+   db.json is a single last-write-wins file with no undo, so a bad merge or corrupt write
+   would take the whole history with it. Once per calendar month we drop a dated copy
+   (db-YYYY-MM.json) next to it and keep the most recent SNAP_KEEP. */
+const SNAP_KEY='cx_snap',SNAP_KEEP=12,SNAP_RE=/^db-(\d{4}-\d{2})\.json$/;
+function snapName(ym){return 'db-'+ym+'.json';}
+function snapDue(){const ym=monthKey(today());return localStorage.getItem(SNAP_KEY)!==ym?ym:null;}
+function snapMark(ym){try{localStorage.setItem(SNAP_KEY,ym);}catch(e){}}
+async function snapToFolder(ym,out){if(!_fsDir)return false;
+  const fh=await _fsDir.getFileHandle(snapName(ym),{create:true});const w=await fh.createWritable();await w.write(out);await w.close();
+  const olds=[];for await(const [nm,h] of _fsDir.entries()){const m=nm.match(SNAP_RE);if(m&&h.kind==='file')olds.push(nm);}
+  olds.sort();while(olds.length>SNAP_KEEP){const drop=olds.shift();try{await _fsDir.removeEntry(drop);}catch(e){}}
+  return true;}
+async function snapToGraph(ym,out){if(!gActive()||_gNeedsReauth)return false;
+  const t=await gToken();
+  const r=await fetch(GRAPH_DIR+'/'+snapName(ym)+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:out});
+  if(!r.ok)throw new Error('snapshot '+r.status);
+  try{const lr=await fetch(GRAPH_LIST,{headers:{Authorization:'Bearer '+t}});
+    if(lr.ok){const items=((await lr.json()).value||[]).map(x=>x.name).filter(nm=>SNAP_RE.test(nm)).sort();
+      while(items.length>SNAP_KEEP){const drop=items.shift();
+        await fetch(GRAPH_DIR+'/'+drop,{method:'DELETE',headers:{Authorization:'Bearer '+t}}).catch(()=>{});}}
+  }catch(e){}
+  return true;}
+async function snapNow(){if(!_fsDir&&!gActive()){toast('Link a folder or sign in to OneDrive first.');return;}
+  const ym=monthKey(today());
+  try{const out=await serializeDb();let ok=false;
+    if(_fsDir){try{ok=await snapToFolder(ym,out)||ok;}catch(e){}}
+    if(gActive()&&!_gNeedsReauth){try{ok=await snapToGraph(ym,out)||ok;}catch(e){}}
+    if(ok){snapMark(ym);reRender();toast('Snapshot saved — '+snapName(ym));}else toast('Snapshot failed.');
+  }catch(e){toast('Snapshot failed: '+(e.message||e));}}
+async function snapMaybe(){const ym=snapDue();if(!ym)return;
+  if(!_fsDir&&!gActive())return;                 // nowhere durable to put it yet
+  try{const out=await serializeDb();let ok=false;
+    if(_fsDir){try{ok=await snapToFolder(ym,out)||ok;}catch(e){}}
+    if(gActive()&&!_gNeedsReauth){try{ok=await snapToGraph(ym,out)||ok;}catch(e){}}
+    if(ok)snapMark(ym);
+  }catch(e){}}
 async function pullDisk(silent){if(!_fsDir)return;try{const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=f.lastModified;localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent)toast('Pulled latest.');renderView();}catch(e){if(e.name!=='NotFoundError'&&!silent)toast('Pull failed: '+e.message);}}
 async function syncNow(){if(!_fsDir){toast('No folder linked.');return;}await pullDisk(true);await saveToFile();toast('Synced ⇅');}
 async function refreshApp(){const btn=g('ghRefresh');if(btn){btn.classList.remove('spin');void btn.offsetWidth;btn.classList.add('spin');}
@@ -1298,6 +1337,8 @@ function drawQuad(cv,items){const c=cv.getContext('2d');const W=cv.width=cv.clie
     c.font='600 16px Inter';c.fillStyle='#181818';c.textAlign='left';c.fillText(String(o.title).slice(0,16),x+14,y+5);c.font='700 18px Inter';});}
 /* ═══ ONEDRIVE ACCOUNT SYNC (Microsoft Graph) ═══ */
 const GRAPH_FILE='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario/db.json';
+const GRAPH_DIR='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario';
+const GRAPH_LIST='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario:/children?$select=name&$top=200';
 var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false,_gNeedsReauth=false,_gDirty=false,_gEtag='',_gRetryT=null,_gRetryN=0;
 var _gCfg=null;try{_gCfg=JSON.parse(localStorage.getItem('cx_graph')||'null');}catch(e){}
 function gActive(){return!!(_msal&&_gAcct);}
@@ -1449,6 +1490,30 @@ function finMonthNum(ym){return +ym.slice(5,7);}
 function finGroupLbl(g){return (FIN_GROUPS.find(x=>x[0]===g)||[])[1]||g;}
 function finFreqLbl(f){return (FIN_FREQ.find(x=>x[0]===f)||[])[1]||f;}
 function finDueIn(c,ym){if(c.group!=='fixed')return true;return finMonthsFor(c).includes(finMonthNum(ym));}
+/* A fixed category linked to a live loan is a duplicate of that loan's EMI: the loan owns the
+   amount (bank EMIs post to outflow, card EMIs sit inside the card statement), so the category
+   must not be counted again. */
+function finLinkedLoan(c){return c&&c.loan_id?LOAN().find(l=>l.id===c.loan_id):null;}
+function finIsDup(c){return !!finLinkedLoan(c);}
+/* Heuristic: a fixed category that looks like an existing loan's EMI but isn't linked yet.
+   Only suggests — never auto-links — because the match is by name/amount, not identity. */
+function finDupSuspects(){const ls=LOAN();if(!ls.length)return [];
+  const norm=s=>String(s||'').toLowerCase().replace(/\bemi\b|\bloan\b|[^a-z0-9]/g,'');
+  return FCAT().filter(c=>c.group==='fixed'&&!c.loan_id&&!c.dup_ok).map(c=>{
+    const cn=norm(c.name);if(!cn)return null;
+    const hit=ls.find(l=>{const ln=norm(l.name);
+      const nameMatch=ln&&cn&&(ln.includes(cn)||cn.includes(ln));
+      const amtMatch=(+c.amount>0)&&(+l.emi>0)&&Math.abs(+c.amount-(+l.emi))<=1;
+      return nameMatch||amtMatch;});
+    return hit?{cat:c,loan:hit}:null;}).filter(Boolean);}
+function finDupBanner(){const s=finDupSuspects();if(!s.length)return '';
+  return `<div class="card" style="border-left:3px solid var(--amb)"><div class="cb" style="padding:12px 14px">
+    <div style="font-weight:700;font-size:12.5px;margin-bottom:4px">⚠ Possible double-counting</div>
+    <div style="font-size:12.5px;color:var(--t2)">These commitments look like loans you already track, so the same payment may be counted twice this month:</div>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${s.map(x=>`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px"><b>${esc(x.cat.name)}</b> ↔ loan <b>${esc(x.loan.name)}</b><button class="btn xs" onclick="finLinkDup('${x.cat.id}','${x.loan.id}')">Count once (link)</button><button class="btn gh2 xs" onclick="finDismissDup('${x.cat.id}')">Keep separate</button></div>`).join('')}</div>
+  </div></div>`;}
+function finLinkDup(catId,loanId){const c=fincats.find(x=>x.id===catId);if(!c)return;c.loan_id=loanId;c.updated_at=now();persist();reRender();toast('Linked — counted once, on the loan.');}
+function finDismissDup(catId){const c=fincats.find(x=>x.id===catId);if(!c)return;c.dup_ok=true;c.updated_at=now();persist();reRender();}
 function finPlanRow(catId,ym){return finplan.find(p=>!p.deleted&&p.cat_id===catId&&p.month===ym);}
 function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
 function finActual(c,ym){const ov=finPlanRow(c.id,ym);if(ov&&ov.actual_override!=null)return +ov.actual_override||0;return FTX().filter(t=>t.cat_id===c.id&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);}
@@ -1468,7 +1533,7 @@ function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:
 function ymAdd(ym,n){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);}
 function finBalRow(ym){return finbal.find(b=>!b.deleted&&b.month===ym);}
 function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
-function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym);}
+function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym);}
 function finOpening(ym){const r=finBalRow(ym);if(r)return +r.opening||0;
   const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>a.month.localeCompare(b.month));
   if(!priors.length)return 0;
@@ -1542,9 +1607,9 @@ async function cardEditPaid(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(
   const v=await askText('Amount paid on '+c.name+' — '+finMonthLabel(ym)+'.',{title:'Amount paid',type:'number',value:cur?String(cur):'',ok:'Set'});
   if(v===null)return;cardSetPaid(cardId,ym,v.trim()===''?0:+v);}
 function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((a,b)=>a.name.localeCompare(b.name));
-  const annual=list.reduce((a,c)=>a+finAnnualTotal(c),0);
-  const rows=list.map(c=>`<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span></div>
-    <div class="meta">📅 ${esc(finDueMonthsLabel(c))} · <span class="num">annual ${fmtMoney(finAnnualTotal(c))}</span></div></div>
+  const annual=list.reduce((a,c)=>a+(finIsDup(c)?0:finAnnualTotal(c)),0);
+  const rows=list.map(c=>`<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>${finIsDup(c)?' <span class="pill n" title="Counted on the linked loan">tracked as loan</span>':''}</div>
+    <div class="meta">📅 ${esc(finDueMonthsLabel(c))} · <span class="num">annual ${finIsDup(c)?'— counted on loan':fmtMoney(finAnnualTotal(c))}</span></div></div>
     <div class="fr-ctl"><input type="number" value="${c.amount||''}" placeholder="amount ₹" title="Amount per payment" onchange="finSetCommitAmount('${c.id}',this.value)">
     <div class="fr-acts"><button class="iconb" title="Edit schedule / name" onclick="openFinCat('${c.id}')">⚙</button></div></div></div>`).join('')
     ||'<div class="empty">No fixed commitments yet. Add EMIs, fees, LIC & insurance premiums — each with its own frequency and amount.</div>';
@@ -1561,7 +1626,8 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
   const active=cats.filter(c=>finDueIn(c,ym));
   const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>((a.day||99)-(b.day||99))||a.name.localeCompare(b.name));
-  const sumP=l=>l.reduce((a,c)=>a+finPlanned(c,ym),0),sumA=l=>l.reduce((a,c)=>a+finActual(c,ym),0);
+  // Loan-linked categories are shown for context but never counted (the loan owns the amount).
+  const sumP=l=>l.reduce((a,c)=>a+(finIsDup(c)?0:finPlanned(c,ym)),0),sumA=l=>l.reduce((a,c)=>a+(finIsDup(c)?0:finActual(c,ym)),0);
   const inc=byG('income'),fix=byG('fixed'),exp=byG('expense'),sav=byG('savings');
   const pInc=sumP(inc),aInc=sumA(inc),pOut=sumP(fix)+sumP(exp),aOutCat=sumA(fix)+sumA(exp),pSav=sumP(sav),aSav=sumA(sav);
   const cardPd=cardPaidTotal(ym),loanPd=loanBankPaidTotal(ym),aOut=aOutCat+cardPd+loanPd;
@@ -1571,6 +1637,10 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const bar=(p,a)=>{const pct=p>0?Math.min(100,Math.round(a/p*100)):(a>0?100:0);return `<div class="capbar ${p>0&&a>p?'over':''}" style="margin-top:5px"><div style="width:${pct}%"></div></div>`;};
   const dateStr=c=>{if(!c.day)return'';const dim=new Date(yy,mm,0).getDate();const d=Math.min(c.day,dim);return new Date(ym+'-'+String(d).padStart(2,'0')+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});};
   const row=c=>{const p=finPlanned(c,ym),a=finActual(c,ym),rem=p-a,ov=finPlanRow(c.id,ym),hasOv=ov&&ov.actual_override!=null,ds=dateStr(c);
+    const dupLoan=finLinkedLoan(c);
+    if(dupLoan)return `<div class="finrow loanrow" style="opacity:.75"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n" title="Counted once, on the loan">tracked as loan</span></div>
+      <div class="meta">Counted under <b>${esc(dupLoan.name)}</b> (${dupLoan.pay_method==='cc'?'credit card':'bank'} EMI) — not added again here.</div></div>
+      <div class="fr-ctl"><div class="fr-acts"><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div></div></div>`;
     return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)}${c.group==='fixed'&&(c.freq||'monthly')!=='monthly'?` <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>`:''}${hasOv?' <span class="pill n" title="Actual entered directly">manual</span>':''}</div>
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
       <div class="fr-ctl">
@@ -1584,7 +1654,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
-    vFinCardsSection(ym)+vFinLoansSection(ym)+
+    finDupBanner()+vFinCardsSection(ym)+vFinLoansSection(ym)+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
       return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="fin-bank">
         <div class="fb-row"><label>Opening balance</label><input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" title="Editable — carries forward from last month's closing"></div>
@@ -1606,8 +1676,10 @@ function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;co
   g('fcYearMonth').innerHTML=MON_ABBR.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
   g('fcYearMonth').value=(c&&c.freq==='yearly'&&(c.months||[]).length)?c.months[0]:( (new Date().getMonth()+1) );
   const sel=new Set(c?.months||[]);g('fcMonths').innerHTML=MON_ABBR.map((m,i)=>`<span class="attchip ${sel.has(i+1)?'on':''}" data-m="${i+1}" onclick="this.classList.toggle('on')">${m}</span>`).join('');
+  g('fcLoan').innerHTML='<option value="">— no, count it here —</option>'+LOAN().map(l=>`<option value="${l.id}">${esc(l.name)}${l.lender?' · '+esc(l.lender):''}</option>`).join('');
+  g('fcLoan').value=c?.loan_id||'';
   g('fcDel').style.display=c?'':'none';finCatGroupUI();g('mFinCat').classList.add('open');setTimeout(()=>g('fcName').focus(),50);}
-function finCatGroupUI(){g('fcFixedWrap').style.display=g('fcGroup').value==='fixed'?'':'none';finCatFreqUI();}
+function finCatGroupUI(){g('fcFixedWrap').style.display=g('fcGroup').value==='fixed'?'':'none';g('fcLoanWrap').style.display=(g('fcGroup').value==='fixed'&&LOAN().length)?'':'none';finCatFreqUI();}
 function finCatFreqUI(){const fixed=g('fcGroup').value==='fixed',f=g('fcFreq').value;g('fcMonthsWrap').style.display=(fixed&&f==='custom')?'':'none';g('fcYearWrap').style.display=(fixed&&f==='yearly')?'':'none';}
 function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name required.');return;}const n=now();
   const group=g('fcGroup').value;const freq=group==='fixed'?g('fcFreq').value:'';
@@ -1616,7 +1688,7 @@ function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name 
   else if(group==='fixed'&&freq==='yearly')months=[+g('fcYearMonth').value];
   if(group==='fixed'&&freq==='custom'&&!months.length){toast('Pick at least one month.');return;}
   const dayRaw=parseInt(g('fcDay').value,10);const day=(dayRaw>=1&&dayRaw<=31)?dayRaw:null;
-  const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,updated_at:n};
+  const d={name,group,amount:+g('fcAmount').value||0,freq,months,day,loan_id:group==='fixed'?(g('fcLoan').value||''):'',updated_at:n};
   if(editFC)Object.assign(editFC,d);else fincats.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();reRender();toast('Category saved.');}
 async function delFinCat(){if(editFC&&await askConfirm('Delete "'+editFC.name+'"? Logged payments stay in history.',{ok:'Delete',danger:true})){editFC.deleted=true;editFC.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
@@ -1652,8 +1724,23 @@ function invSetPrice(holdId,ym,raw){const h=IH().find(x=>x.id===holdId);if(!h)re
   if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
   else{const price=+raw,value=qty*price;let r=invExact(holdId,ym);if(r){r.price=price;r.qty=qty;r.value=value;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,price,qty,value,created_at:n,updated_at:n});}
   persist();reRender();}
+/* Money you PUT IN during a month. Without this, a fresh SIP looks like a gain:
+   value went up, but you added it — you didn't earn it. Gain = Δvalue − added. */
+function invAdded(holdId,ym){const r=invExact(holdId,ym);return r?(+r.added||0):0;}
+function invAddedTotal(ym){return IH().reduce((a,h)=>a+invAdded(h.id,ym),0);}
+function invSetAdded(holdId,ym,raw){const n=now();const v=+raw||0;let r=invExact(holdId,ym);
+  if(r){r.added=v;r.updated_at=n;}
+  else{const carried=invValueAsOf(holdId,ym);invval.push({id:uid(),hold_id:holdId,month:ym,value:carried!=null?carried:0,added:v,created_at:n,updated_at:n});}
+  persist();reRender();}
 function invPctStr(delta,base){if(!base)return'';const p=delta/base*100;return' ('+(p>=0?'+':'')+p.toFixed(1)+'%)';}
 function invMoveHtml(delta,base){if(!delta)return'<span class="num" style="color:var(--t4)">no change</span>';const up=delta>0;return`<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(delta))}${invPctStr(delta,base)}</span>`;}
+/* Gain excludes contributions; % is measured against (opening + added), the money actually at work. */
+function invGainHtml(delta,added,base,first){
+  // No prior month to compare against: the whole value is an opening balance, not a gain.
+  if(first)return '<span class="num" style="color:var(--t4)">opening balance</span>';
+  const gain=delta-added;const denom=(base||0)+(added||0);
+  if(!gain)return '<span class="num" style="color:var(--t4)">no gain</span>';const up=gain>0;
+  return `<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(gain))}${denom?invPctStr(gain,denom):''}</span>`;}
 function invToggle(){const t=(v,l)=>`<button class="${invView===v?'on':''}" onclick="invView='${v}';renderView()">${l}</button>`;return `<div class="vtog">${t('overview','Net worth')}${t('holdings','Holdings')}${t('pf','PF accounts')}${t('loans','Loans')}</div>`;}
 function pfCorpus(){return PFA().reduce((a,r)=>a+pfRowTotal(r),0);}
 function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus()-loanTotalOutstanding();}
@@ -1674,7 +1761,7 @@ function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMont
       <div style="text-align:right;min-width:96px;flex:0 0 auto"><b class="num">${fmtMoney(v)}</b><div class="num" style="font-size:11px;color:var(--t3)">${pct}%</div></div></div>`;}).join('')||'<div class="empty">No assets recorded for this month yet.</div>';
   return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+nav+
     `<div class="kpis"><div class="kpi blue"><div class="kl">Net worth</div><div class="kv num" style="font-size:22px">${fmtMoney(net)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(assets)} assets${debt>0?` − ${fmtMoney(debt)} debt`:''}</div></div>
-      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet>0?((delta>=0?'+':'−')+(Math.abs(delta)/prevNet*100).toFixed(1)+'%'):'—'}</div></div>${debt>0?`<div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(debt)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(loanTotalEmi())}/mo EMI</div></div>`:''}</div>`+
+      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet>0?((delta>=0?'+':'−')+(Math.abs(delta)/prevNet*100).toFixed(1)+'%'):'—'}${invAddedTotal(ym)?' · incl. '+fmtMoney(invAddedTotal(ym))+' added':''}</div></div>${debt>0?`<div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(debt)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(loanTotalEmi())}/mo EMI</div></div>`:''}</div>`+
     `<div class="card"><div class="ch"><span>Asset allocation</span><span class="n num">${alloc.length}</span></div>${rows}</div>
     <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your PF corpus, minus total outstanding debt. Update figures on the Holdings, PF accounts and Loans tabs.</p>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
@@ -1690,23 +1777,33 @@ function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invM
     const wt=invIsWeight(h),ul=invUnitLbl(h.unit),price=wt?invPriceAsOf(h.id,ym):null,qty=+h.qty||0;
     const qtyChip=wt?` <span class="num" style="color:var(--t3)">${qty}${ul}</span>`:'';
     const priceMeta=wt&&price!=null?` · <span class="num" style="color:var(--t3)">@ ${fmtMoney(price)}/${ul}</span>`:'';
+    const add=invAdded(h.id,ym);
+    const moveLine=cur==null?'<span style="color:var(--t4)">not set yet</span>'
+      :(wt?`<span class="num">value ${fmtMoney(cur)}</span> · `:'')
+       +(add?`<span class="num" style="color:var(--t3)">+${fmtMoney(add)} added</span> · `:'')
+       +invGainHtml(d,add,prev||0,prev==null)+(prev==null?'':' gain vs '+finMonthLabel(pm))+priceMeta;
     return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(h.name)}${h.kind?` <span class="pill n">${esc(h.kind)}</span>`:''}${qtyChip}${cur!=null&&!ex?' <span class="pill n" title="Carried from an earlier month — update to log this month">carried</span>':''}</div>
-      <div class="meta">${cur==null?'<span style="color:var(--t4)">not set yet</span>':(wt?`<span class="num">value ${fmtMoney(cur)}</span> · `:'')+invMoveHtml(d,prev||0)+' vs '+finMonthLabel(pm)+priceMeta}</div></div>
+      <div class="meta">${moveLine}</div></div>
       <div class="fr-ctl">
         ${wt?`<input type="number" step="any" value="${price!=null?price:''}" placeholder="₹/${ul}" title="Market price per ${ul} — value = ${qty}${ul} × price" onchange="invSetPrice('${h.id}','${ym}',this.value)">`
             :`<input type="number" value="${cur!=null?cur:''}" placeholder="value ₹" onchange="invSetValue('${h.id}','${ym}',this.value)">`}
+        <input type="number" value="${add||''}" placeholder="+ invested ₹" title="Money you added this month (SIP/purchase) — excluded from gain" onchange="invSetAdded('${h.id}','${ym}',this.value)">
         <div class="fr-acts"><button class="iconb" title="Edit holding" onclick="openInvHold('${h.id}')">⚙</button></div>
       </div></div>`;};
   // history: months that have any value entry, up to selected month, last 12
   const months=[...new Set(IV().filter(v=>v.month<=ym).map(v=>v.month))].sort().slice(-12);
-  const histRows=months.slice().reverse().map(mo=>{const t=invTotalAsOf(mo),pv=invTotalAsOf(invPrevMonth(mo)),dd=t-pv;
-    return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${finMonthLabel(mo)}</div></div><div style="display:flex;gap:12px;align-items:center"><b class="num">${fmtMoney(t)}</b><span style="min-width:130px;text-align:right">${invMoveHtml(dd,pv)}</span></div></div>`;}).join('');
+  const firstMo=months[0];
+  const histRows=months.slice().reverse().map(mo=>{const t=invTotalAsOf(mo),pv=invTotalAsOf(invPrevMonth(mo)),dd=t-pv,ad=invAddedTotal(mo);
+    return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${finMonthLabel(mo)}</div>${ad?`<div class="meta"><span class="num">+${fmtMoney(ad)} invested</span></div>`:''}</div><div style="display:flex;gap:12px;align-items:center"><b class="num">${fmtMoney(t)}</b><span style="min-width:130px;text-align:right">${invGainHtml(dd,ad,pv,mo===firstMo&&!pv)}</span></div></div>`;}).join('');
   return pagehead('PERSONAL','Investments',finMonthLabel(ym),invToggle()+`<button class="btn sm" onclick="openInvHold()">+ Investment</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="invMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="invMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="invMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
-    `<div class="kpis"><div class="kpi blue"><div class="kl">Portfolio value</div><div class="kv num" style="font-size:19px">${fmtMoney(total)}</div></div>
-      <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevTotal?((delta>=0?'+':'')+ (delta/prevTotal*100).toFixed(1)+'%'):'—'}</div></div></div>`+
-    `<div class="card"><div class="ch"><span>Holdings — update this month's value</span><span class="n num">${holds.length}</span></div>${holds.map(row).join('')}<div class="addline"><button class="btn sm" onclick="openInvHold()">+ Add investment</button></div></div>`+
-    (months.length?`<div class="card"><div class="ch"><span>History — total value &amp; movement</span><span class="n num">${months.length} mo</span></div><div class="scrolllist">${histRows}</div></div>`:'');}
+    (()=>{const added=invAddedTotal(ym),gain=delta-added,denom=prevTotal+added;
+      return `<div class="kpis"><div class="kpi blue"><div class="kl">Portfolio value</div><div class="kv num" style="font-size:19px">${fmtMoney(total)}</div>${added?`<div class="num" style="font-size:10px;color:var(--t3)">incl. ${fmtMoney(added)} added this month</div>`:''}</div>
+      <div class="kpi ${gain<0?'bad':'good'}"><div class="kl">Gain vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${gain>=0?'+':'−'}${fmtMoney(Math.abs(gain))}</div><div class="num" style="font-size:10px;color:var(--t3)">${denom?((gain>=0?'+':'')+(gain/denom*100).toFixed(1)+'%'):'—'}${added?' · excludes money added':''}</div></div>
+      ${added?`<div class="kpi"><div class="kl">Invested this month</div><div class="kv num" style="font-size:19px">${fmtMoney(added)}</div></div>`:''}</div>`;})()+
+    `<div class="card"><div class="ch"><span>Holdings — value &amp; money added</span><span class="n num">${holds.length}</span></div>${holds.map(row).join('')}<div class="addline"><button class="btn sm" onclick="openInvHold()">+ Add investment</button></div></div>`+
+    (months.length?`<div class="card"><div class="ch"><span>History — value, additions &amp; gain</span><span class="n num">${months.length} mo</span></div><div class="scrolllist">${histRows}</div></div>`:'')+
+    `<p class="note" style="padding:0 4px">Gain excludes money you added, so a SIP no longer looks like a profit. Enter each month's contribution in the "+ invested" box next to the holding.</p>`;}
 let editIH=null;
 function openInvHold(id){editIH=id?invhold.find(x=>x.id===id):null;const h=editIH;
   g('mInvHoldTitle').firstChild.textContent=(h?'Edit Investment':'New Investment')+' ';
@@ -3017,10 +3114,12 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
     <p class="note">A PIN gate on the Personal section (Money, Investments, personal tasks) so it isn't opened casually on an unlocked device. It re-locks on reload and after the app is in the background a few minutes; changing or removing it needs the current PIN. This is an access deterrent, not encryption — the data on this device is not encrypted at rest, so anyone with technical access to the browser storage can still read it. For real at-rest protection, keep a device passcode/disk encryption on and turn on db.json encryption above.</p></div>
   <div class="setcard"><h4>Backup & devices</h4>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div class="srow"><span>Monthly snapshot</span><b>${(()=>{const l=localStorage.getItem(SNAP_KEY);return l?'Last: '+finMonthLabel(l):((_fsDir||gActive())?'Due — runs shortly':'Needs folder or OneDrive');})()}</b></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       <button class="btn gh2 sm" onclick="exportJson()">Export db.json</button>
-      <button class="btn gh2 sm" onclick="g('jsonFile').click()">Import & merge</button></div>
-    <p class="note">Phones can't hold a folder link — export/import the same db.json via the OneDrive app there. Imports merge record-by-record; newer edits win.</p></div>
+      <button class="btn gh2 sm" onclick="g('jsonFile').click()">Import & merge</button>
+      <button class="btn gh2 sm" onclick="snapNow()">Snapshot now</button></div>
+    <p class="note">Once a month Clario keeps a dated copy (db-YYYY-MM.json) beside db.json — last ${SNAP_KEEP} are kept — so a bad merge or corrupt write can be rolled back. Phones can't hold a folder link — export/import the same db.json via the OneDrive app there. Imports merge record-by-record; newer edits win.</p></div>
   ${bulkCard()}
   </div><div>
   <div class="setcard"><h4>Departments</h4>
@@ -3704,7 +3803,8 @@ try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
   view=v;viewArg=a;}}catch(e){}
 applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
-setTimeout(()=>checkLocationConfirmation(),350);})();
+setTimeout(()=>checkLocationConfirmation(),350);
+setTimeout(()=>{try{snapMaybe();}catch(e){}},6000);})();
 </script>
 </body>
 </html>
