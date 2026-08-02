@@ -28,8 +28,8 @@
   --font:'Inter',system-ui,-apple-system,sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{font-family:var(--font);font-size:13px;line-height:1.5;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased}
+html{height:100%}
+body{min-height:100%;font-family:var(--font);font-size:13px;line-height:1.5;color:var(--t1);background:var(--bg);-webkit-font-smoothing:antialiased}
 button{font-family:var(--font);cursor:pointer;border:none;background:none;color:inherit;font-size:13px}
 input,select,textarea{font-family:var(--font);font-size:13px;color:var(--t1);background:#fff;border:1px solid var(--bdr2);border-radius:var(--rs);padding:7px 10px}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 2px rgba(15,114,194,.25)}
@@ -39,6 +39,11 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 
 /* ═══ global header ═══ */
 #gh{height:auto;min-height:52px;padding-top:calc(env(safe-area-inset-top,0px));background:#fff;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:14px;padding:0 16px;position:sticky;top:0;z-index:40}
+#ghRefresh.spin{animation:ghspin .6s linear}
+@keyframes ghspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+#toTop{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;width:42px;height:42px;border-radius:50%;background:var(--blue);color:#fff;font-size:20px;line-height:1;box-shadow:0 4px 14px rgba(24,24,24,.28);opacity:0;pointer-events:none;transition:opacity .18s;display:flex;align-items:center;justify-content:center}
+#toTop.show{opacity:.92;pointer-events:auto}
+#toTop:hover{opacity:1}
 .gh-brand{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap;line-height:1}
 .gh-logo{width:32px;height:32px;border-radius:8px;display:block;object-fit:cover}
 .gh-search{flex:1;max-width:560px;position:relative}
@@ -176,7 +181,7 @@ table.t td.r,table.t th.r{text-align:right}
 .kpi.blue{border-top-color:var(--blue)}.kpi.blue .kv{color:var(--blue-d)}
 
 /* ═══ tabs & filters ═══ */
-.tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--bdr);flex-wrap:wrap}
+.tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid var(--bdr);flex-wrap:wrap;position:sticky;top:calc(var(--ghH,52px) - 1px);background:var(--bg);z-index:30}
 .tab{padding:8px 15px;font-size:13px;font-weight:600;color:var(--t3);border-bottom:3px solid transparent;margin-bottom:-2px}
 .tab:hover{color:var(--t1)}
 .tab.on{color:var(--blue-d);border-bottom-color:var(--blue)}
@@ -186,6 +191,13 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .vtog{display:inline-flex;border:1px solid var(--bdr);border-radius:6px;overflow:hidden;margin-left:auto}
 .vtog button{padding:5px 11px;font-size:12px;background:#fff;color:var(--t3)}
 .vtog button.on{background:var(--blue);color:#fff}
+.lockwrap{display:flex;justify-content:center;padding:44px 16px}
+.lockcard{max-width:340px;width:100%;text-align:center;padding:30px 24px}
+.lockcard .lockicon{font-size:40px;line-height:1;margin-bottom:8px}
+.lockcard h2{font-size:19px;margin:2px 0 6px}
+.lockcard input{width:100%;text-align:center;font-size:22px;letter-spacing:6px;padding:11px;margin:12px 0 4px;border:1px solid var(--bdr2);border-radius:var(--r)}
+.lockcard .pinerr{color:var(--red);font-size:12px;min-height:16px;margin-bottom:10px}
+.lockcard .btn{width:100%}
 .acard{background:#fff;border:1px solid var(--bdr);border-radius:var(--r);padding:13px;cursor:pointer;box-shadow:var(--sh)}
 .acard:hover{border-color:var(--blue-b)}
 .acard .an{font-weight:700;font-size:14px;color:var(--blue-d)}
@@ -438,9 +450,9 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   .pftbl input{font-size:16px;width:88px;padding:7px 7px}
   .pftbl input.pf-co{width:120px}
   input,select,textarea{font-size:16px}
-  #gh{position:static;height:auto;min-height:0;flex-wrap:wrap;gap:6px 8px;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top,0px))}
+  #gh{position:sticky;top:0;z-index:41;height:auto;min-height:0;flex-wrap:wrap;gap:6px 8px;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top,0px))}
   .gh-search{order:3;flex-basis:100%;max-width:none}
-  #navbar{top:env(safe-area-inset-top,0px)}
+  #navbar{top:var(--ghH,44px)}
   .ovl{padding:20px 8px}
   .addline input,.addline select,.filters input,.filters select{font-size:16px}
   #main{padding:12px 10px}
@@ -483,6 +495,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="gh-search" id="ghSearchWrap"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
   <div class="gh-right">
     <div class="vtog" id="modeToggle"></div>
+    <button class="gh-sync" id="ghRefresh" onclick="refreshApp()" title="Refresh — pull the latest data and redraw">⟳</button>
     <button class="gh-sync" id="ghSyncBtn" onclick="nav('settings')" title="Sync: green = synced, blue = syncing, red = attention, grey = not connected. Tap for Settings."><span class="sdot" id="sdot"></span><span id="stxt">Local only</span></button>
     <div style="position:relative" id="ghNewWrap"><button class="btn sm" onclick="toggleNewMenu(event)">+ New ▾</button><div id="newmenu"></div></div>
     <button class="gh-sync" style="font-weight:800;font-size:14px" title="Help & FAQ" onclick="nav('help')">?</button>
@@ -843,12 +856,13 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 </div></div>
 
 <div class="toast" id="toast"></div>
+<button id="toTop" onclick="scrollToTop()" title="Back to top" aria-label="Back to top">↑</button>
 <input type="file" id="icsFile" accept=".ics" style="display:none">
 <input type="file" id="jsonFile" accept=".json" style="display:none">
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check';
+const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
 const g=id=>document.getElementById(id);
@@ -1006,6 +1020,34 @@ async function enableEnc(){const p1=await askText('Choose an encryption passphra
   _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(p1,_encMeta.salt);localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));persist();if(_fsDir)await saveToFile();toast('db.json is now AES-256 encrypted.');renderView();}
 async function disableEnc(){if(!await askConfirm('Turn off encryption? db.json will be written as plain text.',{title:'Disable encryption',ok:'Turn off',danger:true}))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
 
+/* ═══ PERSONAL SECTION PIN LOCK (access gate; see security note in Settings) ═══ */
+let _pinCfg=null;try{_pinCfg=JSON.parse(localStorage.getItem(PIN_KEY)||'null');}catch(e){}
+let _personalUnlocked=false,_pinAttempts=0,_pinLockUntil=0,_pinHiddenAt=0;
+function pinIsSet(){return !!(_pinCfg&&_pinCfg.hash);}
+async function pinHash(pin,saltB64){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:ub64(saltB64),iterations:200000,hash:'SHA-256'},km,256);return b64(new Uint8Array(bits));}
+async function pinVerify(pin){if(!pinIsSet())return false;try{return (await pinHash(pin,_pinCfg.salt))===_pinCfg.hash;}catch(e){return false;}}
+async function _pinCapture(){const p1=await askText('Enter a PIN (4–12 digits):',{title:'Personal PIN',type:'password',ok:'Next'});if(p1===null)return false;const pin=(p1||'').trim();
+  if(!/^\d{4,12}$/.test(pin)){toast('PIN must be 4–12 digits.');return false;}
+  const p2=await askText('Re-enter the PIN:',{title:'Confirm PIN',type:'password',ok:'Save'});if(p2===null)return false;if((p2||'').trim()!==pin){toast('PINs do not match.');return false;}
+  const salt=b64(crypto.getRandomValues(new Uint8Array(16)));const hash=await pinHash(pin,salt);_pinCfg={salt,hash};localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));_personalUnlocked=true;_pinAttempts=0;_pinLockUntil=0;return true;}
+async function setPin(){if(pinIsSet())return changePin();if(await _pinCapture()){toast('Personal PIN set.');renderView();}}
+async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture()){toast('PIN updated.');renderView();}}
+async function removePin(){if(!pinIsSet())return;const cur=await askText('Enter your current PIN to remove the lock:',{title:'Remove lock',type:'password',ok:'Remove'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}_pinCfg=null;localStorage.removeItem(PIN_KEY);_personalUnlocked=false;toast('Personal lock removed.');renderView();}
+function lockPersonal(){_personalUnlocked=false;renderView();}
+async function pinTry(){if(_pinLockUntil>Date.now())return;const el=g('pinInput');const pin=(el?el.value:'').trim();if(!pin)return;
+  if(await pinVerify(pin)){_personalUnlocked=true;_pinAttempts=0;_pinLockUntil=0;reRender();return;}
+  _pinAttempts++;if(_pinAttempts>=5)_pinLockUntil=Date.now()+30000;
+  const er=g('pinErr');if(er)er.textContent=_pinAttempts>=5?'Too many attempts — wait 30 seconds.':'Wrong PIN. Try again.';
+  const inp=g('pinInput');if(inp){inp.value='';inp.focus();}
+  if(_pinAttempts>=5)reRender();}
+function vPersonalLock(){const blocked=_pinLockUntil>Date.now();
+  return `<div class="lockwrap"><div class="card lockcard"><div class="lockicon">🔒</div><h2>Personal is locked</h2>
+    <p class="note" style="margin:0 0 4px">Enter your PIN to unlock the Personal section on this device.</p>
+    <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••" ${blocked?'disabled':''} onkeydown="if(event.key==='Enter')pinTry()">
+    <div id="pinErr" class="pinerr">${blocked?'Too many attempts — wait 30 seconds.':''}</div>
+    <button class="btn" ${blocked?'disabled':''} onclick="pinTry()">Unlock</button></div></div>`;}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){_pinHiddenAt=Date.now();}else if(_pinHiddenAt&&pinIsSet()&&Date.now()-_pinHiddenAt>180000){_personalUnlocked=false;if(appMode==='personal')reRender();}});
+
 /* ═══ ONEDRIVE SYNC ═══ */
 let _fsDir=null,_fsSaving=false,_fsQ=false,_fsTimer=null,_fsLastM=0,_fsWatch=null;
 const hasFS=()=>typeof window.showDirectoryPicker==='function';
@@ -1032,6 +1074,13 @@ async function saveToFile(){if(!_fsDir)return;if(_fsSaving){_fsQ=true;return;}_f
   finally{_fsSaving=false;if(_fsQ){_fsQ=false;saveToFile();}}}
 async function pullDisk(silent){if(!_fsDir)return;try{const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=f.lastModified;localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent)toast('Pulled latest.');renderView();}catch(e){if(e.name!=='NotFoundError'&&!silent)toast('Pull failed: '+e.message);}}
 async function syncNow(){if(!_fsDir){toast('No folder linked.');return;}await pullDisk(true);await saveToFile();toast('Synced ⇅');}
+async function refreshApp(){const btn=g('ghRefresh');if(btn){btn.classList.remove('spin');void btn.offsetWidth;btn.classList.add('spin');}
+  try{if(gActive()){await gPull(true);}else if(_fsDir){await pullDisk(true);}}catch(e){}
+  reRender();toast('Refreshed.');}
+function scrollToTop(){window.scrollTo({top:0,behavior:'smooth'});}
+function setGhHeight(){const h=g('gh');if(h)document.documentElement.style.setProperty('--ghH',h.offsetHeight+'px');}
+window.addEventListener('resize',setGhHeight);
+window.addEventListener('scroll',()=>{const b=g('toTop');if(b)b.classList.toggle('show',(window.pageYOffset||document.documentElement.scrollTop||0)>400);},{passive:true});
 async function checkDisk(){if(!_fsDir||_fsSaving)return;try{const m=await fMtime();if(m&&m>_fsLastM){const fh=await _fsDir.getFileHandle(DB_FILE);const f=await fh.getFile();mergeRemote(await parseDb(await f.text()));_fsLastM=m;localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();syncUI('ok',_fsDir.name+' · updated');}}catch(e){}}
 function startWatch(){stopWatch();_fsWatch=setInterval(checkDisk,20000);}
 function stopWatch(){clearInterval(_fsWatch);_fsWatch=null;}
@@ -1231,7 +1280,7 @@ function drawQuad(cv,items){const c=cv.getContext('2d');const W=cv.width=cv.clie
     c.font='600 16px Inter';c.fillStyle='#181818';c.textAlign='left';c.fillText(String(o.title).slice(0,16),x+14,y+5);c.font='700 18px Inter';});}
 /* ═══ ONEDRIVE ACCOUNT SYNC (Microsoft Graph) ═══ */
 const GRAPH_FILE='https://graph.microsoft.com/v1.0/me/drive/root:/Apps/Clario/db.json';
-var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false,_gNeedsReauth=false;
+var _msal=null,_gAcct=null,_gLastM='',_gTimer=null,_gST=null,_gSaving=false,_gQ=false,_gNeedsReauth=false,_gDirty=false,_gEtag='',_gRetryT=null,_gRetryN=0;
 var _gCfg=null;try{_gCfg=JSON.parse(localStorage.getItem('cx_graph')||'null');}catch(e){}
 function gActive(){return!!(_msal&&_gAcct);}
 function setReauth(on){_gNeedsReauth=on;const b=g('reauthbar');if(b)b.classList.toggle('show',on);}
@@ -1263,32 +1312,51 @@ function gAuthErr(e){return e&&(e.name==='InteractionRequiredAuthError'||/intera
 async function gToken(){try{return(await _msal.acquireTokenSilent({scopes:['Files.ReadWrite'],account:_gAcct})).accessToken;}
   catch(e){if(gAuthErr(e)){setReauth(true);syncUI('err','Sign-in expired — reconnect');}throw e;}}
 function gCheckAuthResp(r){if(r.status===401){setReauth(true);syncUI('err','Sign-in expired — reconnect');return true;}return false;}
-async function gMeta(){const t=await gToken();const r=await fetch(GRAPH_FILE+'?select=lastModifiedDateTime',{headers:{Authorization:'Bearer '+t}});
+async function gMeta(){const t=await gToken();const r=await fetch(GRAPH_FILE+'?select=lastModifiedDateTime,eTag',{headers:{Authorization:'Bearer '+t}});
   if(gCheckAuthResp(r))throw new Error('reauth');
-  if(r.status===404)return null;if(!r.ok)throw new Error('meta '+r.status);return(await r.json()).lastModifiedDateTime||'';}
-async function gPull(silent){if(!gActive()||_gNeedsReauth)return;
+  if(r.status===404)return null;if(!r.ok)throw new Error('meta '+r.status);
+  const j=await r.json();return {m:j.lastModifiedDateTime||'',etag:j.eTag||''};}
+async function gPull(silent){if(!gActive()||_gNeedsReauth)return false;
   try{const t=await gToken();const r=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t}});
-    if(gCheckAuthResp(r))return;
-    if(r.status===404){if(!silent)toast('No db.json in OneDrive yet — it will be created on first save.');return;}
+    if(gCheckAuthResp(r))return false;
+    if(r.status===404){if(!silent)toast('No db.json in OneDrive yet — it will be created on first save.');return false;}
     if(!r.ok)throw new Error('pull '+r.status);
-    mergeRemote(await parseDb(await r.text()));_gLastM=await gMeta()||'';
-    localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent){toast('Pulled from OneDrive.');}reRender();}
-  catch(e){if(_gNeedsReauth)return;if(!silent)toast('Pull failed: '+(e.message||e));}}
+    const et=r.headers.get('ETag');if(et)_gEtag=et;
+    mergeRemote(await parseDb(await r.text()));
+    const mt=await gMeta();if(mt){_gLastM=mt.m;if(mt.etag)_gEtag=mt.etag;}
+    localStorage.setItem(LS_KEY,JSON.stringify(getState()));if(!silent){toast('Pulled from OneDrive.');}reRender();return true;}
+  catch(e){if(_gNeedsReauth)return false;if(!silent)toast('Pull failed: '+(e.message||e));return false;}}
+function gRetry(sec){if(_gRetryT)return;const delay=sec?sec*1000:Math.min(60000,5000*Math.pow(2,_gRetryN));_gRetryN++;
+  _gRetryT=setTimeout(()=>{_gRetryT=null;if(_gDirty&&gActive()&&!_gNeedsReauth&&navigator.onLine!==false)gSave();},delay);}
+async function gPut(out){const t=await gToken();const h={Authorization:'Bearer '+t,'Content-Type':'application/json'};if(_gEtag)h['If-Match']=_gEtag;
+  return fetch(GRAPH_FILE+':/content',{method:'PUT',headers:h,body:out});}
 async function gSave(){if(!gActive()||_gNeedsReauth)return;if(_gSaving){_gQ=true;return;}_gSaving=true;syncUI('busy');
-  try{const m=await gMeta();
-    if(m&&_gLastM&&m>_gLastM){const t0=await gToken();const r0=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t0}});
-      if(gCheckAuthResp(r0))throw new Error('reauth');
-      if(r0.ok){mergeRemote(await parseDb(await r0.text()));localStorage.setItem(LS_KEY,JSON.stringify(getState()));reRender();}}
-    const out=await serializeDb();const t=await gToken();
-    const r=await fetch(GRAPH_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:out});
+  try{
+    // Pull + merge first if the remote copy is newer, so we never overwrite another device's changes.
+    const mt=await gMeta();
+    if(mt&&_gLastM&&mt.m>_gLastM){await gPull(true);}
+    else if(mt&&mt.etag)_gEtag=mt.etag;
+    let out=await serializeDb();let r=await gPut(out);
+    if(r.status===412){ // ETag conflict — a concurrent write landed; merge it in and retry once (force)
+      await gPull(true);out=await serializeDb();const t2=await gToken();
+      r=await fetch(GRAPH_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t2,'Content-Type':'application/json'},body:out});}
     if(gCheckAuthResp(r))throw new Error('reauth');
+    if(r.status===429||r.status===503){const ra=+(r.headers.get('Retry-After')||'0');throw Object.assign(new Error('throttled '+r.status),{retryAfter:ra||10});}
     if(!r.ok)throw new Error('save '+r.status);
-    _gLastM=await gMeta()||'';syncUI('ok','OneDrive · '+(_gAcct.username||''));}
-  catch(e){if(_gNeedsReauth)return;syncUI('err');if(e.message!=='no pass')toast('OneDrive save failed: '+(e.message||e));}
+    const j=await r.json().catch(()=>null);
+    if(j){if(j.lastModifiedDateTime)_gLastM=j.lastModifiedDateTime;if(j.eTag)_gEtag=j.eTag;}else{const mt2=await gMeta().catch(()=>null);if(mt2){_gLastM=mt2.m;if(mt2.etag)_gEtag=mt2.etag;}}
+    _gDirty=false;_gRetryN=0;syncUI('ok','OneDrive · '+(_gAcct.username||''));}
+  catch(e){if(_gNeedsReauth){return;}
+    if(e&&e.message==='no pass'){syncUI('err');}   // passphrase entry cancelled — not a transient error
+    else{_gDirty=true;syncUI('err','Sync pending — will retry');gRetry(e&&e.retryAfter);}}
   finally{_gSaving=false;if(_gQ){_gQ=false;if(!_gNeedsReauth)gSave();}}}
-function gSched(){clearTimeout(_gST);_gST=setTimeout(gSave,1200);}
-function gStart(){clearInterval(_gTimer);_gTimer=setInterval(async()=>{if(!gActive()||_gSaving||_gNeedsReauth)return;
-  try{const m=await gMeta();if(m&&m>_gLastM)await gPull(true);}catch(e){}},20000);}
+function gSched(){_gDirty=true;clearTimeout(_gST);_gST=setTimeout(gSave,1200);}
+function gStart(){clearInterval(_gTimer);_gTimer=setInterval(async()=>{if(!gActive()||_gNeedsReauth)return;
+  if(_gDirty&&!_gSaving){gSave();return;}
+  if(_gSaving)return;
+  try{const mt=await gMeta();if(mt&&mt.m>_gLastM)await gPull(true);}catch(e){}},20000);}
+window.addEventListener('online',()=>{if(gActive()&&_gDirty&&!_gNeedsReauth&&!_gSaving){if(_gRetryT){clearTimeout(_gRetryT);_gRetryT=null;}_gRetryN=0;gSave();}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&gActive()&&_gDirty&&!_gNeedsReauth&&!_gSaving)gSave();});
 async function gSyncNow(){if(!gActive()){toast('Sign in first.');return;}
   if(_gNeedsReauth){await gReconnect();return;}
   await gPull(true);await gSave();
@@ -1300,19 +1368,21 @@ function gCard(){const on=gActive();
   ${on?'':`<div style="margin-top:8px"><input id="gClient" placeholder="Azure application (client) ID" value="${esc(_gCfg?_gCfg.clientId:'')}" style="width:100%"></div>`}
   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
     ${_gNeedsReauth?`<button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:on?`<button class="btn gh2 sm" onclick="gSyncNow()">Sync now ⇅</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:`<button class="btn sm" onclick="gSignIn()">Sign in with Microsoft</button>`}</div>
-  <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are picked up every 20 seconds.'}</p></div>`;}
+  <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are pulled every 20 seconds. Saves pull-and-merge first and use an ETag check so two devices never overwrite each other; a failed save is kept pending and retried automatically (with backoff), on reconnect, and when the app is reopened.'}</p></div>`;}
 /* ═══ PERSONAL MODE — minimal task list, family owners, birthdays ═══ */
 function prow(t){const td=today();const over=t.status!=='done'&&t.due&&t.due<td;
   return`<div class="row ${t.status==='done'?'done':''}"><button class="chk ${t.status==='done'?'on':''}" onclick="togglePersonalTask('${t.id}')">${t.status==='done'?'✓':''}</button>
     <div class="bd"><div class="tt">${esc(t.title)}</div>
     <div class="meta">${t.due?`<span class="due ${over?'over':t.due===td?'today':''}">${fmtD(t.due)}</span>`:''}${t.owner&&t.owner!=='me'?`<span class="pill b">${esc(famName(t.owner))}</span>`:''}${t.repeat?`<span class="pill b" title="Repeats ${esc(t.repeat)}">↻ ${esc(t.repeat)}</span>`:''}${t.notes?`<span>· ${esc(t.notes.slice(0,55))}${t.notes.length>55?'…':''}</span>`:''}</div></div>
     <div class="rowacts"><button class="iconb" onclick="openPersonalTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="delPersonalTask('${t.id}')">✕</button></div></div>`;}
-function vPersonal(){const bdays=upcomingBirthdays();const soon=bdays.filter(b=>b.inDays<=7).length;
+function vPersonal(){if(pinIsSet()&&!_personalUnlocked)return vPersonalLock();
+  const bdays=upcomingBirthdays();const soon=bdays.filter(b=>b.inDays<=7).length;
   const tabs=`<div class="tabs">
     <button class="tab ${personalTab==='tasks'?'on':''}" onclick="personalTab='tasks';renderView()">Tasks</button>
     <button class="tab ${personalTab==='money'?'on':''}" onclick="personalTab='money';renderView()">Money</button>
     <button class="tab ${personalTab==='invest'?'on':''}" onclick="personalTab='invest';renderView()">Investments</button>
-    <button class="tab ${personalTab==='birthdays'?'on':''}" onclick="personalTab='birthdays';renderView()">Birthdays${soon?` <span class="num">(${soon})</span>`:''}</button></div>`;
+    <button class="tab ${personalTab==='birthdays'?'on':''}" onclick="personalTab='birthdays';renderView()">Birthdays${soon?` <span class="num">(${soon})</span>`:''}</button>
+    ${pinIsSet()?`<button class="tab" style="margin-left:auto" title="Lock the Personal section" onclick="lockPersonal()">🔒 Lock</button>`:''}</div>`;
   return tabs+(personalTab==='birthdays'?vPersonalBirthdays(bdays):personalTab==='money'?vPersonalMoney():personalTab==='invest'?vPersonalInvest():vPersonalTasks());}
 function vPersonalTasks(){
   const list=TP().sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
@@ -2855,6 +2925,10 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="srow"><span>Synced file</span><b>${enc?'AES-256 encrypted':'Plain text'}</b></div>
     <div style="margin-top:10px">${enc?'<button class="btn gh2 sm" onclick="disableEnc()">Turn off</button>':'<button class="btn sm" onclick="enableEnc()">Encrypt db.json</button>'}</div>
     <p class="note">${enc?'db.json in OneDrive is encrypted with your passphrase (PBKDF2 + AES-GCM). The local cache on each device is protected by your Windows/phone login.':'Anyone who can open db.json in OneDrive can read it. Turn encryption on if it carries customer or KAM material.'} Losing the passphrase means losing the synced file — there is no recovery.</p></div>
+  <div class="setcard"><h4>Personal section lock</h4>
+    <div class="srow"><span>PIN lock</span><b>${pinIsSet()?'On':'Off'}</b></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
+    <p class="note">A PIN gate on the Personal section (Money, Investments, personal tasks) so it isn't opened casually on an unlocked device. It re-locks on reload and after the app is in the background a few minutes; changing or removing it needs the current PIN. This is an access deterrent, not encryption — the data on this device is not encrypted at rest, so anyone with technical access to the browser storage can still read it. For real at-rest protection, keep a device passcode/disk encryption on and turn on db.json encryption above.</p></div>
   <div class="setcard"><h4>Backup & devices</h4>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn gh2 sm" onclick="exportJson()">Export db.json</button>
@@ -3490,7 +3564,8 @@ async function quickNew(kind,sel){const n=now();
     if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}
   if(kind==='region'){const v=((await askText('New region:',{title:'New region'}))||'').trim();if(!v)return;
     if(!regions.includes(v))regions.push(v);persist();fillRegion(sel||'cRegion',v);return;}}
-function wire(){const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
+function wire(){setGhHeight();const pinI=g('pinInput');if(pinI)setTimeout(()=>{try{pinI.focus();}catch(e){}},40);
+  const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   if(g('csvPick'))csvPickUI();
   if(g('faqQ')&&window._faqQ)faqSearch(window._faqQ);
   const ai=g('agInput');if(ai)ai.onkeydown=e=>{if(e.key==='Enter')ai.nextElementSibling.click();};
