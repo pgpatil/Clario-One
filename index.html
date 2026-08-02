@@ -656,10 +656,18 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="fld"><label>Lender</label><input id="lnLender" placeholder="optional — e.g. HDFC, SBI"></div>
   <div class="g2">
     <div class="fld"><label>Monthly EMI (₹)</label><input type="number" id="lnEmi" placeholder="0"></div>
-    <div class="fld"><label>Interest rate (% p.a.)</label><input type="number" id="lnRate" step="any" placeholder="optional — e.g. 8.5"></div>
+    <div class="fld"><label>Interest rate (% p.a.)</label><input type="number" id="lnRate" step="any" placeholder="e.g. 8.5"></div>
   </div>
-  <div class="fld"><label>Outstanding balance (₹)</label><input type="number" id="lnOut" placeholder="0"></div>
-  <p class="note">"Pay EMI" reduces the outstanding by the principal part of one EMI (interest = balance × rate ÷ 12). Without a rate it subtracts the full EMI. Total outstanding is deducted from your net worth.</p>
+  <div class="g2">
+    <div class="fld"><label>Start month</label><input type="month" id="lnStart"></div>
+    <div class="fld"><label>End month</label><input type="month" id="lnEnd"></div>
+  </div>
+  <div class="g2">
+    <div class="fld"><label>EMI paid from</label><select id="lnMethod" onchange="loanMethodUI()"><option value="bank">Bank account</option><option value="cc">Credit card</option></select></div>
+    <div class="fld" id="lnCardWrap" style="display:none"><label>Which card</label><select id="lnCard"></select></div>
+  </div>
+  <div class="fld" id="lnOutWrap"><label>Outstanding balance (₹)</label><input type="number" id="lnOut" placeholder="0"></div>
+  <p class="note">Set <b>EMI + rate + start/end month</b> and the outstanding principal & interest split are calculated from the amortization schedule automatically (leave the balance blank). <b>Bank</b> EMIs show up in the month's expenses and mark the loan paid when you pay them there; <b>credit card</b> EMIs are marked paid automatically once that card's bill is paid.</p>
   </div>
   <div class="macts"><button class="btn dg sm" id="lnDel" style="display:none" onclick="delLoan()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveLoan()">Save</button></div></div>
@@ -1455,7 +1463,7 @@ function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:
 function ymAdd(ym,n){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);}
 function finBalRow(ym){return finbal.find(b=>!b.deleted&&b.month===ym);}
 function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
-function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym);}
+function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym);}
 function finOpening(ym){const r=finBalRow(ym);if(r)return +r.opening||0;
   const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>a.month.localeCompare(b.month));
   if(!priors.length)return 0;
@@ -1490,12 +1498,14 @@ function cardPaid(cardId,ym){const r=cardRow(cardId,ym);return r?(+r.paid||0):0;
 function cardOutstanding(cardId,ym){return cardStatement(cardId,ym)-cardPaid(cardId,ym);}
 function cardUpsert(cardId,ym,patch){let r=cardRow(cardId,ym);const n=now();if(r)Object.assign(r,patch,{updated_at:n});else fincardtx.push(Object.assign({id:uid(),card_id:cardId,month:ym,statement:0,paid:0,created_at:n,updated_at:n},patch));}
 function cardSetStatement(cardId,ym,val){cardUpsert(cardId,ym,{statement:+val||0});persist();reRender();}
-function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});persist();reRender();}
+function cardSetPaid(cardId,ym,val){cardUpsert(cardId,ym,{paid:+val||0});loanAutoPayForCard(cardId,ym);persist();reRender();}
 function cardPayFull(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const st=cardStatement(cardId,ym);
   if(st<=0){toast('Enter the statement amount first.');return;}
   const dim=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
   const pd=(ym===monthKey(today()))?today():ym+'-'+String(Math.min(c.due_day||dim,dim)).padStart(2,'0');
-  cardUpsert(cardId,ym,{paid:st,paid_date:pd});persist();reRender();toast('Paid '+fmtMoney(st)+' — '+c.name+'.');}
+  cardUpsert(cardId,ym,{paid:st,paid_date:pd});
+  const emis=LOAN().filter(l=>l.pay_method==='cc'&&l.card_id===cardId&&loanDueIn(l,ym)&&l.last_paid_ym!==ym).length;
+  loanAutoPayForCard(cardId,ym);persist();reRender();toast('Paid '+fmtMoney(st)+' — '+c.name+(emis?'. '+emis+' EMI'+(emis>1?'s':'')+' marked paid.':'.'));}
 function cardBilledTotal(ym){return CARD().reduce((a,c)=>a+cardStatement(c.id,ym),0);}
 function cardPaidTotal(ym){return CARD().reduce((a,c)=>a+cardPaid(c.id,ym),0);}
 function cardOutstandingTotal(ym){return CARD().reduce((a,c)=>a+cardOutstanding(c.id,ym),0);}
@@ -1549,7 +1559,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const sumP=l=>l.reduce((a,c)=>a+finPlanned(c,ym),0),sumA=l=>l.reduce((a,c)=>a+finActual(c,ym),0);
   const inc=byG('income'),fix=byG('fixed'),exp=byG('expense'),sav=byG('savings');
   const pInc=sumP(inc),aInc=sumA(inc),pOut=sumP(fix)+sumP(exp),aOutCat=sumA(fix)+sumA(exp),pSav=sumP(sav),aSav=sumA(sav);
-  const cardPd=cardPaidTotal(ym),aOut=aOutCat+cardPd;
+  const cardPd=cardPaidTotal(ym),loanPd=loanBankPaidTotal(ym),aOut=aOutCat+cardPd+loanPd;
   const pSurp=pInc-pOut-pSav,aSurp=aInc-aOut-aSav;
   const [yy,mm]=ym.split('-').map(Number);const isCur=ym===monthKey(td);const dleft=isCur?new Date(yy,mm,0).getDate()-new Date().getDate():0;
   const kpi=(lbl,p,a,cls)=>`<div class="kpi ${cls||''}"><div class="kl">${lbl}</div><div class="kv num" style="font-size:18px">${fmtMoney(a)}</div><div class="num" style="font-size:10px;color:var(--t3)">plan ${fmtMoney(p)}</div></div>`;
@@ -1569,13 +1579,14 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
-    vFinCardsSection(ym)+
+    vFinCardsSection(ym)+vFinLoansSection(ym)+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
       return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="fin-bank">
         <div class="fb-row"><label>Opening balance</label><input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" title="Editable — carries forward from last month's closing"></div>
         <div class="fb-row"><span>+ Income received</span><b class="num" style="color:var(--grn)">${fmtMoney(aInc)}</b></div>
         <div class="fb-row"><span>− Expenses & commitments</span><b class="num" style="color:var(--red)">${fmtMoney(aOutCat+aSav)}</b></div>
         ${cardPd>0?`<div class="fb-row"><span>− Credit card payments</span><b class="num" style="color:var(--red)">${fmtMoney(cardPd)}</b></div>`:''}
+        ${loanPd>0?`<div class="fb-row"><span>− Loan EMIs (bank)</span><b class="num" style="color:var(--red)">${fmtMoney(loanPd)}</b></div>`:''}
         <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
@@ -1733,41 +1744,89 @@ function vInvPf(){const rows=PFA().slice().sort((a,b)=>(a.company||'').localeCom
       <p class="note" style="padding:0 4px">Each company's total is the sum of employee, employer and bonus contributions. Update the figures from your PF passbook whenever you like.</p>`;}
 /* ═══ PERSONAL — INVESTMENTS: LOANS & DEBT ═══ */
 function LOAN(){return loans.filter(x=>!x.deleted);}
-function loanTotalOutstanding(){return LOAN().reduce((a,l)=>a+(+l.outstanding||0),0);}
+function loanMonthsBetween(a,b){if(!a||!b)return 0;const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);return (by-ay)*12+(bm-am);}
+function loanTenure(l){return (l.start_ym&&l.end_ym)?Math.max(0,loanMonthsBetween(l.start_ym,l.end_ym)+1):0;}
+function loanHasSchedule(l){return !!(l.start_ym&&l.end_ym&&(+l.emi>0)&&loanTenure(l)>0);}
+function loanMonRate(l){return (+l.rate||0)/1200;}
+function loanPaidCount(l){return Math.max(0,Math.min(loanTenure(l),+l.paid_count||0));}
+function loanPV(emi,r,k){if(k<=0)return 0;return r>0?emi*(1-Math.pow(1+r,-k))/r:emi*k;}
+function loanOutstanding(l){if(!loanHasSchedule(l))return +l.outstanding||0;
+  const rem=loanTenure(l)-loanPaidCount(l);return Math.max(0,Math.round(loanPV(+l.emi,loanMonRate(l),rem)));}
+function loanNextSplit(l){const out=loanOutstanding(l);const interest=Math.round(out*loanMonRate(l));const principal=Math.max(0,Math.min(out,(+l.emi||0)-interest));return {interest,principal,out};}
+function loanDueIn(l,ym){if(!loanHasSchedule(l))return loanOutstanding(l)>0;return ym>=l.start_ym&&ym<=l.end_ym&&loanPaidCount(l)<loanTenure(l);}
+function loanPaidThisMonth(l,ym){return l.last_paid_ym===ym;}
+function loanTotalOutstanding(){return LOAN().reduce((a,l)=>a+loanOutstanding(l),0);}
 function loanTotalEmi(){return LOAN().reduce((a,l)=>a+(+l.emi||0),0);}
+function loanBankPaidTotal(ym){return LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&l.last_paid_ym===ym).reduce((a,l)=>a+(+l.emi||0),0);}
+/* Record one EMI. guard=true skips if this month is already recorded (used by automation & the month view). */
+function loanRecordEmi(l,ym,guard){if(guard&&l.last_paid_ym===ym)return false;const n=now();
+  if(loanHasSchedule(l)){if(loanPaidCount(l)>=loanTenure(l))return false;l.paid_count=loanPaidCount(l)+1;}
+  else{const out=+l.outstanding||0;if(out<=0)return false;const sp=loanNextSplit(l);l.outstanding=Math.max(0,Math.round(out-(sp.principal||(+l.emi||0))));}
+  l.last_paid_ym=ym;l.updated_at=n;return true;}
+/* When a card's bill is fully paid for the month, auto-mark its linked EMIs paid. */
+function loanAutoPayForCard(cardId,ym){if(cardStatement(cardId,ym)<=0)return;if(cardPaid(cardId,ym)<cardStatement(cardId,ym))return;let any=false;
+  LOAN().filter(l=>(l.pay_method)==='cc'&&l.card_id===cardId&&loanDueIn(l,ym)&&l.last_paid_ym!==ym).forEach(l=>{if(loanRecordEmi(l,ym,true))any=true;});
+  if(any){persist();}}
+function loanUnpay(id,ym){const l=LOAN().find(x=>x.id===id);if(!l||l.last_paid_ym!==ym)return;
+  if(loanHasSchedule(l))l.paid_count=Math.max(0,loanPaidCount(l)-1);else l.outstanding=(+l.outstanding||0)+(+l.emi||0);
+  l.last_paid_ym='';l.updated_at=now();persist();reRender();}
+function vFinLoansSection(ym){const list=LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&loanDueIn(l,ym)).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!list.length)return '';
+  const paid=list.filter(l=>l.last_paid_ym===ym).reduce((a,l)=>a+(+l.emi||0),0),due=list.reduce((a,l)=>a+(+l.emi||0),0);
+  const rows=list.map(l=>{const p=l.last_paid_ym===ym,sp=loanNextSplit(l);
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)} <span class="pill n">EMI</span>${p?' <span class="pill g">paid</span>':''}</div>
+      <div class="meta"><span class="num">${fmtMoney(+l.emi||0)}/mo</span>${loanHasSchedule(l)&&!p?` · <span class="num" style="color:var(--t4)">${fmtMoney(sp.principal)} principal + ${fmtMoney(sp.interest)} interest</span>`:''}</div></div>
+      <div class="fr-ctl"><div class="fr-acts">${p?`<button class="btn gh2 xs" title="Undo this month's EMI" onclick="loanUnpay('${l.id}','${ym}')">↺ undo</button>`:`<button class="btn xs" title="Pay this EMI from the bank — counts as an expense and marks the loan paid" onclick="loanPayEmi('${l.id}','${ym}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('');
+  return `<div class="card"><div class="ch"><span>🏦 Loan EMIs (bank)</span><span class="n num">paid ${fmtMoney(paid)} / ${fmtMoney(due)} due</span></div>${rows}</div>`;}
 let editLoan=null;
+function loanMethodUI(){g('lnCardWrap').style.display=g('lnMethod').value==='cc'?'':'none';}
 function openLoan(id){editLoan=id?loans.find(x=>x.id===id):null;const l=editLoan;
   g('mLoanTitle').firstChild.textContent=(l?'Edit Loan':'New Loan')+' ';
-  g('lnName').value=l?.name||'';g('lnLender').value=l?.lender||'';g('lnEmi').value=(l&&l.emi)?l.emi:'';g('lnRate').value=(l&&l.rate)?l.rate:'';g('lnOut').value=(l&&l.outstanding)?l.outstanding:'';
+  g('lnName').value=l?.name||'';g('lnLender').value=l?.lender||'';g('lnEmi').value=(l&&l.emi)?l.emi:'';g('lnRate').value=(l&&l.rate)?l.rate:'';
+  g('lnStart').value=l?.start_ym||'';g('lnEnd').value=l?.end_ym||'';g('lnOut').value=(l&&l.outstanding)?l.outstanding:'';
+  g('lnMethod').value=l?.pay_method||'bank';
+  const cards=CARD();g('lnCard').innerHTML=cards.length?cards.map(c=>`<option value="${c.id}">${esc(c.name)}${c.last4?' ••'+esc(c.last4):''}</option>`).join(''):'<option value="">(add a credit card first)</option>';
+  g('lnCard').value=l?.card_id||'';loanMethodUI();
   g('lnDel').style.display=l?'':'none';g('mLoan').classList.add('open');setTimeout(()=>g('lnName').focus(),50);}
 function saveLoan(){const name=g('lnName').value.trim();if(!name){toast('Loan name required.');return;}const n=now();
-  const d={name,lender:g('lnLender').value.trim(),emi:+g('lnEmi').value||0,rate:+g('lnRate').value||0,outstanding:+g('lnOut').value||0,updated_at:n};
-  if(editLoan)Object.assign(editLoan,d);else loans.push(Object.assign({id:uid(),created_at:n},d));
+  const method=g('lnMethod').value;const start_ym=g('lnStart').value||'';const end_ym=g('lnEnd').value||'';
+  if(start_ym&&end_ym&&loanMonthsBetween(start_ym,end_ym)<0){toast('End month must be after the start month.');return;}
+  const d={name,lender:g('lnLender').value.trim(),emi:+g('lnEmi').value||0,rate:+g('lnRate').value||0,start_ym,end_ym,pay_method:method,card_id:method==='cc'?g('lnCard').value:'',outstanding:+g('lnOut').value||0,updated_at:n};
+  if(editLoan)Object.assign(editLoan,d);
+  else{const l=Object.assign({id:uid(),paid_count:0,last_paid_ym:'',created_at:n},d);
+    if(start_ym&&end_ym&&d.emi>0){l.paid_count=Math.max(0,Math.min(loanTenure(l),loanMonthsBetween(start_ym,monthKey(today()))));}
+    loans.push(l);}
   closeM();persist();reRender();toast('Loan saved.');}
 async function delLoan(){if(editLoan&&await askConfirm('Delete "'+editLoan.name+'"?',{ok:'Delete',danger:true})){editLoan.deleted=true;editLoan.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
 function loanSetOutstanding(id,val){const l=loans.find(x=>x.id===id);if(!l)return;l.outstanding=+val||0;l.updated_at=now();persist();reRender();}
-function loanPayEmi(id){const l=LOAN().find(x=>x.id===id);if(!l)return;const out=+l.outstanding||0,emi=+l.emi||0;
-  if(out<=0){toast('This loan is already cleared.');return;}
+function loanPayEmi(id,ym){const l=LOAN().find(x=>x.id===id);if(!l)return;const emi=+l.emi||0;
   if(emi<=0){toast('Set the EMI amount first.');return;}
-  const interest=(+l.rate>0)?out*(+l.rate)/1200:0;
-  let principal=emi-interest;
-  if(principal<=0){toast('EMI doesn\'t cover the monthly interest — check the EMI/rate.');return;}
-  principal=Math.min(principal,out);
-  l.outstanding=Math.round((out-principal)*100)/100;l.updated_at=now();persist();reRender();
-  toast('EMI recorded — '+fmtMoney(Math.round(principal))+' off principal'+(interest>0?', '+fmtMoney(Math.round(interest))+' interest':'')+'.');}
-function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>(b.outstanding||0)-(a.outstanding||0));
-  const totOut=loanTotalOutstanding(),totEmi=loanTotalEmi();
-  const body=rows.map(l=>{const out=+l.outstanding||0,emi=+l.emi||0,cleared=out<=0;
-    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':''}</div>
-      <div class="meta"><span class="num">EMI ${fmtMoney(emi)}/mo</span>${out>0?` · <span class="num" style="color:var(--red);font-weight:600">${fmtMoney(out)} outstanding</span>`:''}</div></div>
-      <div class="fr-ctl"><input type="number" value="${out||''}" placeholder="balance ₹" title="Outstanding balance" onchange="loanSetOutstanding('${l.id}',this.value)">
-      <div class="fr-acts"><button class="btn xs" title="Record one EMI — reduces the balance by the principal portion" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button><button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
+  if(loanHasSchedule(l)&&loanPaidCount(l)>=loanTenure(l)){toast('This loan is fully paid.');return;}
+  if(!loanHasSchedule(l)&&loanOutstanding(l)<=0){toast('This loan is already cleared.');return;}
+  const sp=loanNextSplit(l);
+  if(loanRecordEmi(l,ym||monthKey(today()),false)){persist();reRender();
+    toast('EMI recorded — '+fmtMoney(sp.principal)+' off principal'+(sp.interest>0?', '+fmtMoney(sp.interest)+' interest':'')+'.');}}
+function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>loanOutstanding(b)-loanOutstanding(a));
+  const totOut=loanTotalOutstanding(),totEmi=loanTotalEmi();const cym=monthKey(today());
+  const body=rows.map(l=>{const out=loanOutstanding(l),emi=+l.emi||0,sched=loanHasSchedule(l),n=loanTenure(l),paid=loanPaidCount(l),cleared=sched?paid>=n:out<=0;
+    const paidThis=l.last_paid_ym===cym;const sp=loanNextSplit(l);
+    const cardNm=l.pay_method==='cc'?(CARD().find(c=>c.id===l.card_id)||{}).name:'';
+    const meta=[`EMI ${fmtMoney(emi)}/mo`];
+    if(out>0)meta.push(`<span style="color:var(--red);font-weight:600">${fmtMoney(out)} outstanding</span>`);
+    if(sched)meta.push(`${paid}/${n} paid`);
+    if(l.end_ym)meta.push(`ends ${finMonthLabel(l.end_ym)}`);
+    meta.push(l.pay_method==='cc'?('💳 '+(cardNm?esc(cardNm):'card')):'🏦 bank');
+    const sub=(sched&&out>0)?`<div class="meta" style="color:var(--t4)">next EMI: ${fmtMoney(sp.principal)} principal + ${fmtMoney(sp.interest)} interest</div>`:'';
+    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':paidThis?' <span class="pill g">paid '+MON_ABBR[+cym.slice(5,7)-1]+'</span>':''}</div>
+      <div class="meta"><span class="num">${meta.join(' · ')}</span></div>${sub}</div>
+      <div class="fr-ctl">${sched?'':`<input type="number" value="${out||''}" placeholder="balance ₹" title="Outstanding balance" onchange="loanSetOutstanding('${l.id}',this.value)">`}
+      <div class="fr-acts">${cleared?'':`<button class="btn xs" title="Record one EMI toward this loan" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
     ||'<div class="empty">No loans yet. Add home / car / personal loans to track EMIs and your total outstanding debt.</div>';
   return pagehead('PERSONAL','Investments','Loans & debt — EMIs and outstanding balances',invToggle())+
     `<div class="kpis"><div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(totOut)}</div><div class="num" style="font-size:10px;color:var(--t3)">${rows.length} loan${rows.length===1?'':'s'}</div></div>
       <div class="kpi"><div class="kl">Total EMI / month</div><div class="kv num" style="font-size:19px">${fmtMoney(totEmi)}</div></div></div>`+
     `<div class="card"><div class="ch"><span>Loans</span><button class="btn sm" onclick="openLoan()">+ Add loan</button></div>${body}</div>
-    <p class="note" style="padding:0 4px">Total outstanding debt is subtracted from your net worth. "Pay EMI" pays down the principal (interest = balance × rate ÷ 12); update the balance directly anytime. EMIs are also budgeted as fixed commitments on the Money tab.</p>`;}
+    <p class="note" style="padding:0 4px">With EMI + rate + start/end month set, the outstanding principal and each EMI's principal/interest split are calculated from the amortization schedule. Total outstanding is subtracted from your net worth. Bank EMIs also appear on the Money tab's expenses; credit-card EMIs are marked paid when that card's bill is paid.</p>`;}
 async function quickNewFamily(sel){const v=((await askText('New family member name:',{title:'New family member'}))||'').trim();if(!v)return;
   const n=now();family.push({id:uid(),name:v,notes:'',created_at:n,updated_at:n});persist();fillFamily(sel,family[family.length-1].id);}
 let editFA=null;
