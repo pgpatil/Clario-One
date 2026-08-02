@@ -871,6 +871,9 @@ const now=()=>new Date().toISOString();
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>ymd(new Date());
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* Long-list cap: render the first `cap` rows with a "Show all" button, so heavy tabs don't scroll forever. */
+function listCap(key,arr,cap){cap=cap||50;return (window['_all_'+key]||arr.length<=cap)?arr:arr.slice(0,cap);}
+function capMore(key,total,cap){cap=cap||50;const n=total-cap;return (!window['_all_'+key]&&n>0)?`<div style="text-align:center;padding:10px 0"><button class="btn gh2 sm" onclick="window._all_${key}=1;renderView()">Show all ${total} — ${n} more</button></div>`:'';}
 const jss=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
 const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000);
@@ -928,6 +931,8 @@ var appMode=localStorage.getItem(MODE_KEY)||'official';
 var personalTab='tasks';
 var finMonth='';
 var finView='month';
+var _finCollapse={};
+function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans'];
@@ -1558,7 +1563,8 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
         <div class="fr-acts">${c.group!=='income'?`<button class="btn xs" title="Log a payment of the planned amount (${fmtMoney(rem>0?rem:p)})" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`:''}<button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
       </div></div>`;};
   const addLbl={income:'income',fixed:'commitment',expense:'expense',savings:'savings'};
-  const section=(title,list,gkey)=>`<div class="card"><div class="ch"><span>${title}</span><span class="n num">plan ${fmtMoney(sumP(list))} · actual ${fmtMoney(sumA(list))}</span></div>${list.map(row).join('')||`<div class="empty">Nothing here for ${finMonthLabel(ym)}.</div>`}<div class="addline"><button class="btn sm" onclick="openFinCat(null,'${gkey}')">+ Add ${addLbl[gkey]}</button></div></div>`;
+  const section=(title,list,gkey)=>{const col=!!_finCollapse[gkey];
+    return `<div class="card"><div class="ch" style="cursor:pointer" onclick="finToggleSec('${gkey}')" title="${col?'Expand':'Collapse'}"><span>${col?'▸':'▾'} ${title}${col?` <span class="n num">(${list.length})</span>`:''}</span><span class="n num">plan ${fmtMoney(sumP(list))} · actual ${fmtMoney(sumA(list))}</span></div>${col?'':(list.map(row).join('')||`<div class="empty">Nothing here for ${finMonthLabel(ym)}.</div>`)+`<div class="addline"><button class="btn sm" onclick="openFinCat(null,'${gkey}')">+ Add ${addLbl[gkey]}</button></div>`}</div>`;};
   const tx=FTX().filter(t=>t.month===ym).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
@@ -2116,17 +2122,18 @@ function vPeople(){
     oldest:w.length?Math.max(...w.map(t=>ageDays((t.created_at||now()).slice(0,10)))):0};};
   const getters={name:p=>p.name,role:p=>p.role||'',dept:p=>p.dept||'',waiting:p=>stat(p).w,oldest:p=>stat(p).oldest};
   let list=applySort('people',P(),getters);if(!_sort.people)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  const _pN=list.length;list=listCap('people',list);
   const head=pagehead('TEAM','People','Delegation and 1:1 agendas',`<button class="btn sm" onclick="openPerson()">+ Person</button>`)
     +`<div class="filters">${viewToggle('people',view)}</div>`;
   if(!P().length)return head+'<div class="card"><div class="empty">Add the people you delegate to and meet with.</div></div>';
   if(view==='list'){
     const rows=list.map(p=>{const s=stat(p);return`<tr class="click" onclick="nav('people','${p.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(p.name)}</td><td>${esc(p.role||'')}</td><td>${esc(p.dept||'')}</td><td class="r num">${s.ag||'—'}</td><td class="r num" style="${s.w?'font-weight:700':''}">${s.w||'—'}</td><td class="r num">${s.oldest>7?`<span style="color:var(--amb-d)">${s.oldest}d</span>`:s.oldest?s.oldest+'d':'—'}</td></tr>`;}).join('');
-    return head+`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('people','name','Name')}${sortHead('people','role','Role')}${sortHead('people','dept','Department')}<th class="r">Agenda</th>${sortHead('people','waiting','Waiting','r')}${sortHead('people','oldest','Oldest','r')}</tr>${rows}</table></div>`;
+    return head+`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('people','name','Name')}${sortHead('people','role','Role')}${sortHead('people','dept','Department')}<th class="r">Agenda</th>${sortHead('people','waiting','Waiting','r')}${sortHead('people','oldest','Oldest','r')}</tr>${rows}</table></div>`+capMore('people',_pN);
   }
   const cards=list.map(p=>{const s=stat(p);
     return`<div class="pcard" onclick="nav('people','${p.id}')"><div class="pn">${esc(p.name)}</div><div class="pr">${esc(p.role||'')}${p.role&&p.dept?' · ':''}${esc(p.dept||'')}</div>
     <div class="pstats"><span>Agenda <b class="num">${s.ag}</b></span><span class="${s.w?'warn':''}">Waiting <b class="num">${s.w}</b></span>${s.oldest>7?`<span class="bad">Oldest <b class="num">${s.oldest}d</b></span>`:''}</div></div>`;}).join('');
-  return head+`<div class="pgrid">${cards}</div>`;}
+  return head+`<div class="pgrid">${cards}</div>`+capMore('people',_pN);}
 
 function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='open');
   const w=waiting().filter(t=>t.owner===p.id).sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
@@ -2171,6 +2178,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const dd=t=>t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
   const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status};
   list=applySort('tasks',list,getters);if(!_sort.tasks)list=list.sort((a,b)=>(dd(a)||'9999').localeCompare(dd(b)||'9999'));
+  const _tN=list.length;list=listCap('tasks',list);
   const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
   const filters=`<div class="filters"><input placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
@@ -2183,7 +2191,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const rows=list.map(t=>{const d=dd(t);const over=t.status!=='done'&&d&&d<td;
     return`<tr class="click" onclick="nav('task','${t.id}')"><td><span class="pri ${t.priority||'medium'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${esc(t.title)}</td><td>${t.type==='call'?'<span class="pill b">Call</span>':''}${t.owner&&t.owner!=='me'?esc(pname(t.owner)):'<span style="color:var(--t4)">Me</span>'}</td><td>${t.customer_id?esc(cname(t.customer_id)):''}</td><td>${esc(t.dept||'')}</td><td>${d?`<span class="due ${over?'over':d===td?'today':''}">${fmtD(d)}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${t.status==='done'?'<span class="pill g">done</span>':t.status==='waiting'?'<span class="pill a">waiting</span>':'<span class="pill b">open</span>'}</td></tr>`;}).join('');
   const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
-  return pagehead('WORK','Tasks',list.length+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body;}
+  return pagehead('WORK','Tasks',_tN+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body+capMore('tasks',_tN);}
 
 const SUMMARY_SIGNOFF='Please feel free to add any points which might have been missed or for any further clarifications.';
 function openSummaryWindow(title,html,plain){
@@ -2256,8 +2264,9 @@ function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(
     <select onchange="window._mDateField=this.value;renderView()" title="Filter by date"><option value="">Any date</option><option value="created_at"${dfF==='created_at'?' selected':''}>Created</option><option value="updated_at"${dfF==='updated_at'?' selected':''}>Modified</option><option value="completed_at"${dfF==='completed_at'?' selected':''}>Completed</option></select>
     ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._mDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._mDateTo=this.value;renderView()" style="max-width:135px">`:''}
     ${(q||sf!=='upcoming'||dfF)?`<button class="btn gh2 sm" onclick="window._mq='';window._mSt='upcoming';window._mDateField='';window._mDateFrom='';window._mDateTo='';renderView()">Clear</button>`:''}</div>`;
-  const body=list.length?`<div class="card">${list.map(mrowHtml).join('')}</div>`:'<div class="card"><div class="empty">No meetings match. Add one, or import from Outlook (.ics).</div></div>';
-  return pagehead('MEETINGS','Meetings',list.length+' shown',
+  const _mN=list.length;list=listCap('meetings',list);
+  const body=(_mN?`<div class="card">${list.map(mrowHtml).join('')}</div>`:'<div class="card"><div class="empty">No meetings match. Add one, or import from Outlook (.ics).</div></div>')+capMore('meetings',_mN);
+  return pagehead('MEETINGS','Meetings',_mN+' shown',
     `<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button><button class="btn sm" onclick="openMeeting()">+ Meeting</button>`)+filters+body;}
 
 /* ═══ TASK PAGE — capture conversation + follow-on actions ═══ */
@@ -2455,6 +2464,7 @@ function vAccounts(){
     deals:c=>meta(c).dv,open:c=>meta(c).open,na:c=>{const t=acctNextTask(c.id);return t&&t.due?t.due:'9999';}};
   list=applySort('accounts',list,getters);
   if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  const _aN=list.length;list=listCap('accounts',list);
   const segs=[...new Set(CU().map(c=>c.segment).filter(Boolean))].sort();
   const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const regs=[...new Set(CU().map(c=>c.region).filter(Boolean))].sort();
@@ -2478,7 +2488,7 @@ function vAccounts(){
       return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
     body=`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('accounts','name','Account')}${sortHead('accounts','kam','KAM')}${sortHead('accounts','segment','Segment')}${sortHead('accounts','city','City')}${sortHead('accounts','na','Next action')}${sortHead('accounts','deals','Open deals','r')}${sortHead('accounts','open','Open items','r')}</tr>${rows}</table></div>`;
   }
-  return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body;}
+  return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body+capMore('accounts',_aN);}
 
 function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id).sort(byName);
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
