@@ -470,6 +470,10 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   .finrow .fr-acts{gap:6px}
   .finrow .fr-acts .btn,.finrow .fr-acts .iconb{padding:8px 12px;font-size:14px}
   .finrow.loanrow .fr-ctl{justify-content:flex-end}
+  /* keep the sub-tabs on one line (badges can push a tab onto a second row) */
+  .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:8px 12px;white-space:nowrap;flex:0 0 auto}
   .fin-bank input{font-size:16px;width:46%}
 }
 @media(pointer:coarse){
@@ -1436,9 +1440,10 @@ function prow(t){const td=today();const over=t.status!=='done'&&t.due&&t.due<td;
     <div class="rowacts"><button class="iconb" onclick="openPersonalTask('${t.id}')">✎</button><button class="iconb" title="Delete" onclick="delPersonalTask('${t.id}')">✕</button></div></div>`;}
 function vPersonal(){if(pinIsSet()&&!_personalUnlocked)return vPersonalLock();
   const bdays=upcomingBirthdays();const soon=bdays.filter(b=>b.inDays<=7).length;
+  const nOver=(()=>{try{return finOverdueCount();}catch(e){return 0;}})();
   const tabs=`<div class="tabs">
     <button class="tab ${personalTab==='tasks'?'on':''}" onclick="personalTab='tasks';renderView()">Tasks</button>
-    <button class="tab ${personalTab==='money'?'on':''}" onclick="personalTab='money';renderView()">Money</button>
+    <button class="tab ${personalTab==='money'?'on':''}" onclick="personalTab='money';renderView()">Money${nOver?` <span class="bdg hot">${nOver}</span>`:''}</button>
     <button class="tab ${personalTab==='invest'?'on':''}" onclick="personalTab='invest';renderView()">Investments</button>
     <button class="tab ${personalTab==='birthdays'?'on':''}" onclick="personalTab='birthdays';renderView()">Birthdays${soon?` <span class="num">(${soon})</span>`:''}</button>
     ${pinIsSet()?`<button class="tab" style="margin-left:auto" title="Lock the Personal section" onclick="lockPersonal()">🔒 Lock</button>`:''}</div>`;
@@ -1619,6 +1624,34 @@ function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((
     `<div class="card"><div class="ch"><span>Recurring commitments</span><button class="btn sm" onclick="openFinCat(null,'fixed')">+ Add commitment</button></div>${rows}</div>
     <p class="note" style="padding:0 4px">Each commitment appears automatically in the months it's due on the monthly plan, at the amount set here. To make one occurrence differ (e.g. a higher school-fee term), open that month and edit its planned amount there.</p>`;}
 function finMoneyToggle(){return `<div class="vtog"><button class="${finView==='month'?'on':''}" onclick="finView='month';renderView()">Monthly plan</button><button class="${finView==='commit'?'on':''}" onclick="finView='commit';renderView()">Fixed commitments</button></div>`;}
+/* ═══ WHAT NEEDS PAYING ═══
+   One collector over the three places money actually falls due — credit-card bills,
+   bank EMIs and dated categories — so you don't have to hunt through three sections
+   to find out what's outstanding. */
+function finDueItems(ym){const td=today(),out=[];
+  const dayDate=(day)=>{if(!day)return '';const[yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();return ym+'-'+String(Math.min(day,dim)).padStart(2,'0');};
+  CARD().forEach(c=>{const o=cardOutstanding(c.id,ym);if(cardStatement(c.id,ym)>0&&o>0){const d=dayDate(c.due_day);
+    out.push({kind:'card',name:c.name+(c.last4?' ••'+c.last4:''),sub:'Credit card bill',amount:o,due:d,
+      act:`<button class="btn xs" onclick="cardPayFull('${c.id}','${ym}')">✓ pay full</button>`});}});
+  LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&loanDueIn(l,ym)&&l.last_paid_ym!==ym&&(+l.emi>0)).forEach(l=>{
+    out.push({kind:'emi',name:l.name,sub:'Loan EMI',amount:+l.emi||0,due:loanDueDate(l,ym),
+      act:`<button class="btn xs" onclick="loanPayEmi('${l.id}','${ym}')">✓ pay EMI</button>`});});
+  FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&c.day&&finDueIn(c,ym)).forEach(c=>{
+    const rem=finPlanned(c,ym)-finActual(c,ym);if(rem>0)
+      out.push({kind:'commit',name:c.name,sub:finGroupLbl(c.group),amount:rem,due:dayDate(c.day),
+        act:`<button class="btn xs" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`});});
+  out.forEach(i=>{i.overdue=!!(i.due&&i.due<td);});
+  return out.sort((a,b)=>(b.overdue-a.overdue)||((a.due||'9999-99')).localeCompare(b.due||'9999-99'));}
+function finOverdueCount(){return finDueItems(monthKey(today())).filter(i=>i.overdue).length;}
+function vFinDueCard(ym){const items=finDueItems(ym);if(!items.length)return '';
+  const over=items.filter(i=>i.overdue).length,total=items.reduce((a,i)=>a+i.amount,0);
+  const show=window._allDue?items:items.slice(0,6);
+  const rows=show.map(i=>{const ds=i.due?new Date(i.due+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'no date';
+    return `<div class="finrow loanrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(i.name)}${i.overdue?' <span class="pill r">overdue</span>':''}</div>
+      <div class="meta"><span class="num" style="color:${i.overdue?'var(--red)':'var(--blue-d)'};font-weight:600">📅 ${ds}</span> · ${esc(i.sub)} · <b class="num">${fmtMoney(i.amount)}</b></div></div>
+      <div class="fr-ctl"><div class="fr-acts">${i.act}</div></div></div>`;}).join('');
+  const more=(!window._allDue&&items.length>6)?`<div style="text-align:center;padding:8px 0"><button class="btn gh2 sm" onclick="window._allDue=1;renderView()">Show all ${items.length}</button></div>`:'';
+  return `<div class="card" style="border-left:3px solid ${over?'var(--red)':'var(--blue)'}"><div class="ch"><span>${over?'⚠ ':''}Needs paying${over?` — ${over} overdue`:''}</span><span class="n num">${items.length} · ${fmtMoney(total)}</span></div>${rows}${more}</div>`;}
 function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMonth,td=today();
   const cats=FCAT();
   if(cats.length&&finView==='commit')return vFinCommitments();
@@ -1654,7 +1687,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   return pagehead('PERSONAL','Money',finMonthLabel(ym)+(isCur?` · ${dleft} day${dleft===1?'':'s'} left`:''),finMoneyToggle()+`<button class="btn gh2 sm" onclick="openFinCat()">+ Category</button>`)+
     `<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="finMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="finMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="finMonth=monthKey(today());renderView()">This month</button>`:''}</div>`+
     `<div class="kpis">${kpi('Income',pInc,aInc,'good')}${kpi('Expenses',pOut,aOut,'warn')}${kpi('Savings',pSav,aSav,'blue')}${kpi(pSurp<0||aSurp<0?'Surplus / deficit':'Surplus',pSurp,aSurp,(aSurp<0?'bad':''))}</div>`+
-    finDupBanner()+vFinCardsSection(ym)+vFinLoansSection(ym)+
+    finDupBanner()+vFinDueCard(ym)+vFinCardsSection(ym)+vFinLoansSection(ym)+
     (()=>{const opening=finOpening(ym),closing=opening+aInc-(aOut+aSav);
       return `<div class="card"><div class="ch"><span>Bank account</span></div><div class="fin-bank">
         <div class="fb-row"><label>Opening balance</label><input type="number" value="${opening||''}" placeholder="0" onchange="finSetOpening('${ym}',this.value)" title="Editable — carries forward from last month's closing"></div>
