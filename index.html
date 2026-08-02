@@ -432,6 +432,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .finrow .fr-ctl{display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex:0 0 auto}
 .finrow .fr-ctl input{width:104px;padding:4px 7px;font-size:12.5px;text-align:right;border:1px solid var(--bdr2);border-radius:var(--rs)}
 .finrow .fr-acts{display:flex;gap:3px}
+.finrow.loanrow{align-items:center}
+.finrow .fr-acts .btn{white-space:nowrap}
 .fin-bank{padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 .fin-bank .fb-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .fin-bank .fb-row label{color:var(--t3)}
@@ -467,6 +469,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   .finrow .fr-ctl input{flex:1;width:auto;font-size:16px;padding:8px 10px}
   .finrow .fr-acts{gap:6px}
   .finrow .fr-acts .btn,.finrow .fr-acts .iconb{padding:8px 12px;font-size:14px}
+  .finrow.loanrow .fr-ctl{justify-content:flex-end}
   .fin-bank input{font-size:16px;width:46%}
 }
 @media(pointer:coarse){
@@ -870,7 +873,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin';
+const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
 const g=id=>document.getElementById(id);
@@ -1156,8 +1159,9 @@ function flushEditors(){try{
   if(view==='task'&&viewArg){const t=tasks.find(x=>x.id===viewArg);const el=g('tnText');if(t&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(t.notes_html||'')){t.notes_html=h;t.notes=htmlToText(h);t.updated_at=now();if(typeof logTaskNotes==='function')logTaskNotes(t);}}}
   if(view==='meeting'&&viewArg){const m=meetings.find(x=>x.id===viewArg);const el=g('mnText');if(m&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(m.notes_html||'')){m.notes_html=h;m.notes=htmlToText(h);m.updated_at=now();if(typeof logMeetingNotes==='function')logMeetingNotes(m);}}}
 }catch(e){}}
-function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,0);}
-function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();window.scrollTo(0,y);}
+function saveNav(){try{localStorage.setItem(NAV_KEY,JSON.stringify({view,viewArg,personalTab,invView,finView,mode:appMode}));}catch(e){}}
+function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();saveNav();window.scrollTo(0,0);}
+function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();saveNav();window.scrollTo(0,y);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -1783,7 +1787,7 @@ function vFinLoansSection(ym){const list=LOAN().filter(l=>(l.pay_method||'bank')
   if(!list.length)return '';
   const paid=list.filter(l=>l.last_paid_ym===ym).reduce((a,l)=>a+(+l.emi||0),0),due=list.reduce((a,l)=>a+(+l.emi||0),0);
   const rows=list.map(l=>{const p=l.last_paid_ym===ym,sp=loanNextSplit(l,ym);
-    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)} <span class="pill n">EMI</span>${p?' <span class="pill g">paid</span>':''}</div>
+    return `<div class="finrow loanrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)} <span class="pill n">EMI</span>${p?' <span class="pill g">paid</span>':''}</div>
       <div class="meta"><span class="num">${fmtMoney(+l.emi||0)}/mo</span>${loanHasSchedule(l)&&!p?` · <span class="num" style="color:var(--t4)">${fmtMoney(sp.principal)} principal + ${fmtMoney(sp.interest)} interest</span>`:''}</div></div>
       <div class="fr-ctl"><div class="fr-acts">${p?`<button class="btn gh2 xs" title="Undo this month's EMI" onclick="loanUnpay('${l.id}','${ym}')">↺ undo</button>`:`<button class="btn xs" title="Pay this EMI from the bank — counts as an expense and marks the loan paid" onclick="loanPayEmi('${l.id}','${ym}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('');
   return `<div class="card"><div class="ch"><span>🏦 Loan EMIs (bank)</span><span class="n num">paid ${fmtMoney(paid)} / ${fmtMoney(due)} due</span></div>${rows}</div>`;}
@@ -1824,10 +1828,9 @@ function vInvLoans(){const rows=LOAN().slice().sort((a,b)=>loanOutstanding(b)-lo
     if(l.end_ym)meta.push(`ends ${finMonthLabel(l.end_ym)}`);
     meta.push(l.pay_method==='cc'?('💳 '+(cardNm?esc(cardNm):'card')):'🏦 bank');
     const sub=(sched&&out>0)?`<div class="meta" style="color:var(--t4)">next EMI: ${fmtMoney(sp.principal)} principal + ${fmtMoney(sp.interest)} interest</div>`:'';
-    return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':paidThis?' <span class="pill g">paid '+MON_ABBR[+cym.slice(5,7)-1]+'</span>':''}</div>
+    return `<div class="finrow loanrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(l.name)}${l.lender?` <span class="pill n">${esc(l.lender)}</span>`:''}${l.rate?` <span class="num" style="color:var(--t3)">${(+l.rate)}%</span>`:''}${cleared?' <span class="pill g">cleared</span>':paidThis?' <span class="pill g">paid '+MON_ABBR[+cym.slice(5,7)-1]+'</span>':''}</div>
       <div class="meta"><span class="num">${meta.join(' · ')}</span></div>${sub}</div>
-      <div class="fr-ctl">${sched?'':`<input type="number" value="${out||''}" placeholder="balance ₹" title="Outstanding balance" onchange="loanSetOutstanding('${l.id}',this.value)">`}
-      <div class="fr-acts">${cleared?'':`<button class="btn xs" title="Record one EMI toward this loan" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
+      <div class="fr-ctl"><div class="fr-acts">${cleared?'':`<button class="btn xs" title="Record one EMI toward this loan" onclick="loanPayEmi('${l.id}')">✓ pay EMI</button>`}<button class="iconb" title="Edit loan" onclick="openLoan('${l.id}')">⚙</button></div></div></div>`;}).join('')
     ||'<div class="empty">No loans yet. Add home / car / personal loans to track EMIs and your total outstanding debt.</div>';
   return pagehead('PERSONAL','Investments','Loans & debt — EMIs and outstanding balances',invToggle())+
     `<div class="kpis"><div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(totOut)}</div><div class="num" style="font-size:10px;color:var(--t3)">${rows.length} loan${rows.length===1?'':'s'}</div></div>
@@ -3685,7 +3688,13 @@ const _origNav=nav;
 nav=async function(v,arg,_fromPop,_fromGoBack){if(v!=='decide'){dTool=null;window._trId=null;window._mtx=null;window._pm=null;window._fw=null;window._pa=null;window._sw=null;}return _origNav(v,arg,_fromPop,_fromGoBack);};
 
 /* ═══ BOOT ═══ */
-(function boot(){loadLS();applyModeUI();renderView();restoreFolder();gRestore();
+(function boot(){loadLS();
+try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
+  if(nv.personalTab)personalTab=nv.personalTab;if(nv.invView)invView=nv.invView;if(nv.finView)finView=nv.finView;
+  let v=nv.view||'home',a=nv.viewArg??null;const detail={meeting:'meetings',deal:'deals',contact:'people',task:'tasks'};
+  if(detail[v]){const arr=window[detail[v]]||[];if(!a||!arr.some(x=>x.id===a&&!x.deleted)){v='home';a=null;}}
+  view=v;viewArg=a;}}catch(e){}
+applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
 setTimeout(()=>checkLocationConfirmation(),350);})();
 </script>
