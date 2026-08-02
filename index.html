@@ -1623,7 +1623,47 @@ function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((
       <div class="kpi"><div class="kl">Items</div><div class="kv num" style="font-size:19px">${list.length}</div></div></div>`+
     `<div class="card"><div class="ch"><span>Recurring commitments</span><button class="btn sm" onclick="openFinCat(null,'fixed')">+ Add commitment</button></div>${rows}</div>
     <p class="note" style="padding:0 4px">Each commitment appears automatically in the months it's due on the monthly plan, at the amount set here. To make one occurrence differ (e.g. a higher school-fee term), open that month and edit its planned amount there.</p>`;}
-function finMoneyToggle(){return `<div class="vtog"><button class="${finView==='month'?'on':''}" onclick="finView='month';renderView()">Monthly plan</button><button class="${finView==='commit'?'on':''}" onclick="finView='commit';renderView()">Fixed commitments</button></div>`;}
+function finMoneyToggle(){const t=(v,l)=>`<button class="${finView===v?'on':''}" onclick="finView='${v}';renderView()">${l}</button>`;
+  return `<div class="vtog">${t('month','Monthly plan')}${t('commit','Fixed commitments')}${t('cast','Forecast')}</div>`;}
+/* ═══ CASHFLOW FORECAST ═══
+   Projects the bank balance forward on planned income minus planned outflow. The point is
+   the lumpy months: quarterly/annual commitments and loan EMIs know their own schedule
+   (and their end dates), so the dip when school fees + insurance + advance tax collide —
+   and the relief when a loan finishes — both show up before they happen. */
+function finPlannedIncome(ym){return FCAT().filter(c=>c.group==='income').reduce((a,c)=>a+finPlanned(c,ym),0);}
+function finPlannedOutflow(ym){
+  const cats=FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finPlanned(c,ym),0);
+  const emis=LOAN().filter(l=>(+l.emi>0)&&loanDueIn(l,ym)).reduce((a,l)=>a+(+l.emi||0),0);
+  return cats+emis;}
+function finForecast(n){n=n||12;const cur=monthKey(today());const rows=[];
+  // Start from where this month actually stands, then apply what's still outstanding
+  // and any income not yet received — so month one isn't double-counted.
+  const stillDue=finDueItems(cur).reduce((a,i)=>a+i.amount,0);
+  const incLeft=Math.max(0,finPlannedIncome(cur)-finIncomeActual(cur));
+  let bal=finClosing(cur)+incLeft-stillDue;
+  rows.push({ym:cur,inc:finIncomeActual(cur)+incLeft,out:finOutflowActual(cur)+stillDue,close:bal,current:true});
+  for(let i=1;i<n;i++){const m=ymAdd(cur,i);const inc=finPlannedIncome(m),out=finPlannedOutflow(m);
+    bal+=inc-out;rows.push({ym:m,inc,out,close:bal});}
+  return rows;}
+function vFinForecast(){const rows=finForecast(12);
+  if(!FCAT().length&&!LOAN().length)return pagehead('PERSONAL','Money','Cashflow forecast',finMoneyToggle())+
+    '<div class="card"><div class="empty">Add income, commitments or loans and the next 12 months are projected here.</div></div>';
+  const low=rows.reduce((m,r)=>r.close<m.close?r:m,rows[0]);
+  const worst=rows.filter(r=>r.close<0).length;
+  const maxAbs=Math.max(...rows.map(r=>Math.abs(r.close)),1);
+  const body=rows.map(r=>{const neg=r.close<0,pct=Math.round(Math.abs(r.close)/maxAbs*100);
+    const net=r.inc-r.out;
+    return `<div class="finrow loanrow"${neg?' style="background:var(--red-l)"':''}><div class="fr-bd">
+      <div class="tt" style="font-size:12.5px">${finMonthLabel(r.ym)}${r.current?' <span class="pill n">this month</span>':''}${r.ym===low.ym&&!r.current?' <span class="pill a">lowest</span>':''}</div>
+      <div class="meta"><span class="num" style="color:var(--grn-d)">+${fmtMoney(r.inc)}</span> · <span class="num" style="color:var(--red)">−${fmtMoney(r.out)}</span> · <span class="num" style="color:var(--t3)">net ${net>=0?'+':'−'}${fmtMoney(Math.abs(net))}</span></div>
+      <div class="capbar ${neg?'over':''}" style="margin-top:5px"><div style="width:${pct}%"></div></div></div>
+      <div style="text-align:right;min-width:92px;flex:0 0 auto"><b class="num" style="color:${neg?'var(--red)':'var(--t1)'}">${fmtMoney(r.close)}</b><div class="num" style="font-size:10px;color:var(--t3)">closing</div></div></div>`;}).join('');
+  return pagehead('PERSONAL','Money','Cashflow forecast — next 12 months',finMoneyToggle())+
+    `<div class="kpis"><div class="kpi ${low.close<0?'bad':'blue'}"><div class="kl">Lowest projected balance</div><div class="kv num" style="font-size:19px">${fmtMoney(low.close)}</div><div class="num" style="font-size:10px;color:var(--t3)">${finMonthLabel(low.ym)}</div></div>
+      ${worst?`<div class="kpi bad"><div class="kl">Months in deficit</div><div class="kv num" style="font-size:19px">${worst}</div><div class="num" style="font-size:10px;color:var(--t3)">balance below zero</div></div>`:`<div class="kpi good"><div class="kl">Months in deficit</div><div class="kv num" style="font-size:19px">0</div><div class="num" style="font-size:10px;color:var(--t3)">stays positive</div></div>`}
+      <div class="kpi"><div class="kl">Committed EMIs / mo</div><div class="kv num" style="font-size:19px">${fmtMoney(loanTotalEmi())}</div></div></div>`+
+    `<div class="card"><div class="ch"><span>Projected bank balance</span><span class="n num">12 mo</span></div>${body}</div>
+    <p class="note" style="padding:0 4px">Built from planned income minus planned commitments, expenses, savings and loan EMIs due in each month — so quarterly and annual items land in the months they're actually due, and an EMI drops out after its end date. This month starts from your real balance and only counts what's still outstanding. Future credit-card spending isn't predictable, so only card-linked EMIs are included.</p>`;}
 /* ═══ WHAT NEEDS PAYING ═══
    One collector over the three places money actually falls due — credit-card bills,
    bank EMIs and dated categories — so you don't have to hunt through three sections
@@ -1654,6 +1694,7 @@ function vFinDueCard(ym){const items=finDueItems(ym);if(!items.length)return '';
   return `<div class="card" style="border-left:3px solid ${over?'var(--red)':'var(--blue)'}"><div class="ch"><span>${over?'⚠ ':''}Needs paying${over?` — ${over} overdue`:''}</span><span class="n num">${items.length} · ${fmtMoney(total)}</span></div>${rows}${more}</div>`;}
 function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMonth,td=today();
   const cats=FCAT();
+  if(finView==='cast')return vFinForecast();
   if(cats.length&&finView==='commit')return vFinCommitments();
   if(!cats.length)return pagehead('PERSONAL','Money','Plan the month, track actuals','')+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
