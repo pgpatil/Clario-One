@@ -612,7 +612,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   </div>
   <div class="fld"><label>Note</label><input id="ftNote" placeholder="optional — what it was for"></div>
   </div>
-  <div class="macts"><div></div><div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveFinTx()">Log payment</button></div></div>
+  <div class="macts"><div></div><div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" id="ftSave" onclick="saveFinTx()">Log payment</button></div></div>
 </div></div>
 
 <!-- Credit card modal -->
@@ -1575,7 +1575,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
       <div class="meta">${ds?`<span class="num" style="color:var(--blue-d);font-weight:600">📅 ${ds}</span> · `:''}<span class="num">actual ${fmtMoney(a)}</span> · <span class="num" style="${rem<0?'color:var(--red);font-weight:700':'color:var(--t3)'}">${rem<0?'over '+fmtMoney(-rem):fmtMoney(rem)+' left'}</span></div>${bar(p,a)}</div>
       <div class="fr-ctl">
         <input type="number" value="${p||''}" placeholder="plan ₹" onchange="finSetPlan('${c.id}','${ym}',this.value)">
-        <div class="fr-acts">${c.group!=='income'?`<button class="btn xs" title="Log a payment of the planned amount (${fmtMoney(rem>0?rem:p)})" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`:''}<button class="btn gh2 xs" title="Log a payment" onclick="openFinTx('${c.id}')">＋ pay</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
+        <div class="fr-acts">${c.group!=='income'?`<button class="btn xs" title="Log a payment of the planned amount (${fmtMoney(rem>0?rem:p)})" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`:''}<button class="btn gh2 xs" title="${c.group==='income'?'Log income received':'Log a payment'}" onclick="openFinTx('${c.id}')">${c.group==='income'?'＋ receive':'＋ pay'}</button><button class="iconb" title="Set actual directly" onclick="finSetActual('${c.id}','${ym}')">✎</button><button class="iconb" title="Edit category" onclick="openFinCat('${c.id}')">⚙</button></div>
       </div></div>`;};
   const addLbl={income:'income',fixed:'commitment',expense:'expense',savings:'savings'};
   const section=(title,list,gkey)=>{const col=!!_finCollapse[gkey];
@@ -1595,7 +1595,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
         <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
-    (tx.length?`<div class="card"><div class="ch"><span>Payments logged — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num">${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('')}</div></div>`:'');}
+    (tx.length?`<div class="card"><div class="ch"><span>Logged this month — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num">${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('')}</div></div>`:'');}
 let editFC=null;
 function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;const c=editFC;
   g('mFinCatTitle').firstChild.textContent=(c?'Edit Category':'New Category')+' ';
@@ -1620,14 +1620,16 @@ function saveFinCat(){const name=g('fcName').value.trim();if(!name){toast('Name 
   if(editFC)Object.assign(editFC,d);else fincats.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();reRender();toast('Category saved.');}
 async function delFinCat(){if(editFC&&await askConfirm('Delete "'+editFC.name+'"? Logged payments stay in history.',{ok:'Delete',danger:true})){editFC.deleted=true;editFC.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
-function openFinTx(catId){window._ftCat=catId;const c=FCAT().find(x=>x.id===catId);
-  g('mFinTxTitle').firstChild.textContent='Log payment — '+(c?c.name:'')+' ';
+function openFinTx(catId){window._ftCat=catId;const c=FCAT().find(x=>x.id===catId);const inc=c&&c.group==='income';
+  g('mFinTxTitle').firstChild.textContent=(inc?'Log income — ':'Log payment — ')+(c?c.name:'')+' ';
+  const sv=g('ftSave');if(sv)sv.textContent=inc?'Log income':'Log payment';
   g('ftAmount').value='';g('ftNote').value='';
   g('ftDate').value=(finMonth===monthKey(today()))?today():finMonth+'-15';
   g('mFinTx').classList.add('open');setTimeout(()=>g('ftAmount').focus(),50);}
 function saveFinTx(){const amt=+g('ftAmount').value;if(!amt){toast('Enter an amount.');return;}const date=g('ftDate').value||today();const n=now();
+  const c=FCAT().find(x=>x.id===window._ftCat);const inc=c&&c.group==='income';
   fintx.push({id:uid(),cat_id:window._ftCat,date,month:monthKey(date),amount:amt,note:g('ftNote').value.trim(),created_at:n,updated_at:n});
-  closeM();persist();reRender();toast('Payment logged.');}
+  closeM();persist();reRender();toast(inc?'Income logged.':'Payment logged.');}
 async function finDelTx(id){const t=fintx.find(x=>x.id===id);if(t&&await askConfirm('Delete this payment?',{ok:'Delete',danger:true})){t.deleted=true;t.updated_at=now();persist();reRender();}}
 
 /* ═══ PERSONAL — INVESTMENTS (monthly value tracking) ═══ */
