@@ -13,7 +13,10 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script>if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
-<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js" crossorigin="anonymous"></script>
+<!-- MSAL vendored locally (official @azure/msal-browser 2.38.1 npm build). Previously loaded from
+     alcdn.msauth.net with no integrity check: a compromised CDN could have read localStorage.
+     Serving it same-origin removes that supply-chain path and the third-party dependency. -->
+<script src="msal-browser-2.38.1.min.js"></script>
 <style>
 /* Inter, self-hosted: latin subset of the variable font. Previously loaded from Google Fonts,
    which leaked the viewer's IP/referrer on every launch and added a third-party dependency.
@@ -1793,7 +1796,14 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
         <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
-    (tx.length?`<div class="card"><div class="ch"><span>Logged this month — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num">${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('')}</div></div>`:'');}
+    (()=>{if(!tx.length)return '';
+      // A category with a manual actual ignores its logged payments entirely, so those rows
+      // would otherwise sit here looking like they count. Mark them plainly instead.
+      const ovr=id=>{const r=finPlanRow(id,ym);return !!(r&&r.actual_override!=null);};
+      const nIgn=tx.filter(t=>ovr(t.cat_id)).length;
+      const rows=tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);const ig=ovr(t.cat_id);
+        return `<div class="row"${ig?' style="opacity:.6"':''}><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}${ig?' <span class="pill n" title="This category\'s actual was entered manually, so logged payments are not counted">not counted</span>':''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num"${ig?' style="text-decoration:line-through;color:var(--t4)"':''}>${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('');
+      return `<div class="card"><div class="ch"><span>Logged this month — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${rows}</div>${nIgn?`<p class="note" style="padding:8px 14px 12px">${nIgn} payment${nIgn>1?'s are':' is'} not counted — that category's actual was typed in directly. Clear the manual figure (✎ on the row) to go back to summing payments.</p>`:''}</div>`;})();}
 let editFC=null;
 function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;const c=editFC;
   g('mFinCatTitle').firstChild.textContent=(c?'Edit Category':'New Category')+' ';
