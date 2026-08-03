@@ -1257,6 +1257,25 @@ document.addEventListener('click',e=>{if(!e.target.closest('.gh-search'))g('srch
 var _sort={};
 function setSort(scope,key){const s=_sort[scope]||{};if(s.key===key)s.dir=s.dir===1?-1:1;else{s.key=key;s.dir=1;}_sort[scope]=s;renderView();}
 function sortHead(scope,key,label,cls){const s=_sort[scope]||{};const ar=s.key===key?(s.dir===1?'▲':'▼'):'⇅';return`<th class="srt ${cls||''}" onclick="setSort('${scope}','${key}')">${label} <span class="ar">${ar}</span></th>`;}
+/* Reusable sort control for lists that aren't sortable tables (Commitments, Meetings).
+   Sortable tables keep using applySort/sortHead; this covers card/row lists. */
+var _lsort={};
+function listSort(scope,def){return _lsort[scope]||def;}
+function setListSort(scope,v){_lsort[scope]=v;renderView();}
+function listSortSelect(scope,opts,def){const cur=listSort(scope,def);
+  return `<select title="Sort this list" onchange="setListSort('${scope}',this.value)">${opts.map(o=>`<option value="${o[0]}"${cur===o[0]?' selected':''}>Sort: ${o[1]}</option>`).join('')}</select>`;}
+function fprName(t){const c=t&&t.contact_id?CO().find(x=>x.id===t.contact_id):null;return c?c.name:'';}
+/* Shared task sort. 'due' folds in the date each kind of row actually shows
+   (task due, call time, follow-up), so one control works across all four tabs. */
+function taskSortBy(list,key){const dueOf=t=>(t.due||(t.when||'').slice(0,10)||(t.follow_up||'').slice(0,10)||'9999-12-31');
+  const arr=[...list];
+  if(key==='created')return arr.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+  if(key==='fpr')return arr.sort((a,b)=>{const x=fprName(a),y=fprName(b);
+    if(!x&&!y)return dueOf(a).localeCompare(dueOf(b));
+    if(!x)return 1;if(!y)return -1;
+    return x.toLowerCase().localeCompare(y.toLowerCase())||dueOf(a).localeCompare(dueOf(b));});
+  return arr.sort((a,b)=>dueOf(a).localeCompare(dueOf(b)));}
+const TASK_SORTS=[['due','Due date'],['created','Created date'],['fpr','FPR']];
 function applySort(scope,arr,getters){const s=_sort[scope];if(!s||!s.key||!getters[s.key])return arr;const g2=getters[s.key];return[...arr].sort((a,b)=>{let x=g2(a),y=g2(b);if(typeof x==='string')x=x.toLowerCase();if(typeof y==='string')y=y.toLowerCase();if(x==null)x='';if(y==null)y='';return (x<y?-1:x>y?1:0)*s.dir;});}
 function viewToggle(scope,val){return`<div class="vtog"><button class="${val==='list'?'on':''}" onclick="_view['${scope}']='list';renderView()">List</button><button class="${val==='card'?'on':''}" onclick="_view['${scope}']='card';renderView()">Cards</button></div>`;}
 var _view={accounts:'list',people:'card'};
@@ -2394,10 +2413,15 @@ function exportIcs(){const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//ClarioO
 /* ═══ COMMITMENTS ═══ */
 var cTab='chase';
 function vCommit(){const td=today();
-  const chase=waiting().sort((a,b)=>(a.follow_up||'9').localeCompare(b.follow_up||'9'));
-  const mine=openMine().filter(t=>t.type!=='call').sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')||['high','medium','low'].indexOf(a.priority)-['high','medium','low'].indexOf(b.priority));
-  const calls=T().filter(t=>t.type==='call'&&t.status!=='done').sort((a,b)=>(a.when||'9').localeCompare(b.when||'9'));
-  const doneAll=T().filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||''));
+  const sk=listSort('commit','due');
+  const chase=taskSortBy(waiting(),sk);
+  const mine=sk==='due'
+    ? taskSortBy(openMine().filter(t=>t.type!=='call'),'due').sort((a,b)=>((a.due||'9999').localeCompare(b.due||'9999'))||['high','medium','low'].indexOf(a.priority)-['high','medium','low'].indexOf(b.priority))
+    : taskSortBy(openMine().filter(t=>t.type!=='call'),sk);
+  const calls=taskSortBy(T().filter(t=>t.type==='call'&&t.status!=='done'),sk);
+  const doneAll=sk==='due'
+    ? T().filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||''))
+    : taskSortBy(T().filter(t=>t.status==='done'),sk);
   const dv=window._cd||'';
   const filt=l=>dv?l.filter(t=>t.dept===dv):l;
   const cdF=window._cDoneField||'completed_at',cdFrom=window._cDoneFrom||'',cdTo=window._cDoneTo||'';
@@ -2419,6 +2443,7 @@ function vCommit(){const td=today();
     <button class="tab ${cTab==='calls'?'on':''}" onclick="cTab='calls';renderView()">Calls <span class="num">(${calls.length})</span></button>
     <button class="tab ${cTab==='done'?'on':''}" onclick="cTab='done';renderView()">Done</button></div>
   <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
+    ${listSortSelect('commit',TASK_SORTS,'due')}
     ${cTab==='done'?`<select onchange="window._cDoneField=this.value;renderView()" title="Filter by date"><option value="completed_at"${cdF==='completed_at'?' selected':''}>Completed</option><option value="created_at"${cdF==='created_at'?' selected':''}>Created</option><option value="updated_at"${cdF==='updated_at'?' selected':''}>Modified</option></select><input type="date" value="${cdFrom}" title="From" onchange="window._cDoneFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${cdTo}" title="To" onchange="window._cDoneTo=this.value;renderView()" style="max-width:135px">${(cdFrom||cdTo)?`<button class="btn gh2 sm" onclick="window._cDoneFrom='';window._cDoneTo='';renderView()">Clear dates</button>`:''}`:''}</div>
   ${bulkbar}${body}`;}
 var _bulkSel=new Set();
@@ -2496,7 +2521,8 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
     if(dfF&&(dfFrom||dfTo)){const v=(t[dfF]||'').slice(0,10);if(!v)return false;if(dfFrom&&v<dfFrom)return false;if(dfTo&&v>dfTo)return false;}
     return true;});
   const dd=t=>t.type==='call'?(t.when||'').slice(0,10):(t.due||'');
-  const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status};
+  const getters={title:t=>t.title,owner:t=>pname(t.owner),due:t=>dd(t)||'9999',priority:t=>({high:0,medium:1,low:2})[t.priority||'medium'],account:t=>cname(t.customer_id),dept:t=>t.dept||'',status:t=>t.status,
+    created:t=>t.created_at||'',fpr:t=>(fprName(t)||'zzzz').toLowerCase()};
   list=applySort('tasks',list,getters);if(!_sort.tasks)list=list.sort((a,b)=>(dd(a)||'9999').localeCompare(dd(b)||'9999'));
   const _tN=list.length;list=listCap('tasks',list);
   const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
@@ -2509,8 +2535,8 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
     ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._tDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._tDateTo=this.value;renderView()" style="max-width:135px">`:''}
     ${(q||own||dp||st!=='open'||dfF)?`<button class="btn gh2 sm" onclick="window._tq='';window._tOwn='';window._tDp='';window._tSt='open';window._tDateField='';window._tDateFrom='';window._tDateTo='';renderView()">Clear</button>`:''}</div>`;
   const rows=list.map(t=>{const d=dd(t);const over=t.status!=='done'&&d&&d<td;
-    return`<tr class="click" onclick="nav('task','${t.id}')"><td><span class="pri ${t.priority||'medium'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${esc(t.title)}</td><td>${t.type==='call'?'<span class="pill b">Call</span>':''}${t.owner&&t.owner!=='me'?esc(pname(t.owner)):'<span style="color:var(--t4)">Me</span>'}</td><td>${t.customer_id?esc(cname(t.customer_id)):''}</td><td>${esc(t.dept||'')}</td><td>${d?`<span class="due ${over?'over':d===td?'today':''}">${fmtD(d)}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${t.status==='done'?'<span class="pill g">done</span>':t.status==='waiting'?'<span class="pill a">waiting</span>':'<span class="pill b">open</span>'}</td></tr>`;}).join('');
-  const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
+    return`<tr class="click" onclick="nav('task','${t.id}')"><td><span class="pri ${t.priority||'medium'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>${esc(t.title)}</td><td>${t.type==='call'?'<span class="pill b">Call</span>':''}${t.owner&&t.owner!=='me'?esc(pname(t.owner)):'<span style="color:var(--t4)">Me</span>'}</td><td>${t.customer_id?esc(cname(t.customer_id)):''}</td><td>${esc(t.dept||'')}</td><td>${fprName(t)?esc(fprName(t)):'<span style="color:var(--t4)">—</span>'}</td><td class="num" style="color:var(--t3)">${t.created_at?fmtD(t.created_at.slice(0,10)):'—'}</td><td>${d?`<span class="due ${over?'over':d===td?'today':''}">${fmtD(d)}</span>`:'<span style="color:var(--t4)">—</span>'}</td><td>${t.status==='done'?'<span class="pill g">done</span>':t.status==='waiting'?'<span class="pill a">waiting</span>':'<span class="pill b">open</span>'}</td></tr>`;}).join('');
+  const body=list.length?`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('tasks','title','Task')}${sortHead('tasks','owner','Owner')}${sortHead('tasks','account','Account')}${sortHead('tasks','dept','Dept')}${sortHead('tasks','fpr','FPR')}${sortHead('tasks','created','Created')}${sortHead('tasks','due','Due')}${sortHead('tasks','status','Status')}</tr>${rows}</table></div>`:'<div class="card"><div class="empty">No tasks match.</div></div>';
   return pagehead('WORK','Tasks',_tN+' shown',`<button class="btn sm" onclick="openTask()">+ Task</button>`)+filters+body+capMore('tasks',_tN);}
 
 const SUMMARY_SIGNOFF='Please feel free to add any points which might have been missed or for any further clarifications.';
@@ -2578,9 +2604,17 @@ function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(
     if(q&&!((m.title+' '+cname(m.customer_id)+' '+(m.attendee_ids||[]).map(pname).join(' ')+' '+(m.dept||'')).toLowerCase().includes(q)))return false;
     if(dfF&&(dfFrom||dfTo)){const v=(m[dfF]||'').slice(0,10);if(!v)return false;if(dfFrom&&v<dfFrom)return false;if(dfTo&&v>dfTo)return false;}
     return true;});
-  list=sf==='past'?list.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||''))):list.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  {const mk=listSort('meetings','due');
+   const acct=m=>(cname(m.customer_id)||'').toLowerCase();
+   const fpr=m=>{const id=(m.contact_ids||[])[0];const c=id?CO().find(x=>x.id===id):null;return (c?c.name:'').toLowerCase();};
+   if(mk==='created')list=list.sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+   else if(mk==='fpr')list=list.sort((a,b)=>{const x=fpr(a),y=fpr(b);if(!x&&!y)return (a.date+(a.time||'')).localeCompare(b.date+(b.time||''));if(!x)return 1;if(!y)return -1;return x.localeCompare(y)||(a.date+(a.time||'')).localeCompare(b.date+(b.time||''));});
+   else if(mk==='account')list=list.sort((a,b)=>{const x=acct(a),y=acct(b);if(!x&&!y)return (a.date+(a.time||'')).localeCompare(b.date+(b.time||''));if(!x)return 1;if(!y)return -1;return x.localeCompare(y)||(a.date+(a.time||'')).localeCompare(b.date+(b.time||''));});
+   // default: chronological — past newest-first, upcoming soonest-first
+   else list=sf==='past'?list.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||''))):list.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));}
   const filters=`<div class="filters"><input placeholder="Search title, account, attendee, dept" value="${esc(window._mq||'')}" oninput="window._mq=this.value;clearTimeout(window._mqt);window._mqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
     <select onchange="window._mSt=this.value;renderView()"><option value="upcoming"${sf==='upcoming'?' selected':''}>Upcoming</option><option value="past"${sf==='past'?' selected':''}>Past</option><option value="all"${sf==='all'?' selected':''}>All</option></select>
+    ${listSortSelect('meetings',[['due','Meeting date'],['created','Created date'],['fpr','FPR'],['account','Account']],'due')}
     <select onchange="window._mDateField=this.value;renderView()" title="Filter by date"><option value="">Any date</option><option value="created_at"${dfF==='created_at'?' selected':''}>Created</option><option value="updated_at"${dfF==='updated_at'?' selected':''}>Modified</option><option value="completed_at"${dfF==='completed_at'?' selected':''}>Completed</option></select>
     ${dfF?`<input type="date" value="${dfFrom}" title="From" onchange="window._mDateFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${dfTo}" title="To" onchange="window._mDateTo=this.value;renderView()" style="max-width:135px">`:''}
     ${(q||sf!=='upcoming'||dfF)?`<button class="btn gh2 sm" onclick="window._mq='';window._mSt='upcoming';window._mDateField='';window._mDateFrom='';window._mDateTo='';renderView()">Clear</button>`:''}</div>`;
