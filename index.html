@@ -13,10 +13,18 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <script>if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
-<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js" crossorigin="anonymous"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- MSAL vendored locally (official @azure/msal-browser 2.38.1 npm build). Previously loaded from
+     alcdn.msauth.net with no integrity check: a compromised CDN could have read localStorage.
+     Serving it same-origin removes that supply-chain path and the third-party dependency. -->
+<script src="msal-browser-2.38.1.min.js"></script>
 <style>
+/* Inter, self-hosted: latin subset of the variable font. Previously loaded from Google Fonts,
+   which leaked the viewer's IP/referrer on every launch and added a third-party dependency.
+   ₹ (U+20B9) isn't in any Inter subset, so it falls back to a system face exactly as before. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;
+  src:url(inter-var.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+
 :root{
   --bg:#f3f2f2; --card:#ffffff; --sub:#fafaf9; --bdr:#e5e5e5; --bdr2:#c9c9c9;
   --t1:#181818; --t2:#444444; --t3:#706e6b; --t4:#6b6b6b;
@@ -1057,12 +1065,12 @@ let _personalUnlocked=false,_pinAttempts=0,_pinLockUntil=0,_pinHiddenAt=0;
 function pinIsSet(){return !!(_pinCfg&&_pinCfg.hash);}
 async function pinHash(pin,saltB64){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:ub64(saltB64),iterations:200000,hash:'SHA-256'},km,256);return b64(new Uint8Array(bits));}
 async function pinVerify(pin){if(!pinIsSet())return false;try{return (await pinHash(pin,_pinCfg.salt))===_pinCfg.hash;}catch(e){return false;}}
-async function _pinCapture(){const p1=await askText('Enter a PIN (4–12 digits):',{title:'Personal PIN',type:'password',ok:'Next'});if(p1===null)return false;const pin=(p1||'').trim();
+async function _pinCapture(keepUnlocked){const p1=await askText('Enter a PIN (4–12 digits):',{title:'Personal PIN',type:'password',ok:'Next'});if(p1===null)return false;const pin=(p1||'').trim();
   if(!/^\d{4,12}$/.test(pin)){toast('PIN must be 4–12 digits.');return false;}
   const p2=await askText('Re-enter the PIN:',{title:'Confirm PIN',type:'password',ok:'Save'});if(p2===null)return false;if((p2||'').trim()!==pin){toast('PINs do not match.');return false;}
-  const salt=b64(crypto.getRandomValues(new Uint8Array(16)));const hash=await pinHash(pin,salt);_pinCfg={salt,hash};localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));_personalUnlocked=true;_pinAttempts=0;_pinLockUntil=0;return true;}
-async function setPin(){if(pinIsSet())return changePin();if(await _pinCapture()){toast('Personal PIN set.');renderView();}}
-async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture()){toast('PIN updated.');renderView();}}
+  const salt=b64(crypto.getRandomValues(new Uint8Array(16)));const hash=await pinHash(pin,salt);_pinCfg={salt,hash};localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));_personalUnlocked=!!keepUnlocked;_pinAttempts=0;_pinLockUntil=0;return true;}
+async function setPin(){if(pinIsSet())return changePin();if(await _pinCapture(false)){toast('Personal PIN set — it will ask for the PIN next time you open Personal.');renderView();}}
+async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture(true)){toast('PIN updated.');renderView();}}
 async function removePin(){if(!pinIsSet())return;const cur=await askText('Enter your current PIN to remove the lock:',{title:'Remove lock',type:'password',ok:'Remove'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}_pinCfg=null;localStorage.removeItem(PIN_KEY);_personalUnlocked=false;toast('Personal lock removed.');renderView();}
 function lockPersonal(){_personalUnlocked=false;renderView();}
 async function pinTry(){if(_pinLockUntil>Date.now())return;const el=g('pinInput');const pin=(el?el.value:'').trim();if(!pin)return;
@@ -1172,7 +1180,8 @@ const NAVMORE=[
   ['Insight',[['decide','Decide'],['dash','Dashboards'],['review','Review']]],
   ['System',[['settings','Settings']]]];
 const MOREIDS=NAVMORE.flatMap(([g,items])=>items.map(i=>i[0]));
-function setMode(m){appMode=m;localStorage.setItem(MODE_KEY,m);applyModeUI();renderView();}
+function setMode(m){if(m!=='personal'&&pinIsSet())_personalUnlocked=false;  // re-lock on leaving Personal
+  appMode=m;localStorage.setItem(MODE_KEY,m);applyModeUI();renderView();}
 function applyModeUI(){const personal=appMode==='personal';
   const mt=g('modeToggle');if(mt)mt.innerHTML=`<button class="${!personal?'on':''}" onclick="setMode('official')">Official</button><button class="${personal?'on':''}" onclick="setMode('personal')">Personal</button>`;
   const hide=el=>{if(el)el.style.display=personal?'none':'';};
@@ -1787,7 +1796,14 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
         <div class="fb-row fb-close"><span>= Closing balance</span><b class="num" style="color:${closing<0?'var(--red)':'var(--t1)'}">${fmtMoney(closing)}</b></div>
       </div></div>`;})()+
     section('Income',inc,'income')+section('Fixed commitments',fix,'fixed')+section('Variable expenses',exp,'expense')+section('Savings & investments',sav,'savings')+
-    (tx.length?`<div class="card"><div class="ch"><span>Logged this month — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);return `<div class="row"><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num">${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('')}</div></div>`:'');}
+    (()=>{if(!tx.length)return '';
+      // A category with a manual actual ignores its logged payments entirely, so those rows
+      // would otherwise sit here looking like they count. Mark them plainly instead.
+      const ovr=id=>{const r=finPlanRow(id,ym);return !!(r&&r.actual_override!=null);};
+      const nIgn=tx.filter(t=>ovr(t.cat_id)).length;
+      const rows=tx.map(t=>{const c=fincats.find(x=>x.id===t.cat_id);const ig=ovr(t.cat_id);
+        return `<div class="row"${ig?' style="opacity:.6"':''}><div class="bd"><div class="tt" style="font-size:12.5px">${esc(c?c.name:'—')}${t.note?` <span style="color:var(--t3);font-weight:400">· ${esc(t.note)}</span>`:''}${ig?' <span class="pill n" title="This category\'s actual was entered manually, so logged payments are not counted">not counted</span>':''}</div><div class="meta">${fmtD(t.date)}</div></div><div style="display:flex;gap:8px;align-items:center"><b class="num"${ig?' style="text-decoration:line-through;color:var(--t4)"':''}>${fmtMoney(t.amount)}</b><button class="iconb" title="Delete" onclick="finDelTx('${t.id}')">✕</button></div></div>`;}).join('');
+      return `<div class="card"><div class="ch"><span>Logged this month — ${finMonthLabel(ym)}</span><span class="n num">${tx.length}</span></div><div class="scrolllist">${rows}</div>${nIgn?`<p class="note" style="padding:8px 14px 12px">${nIgn} payment${nIgn>1?'s are':' is'} not counted — that category's actual was typed in directly. Clear the manual figure (✎ on the row) to go back to summing payments.</p>`:''}</div>`;})();}
 let editFC=null;
 function openFinCat(id,presetGroup){editFC=id?fincats.find(x=>x.id===id):null;const c=editFC;
   g('mFinCatTitle').firstChild.textContent=(c?'Edit Category':'New Category')+' ';
