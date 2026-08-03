@@ -2185,9 +2185,9 @@ function planHtml(scope,key,title,ph,max){const items=planItems(scope,key);
   return`<div class="card"><div class="ch"><span>${title}</span><span class="n num">${items.filter(i=>i.done).length}/${items.length}</span></div>
   ${items.map((i,ix)=>`<div class="${scope==='day'?'top3-it':'row'}">${scope==='day'?`<span class="rank num">${ix+1}</span>`:''}<button class="chk ${i.done?'on':''}" onclick="planToggle('${i.id}')">${i.done?'✓':''}</button><div style="flex:1;font-size:12.5px;font-weight:${scope==='day'?'600':'500'};${i.done?'text-decoration:line-through;color:var(--t3)':''}">${esc(i.text)}</div><button class="iconb" onclick="planDel('${i.id}')">✕</button></div>`).join('')||`<div class="empty">${ph}</div>`}
   ${(!max||items.length<max)?`<div class="addline"><input id="planInp_${scope}" placeholder="Add ${scope==='day'?'a top priority':scope==='week'?'a weekly priority':'a monthly goal'}"><button class="btn sm" onclick="planAdd('${scope}','${key}')">Add</button></div>`:''}</div>`;}
-function planAdd(scope,key){const i=g('planInp_'+scope);const v=(i?i.value:'').trim();if(!v)return;const n=now();plans.push({id:uid(),scope,key,text:v,done:false,created_at:n,updated_at:n});persist();renderView();}
-function planToggle(id){const p=plans.find(x=>x.id===id);if(p){p.done=!p.done;p.updated_at=now();persist();renderView();}}
-function planDel(id){const p=plans.find(x=>x.id===id);if(p){p.deleted=true;p.updated_at=now();persist();renderView();}}
+function planAdd(scope,key){const i=g('planInp_'+scope);const v=(i?i.value:'').trim();if(!v)return;const n=now();plans.push({id:uid(),scope,key,text:v,done:false,created_at:n,updated_at:n});persist();reRender();}
+function planToggle(id){const p=plans.find(x=>x.id===id);if(p){p.done=!p.done;p.updated_at=now();persist();reRender();}}
+function planDel(id){const p=plans.find(x=>x.id===id);if(p){p.deleted=true;p.updated_at=now();persist();reRender();}}
 function getJournal(key){return journals.find(j=>j.key===key&&!j.deleted);}
 function saveJournal(key){const ta=g('jTa');if(!ta)return;const j=getJournal(key);const n=now();
   if(j){j.text=ta.value;j.updated_at=n;}else journals.push({id:uid(),key,text:ta.value,created_at:n,updated_at:n});
@@ -2422,15 +2422,18 @@ function vCommit(){const td=today();
   const doneAll=sk==='due'
     ? T().filter(t=>t.status==='done').sort((a,b)=>(b.completed_at||b.updated_at||'').localeCompare(a.completed_at||a.updated_at||''))
     : taskSortBy(T().filter(t=>t.status==='done'),sk);
-  const dv=window._cd||'';
-  const filt=l=>dv?l.filter(t=>t.dept===dv):l;
+  const dv=window._cd||'';const pv=window._cp||'';
+  const filt=l=>{let r=dv?l.filter(t=>t.dept===dv):l;return pv?r.filter(t=>(t.owner||'me')===pv):r;};
   const cdF=window._cDoneField||'completed_at',cdFrom=window._cDoneFrom||'',cdTo=window._cDoneTo||'';
   const doneFiltered=filt(doneAll).filter(t=>{if(!(cdFrom||cdTo))return true;const v=(t[cdF]||'').slice(0,10);if(!v)return false;if(cdFrom&&v<cdFrom)return false;if(cdTo&&v>cdTo)return false;return true;});
   const done=(cdFrom||cdTo)?doneFiltered:doneFiltered.slice(0,15);
-  const groups={};filt(chase).forEach(t=>{(groups[t.owner]=groups[t.owner]||[]).push(t);});
-  const chaseHtml=Object.entries(groups).map(([pid,list])=>seccard('Waiting on '+esc(pname(pid)),list.length,list.map(t=>trow(t)).join(''),'')).join('')||'<div class="card"><div class="empty">Nothing delegated and open. Delegate with @name in quick capture.</div></div>';
+
+
   const bulk=(cTab==='chase'||cTab==='mine');
-  const chaseHtmlB=Object.entries(groups).map(([pid,list])=>seccard('Waiting on '+esc(pname(pid)),list.length,list.map(t=>trow(t,{bulk:true,snooze:true})).join(''),'')).join('')||'<div class="card"><div class="empty">Nothing delegated and open. Delegate with @name in quick capture.</div></div>';
+  // One flat list — the person shows per row (and is filterable) rather than splitting
+  // the tab into a separate card per person.
+  const chaseList=filt(chase);
+  const chaseHtmlB=seccard('Waiting on others',chaseList.length,chaseList.map(t=>trow(t,{bulk:true,snooze:true})).join(''),'Nothing delegated and open. Delegate with @name in quick capture.');
   const body=cTab==='chase'?chaseHtmlB
     :cTab==='mine'?seccard('On my plate',filt(mine).length,filt(mine).map(t=>trow(t,{bulk:true})).join(''),'Clear.')
     :cTab==='calls'?seccard('Calls',filt(calls).length,filt(calls).map(t=>trow(t)).join(''),'No pending calls.')
@@ -2444,6 +2447,10 @@ function vCommit(){const td=today();
     <button class="tab ${cTab==='done'?'on':''}" onclick="cTab='done';renderView()">Done</button></div>
   <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
     ${listSortSelect('commit',TASK_SORTS,'due')}
+    ${(()=>{const base=cTab==='chase'?chase:cTab==='mine'?mine:cTab==='calls'?calls:doneAll;
+      const ids=[...new Set(base.map(t=>t.owner||'me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
+      if(ids.length<2&&!pv)return '';
+      return `<select title="Filter by person" onchange="window._cp=this.value;renderView()"><option value="">All people</option>${ids.map(id=>`<option value="${esc(id)}"${pv===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>`;})()}
     ${cTab==='done'?`<select onchange="window._cDoneField=this.value;renderView()" title="Filter by date"><option value="completed_at"${cdF==='completed_at'?' selected':''}>Completed</option><option value="created_at"${cdF==='created_at'?' selected':''}>Created</option><option value="updated_at"${cdF==='updated_at'?' selected':''}>Modified</option></select><input type="date" value="${cdFrom}" title="From" onchange="window._cDoneFrom=this.value;renderView()" style="max-width:135px"><input type="date" value="${cdTo}" title="To" onchange="window._cDoneTo=this.value;renderView()" style="max-width:135px">${(cdFrom||cdTo)?`<button class="btn gh2 sm" onclick="window._cDoneFrom='';window._cDoneTo='';renderView()">Clear dates</button>`:''}`:''}</div>
   ${bulkbar}${body}`;}
 var _bulkSel=new Set();
@@ -2504,9 +2511,9 @@ function personPage(p){const ag=AG().filter(a=>a.person_id===p.id&&a.status==='o
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note',null,null,'${p.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call',null,null,'${p.id}')">Log as call</button></div></div>
     <div class="cb"><div class="atl">${acts.map(a=>actItem(a,null,null,p.id)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet.</div>'}</div></div></div>
   </div></div>`;}
-function agendaAdd(pid){const i=g('agInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:pid,text:v,status:'open',created_at:n,updated_at:n});persist();renderView();}
-function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised';a.updated_at=now();persist();renderView();}}
-function agendaDel(id){const a=agenda.find(x=>x.id===id);if(a){a.deleted=true;a.updated_at=now();persist();renderView();}}
+function agendaAdd(pid){const i=g('agInput');const v=(i?i.value:'').trim();if(!v)return;const n=now();agenda.push({id:uid(),person_id:pid,text:v,status:'open',created_at:n,updated_at:n});persist();reRender();}
+function agendaDone(id){const a=agenda.find(x=>x.id===id);if(a){a.status='raised';a.updated_at=now();persist();reRender();}}
+function agendaDel(id){const a=agenda.find(x=>x.id===id);if(a){a.deleted=true;a.updated_at=now();persist();reRender();}}
 
 function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const own=window._tOwn||'';const st=window._tSt||'open';const dp=window._tDp||'';
   const dfF=window._tDateField||'',dfFrom=window._tDateFrom||'',dfTo=window._tDateTo||'';
@@ -3700,8 +3707,8 @@ function toggleTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;
       repeat_weekdays:t.repeat_weekdays||null,repeat_month_mode:t.repeat_month_mode||null,repeat_month_day:t.repeat_month_day??null,repeat_month_nth:t.repeat_month_nth??null,repeat_month_weekday:t.repeat_month_weekday??null,
       phone:t.phone,when:isCall?(nd+timeOfDay):null,status:t.owner!=='me'?'waiting':'open',notes:t.notes,created_at:n2,updated_at:n2});
     toast('Next occurrence scheduled '+fmtD(nd)+'.');}
-  persist();renderView();}
-function toggleFocus(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(!t.focus&&T().filter(x=>x.focus&&x.status!=='done').length>=3){toast('Three focus slots — unstar one first.');return;}t.focus=!t.focus;t.updated_at=now();persist();renderView();}
+  persist();reRender();}
+function toggleFocus(id){const t=tasks.find(x=>x.id===id);if(!t)return;if(!t.focus&&T().filter(x=>x.focus&&x.status!=='done').length>=3){toast('Three focus slots — unstar one first.');return;}t.focus=!t.focus;t.updated_at=now();persist();reRender();}
 
 let editP=null;
 function openPerson(id){editP=id?people.find(x=>x.id===id):null;
