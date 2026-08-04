@@ -249,6 +249,10 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .wcal-col-head .dn{font-size:14px;color:var(--t1)}
 .wcal-col.today .wch-top,.wcal-col.today .dn{color:var(--blue-d)}
 .wch-loc .pill{font-size:10px}
+.loc-carried{opacity:.62;font-style:italic}
+.mg-c.weekoff{background:repeating-linear-gradient(135deg,var(--sub),var(--sub) 6px,var(--bg) 6px,var(--bg) 12px)}
+.wcal-col.weekoff .wcal-col-head{background:var(--sub)}
+.wcal-col.weekoff{background:rgba(0,0,0,.015)}
 .wch-tasks{font-size:11px;color:var(--t2);font-weight:600}
 .wch-tasks:hover{color:var(--blue-d)}
 .wcal-col-body{position:relative}
@@ -960,6 +964,9 @@ var regions=[];
 var locationsList=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var companyName='';
+/* Weekly offs. off = weekday numbers that are non-working (0=Sun). satRule handles the common
+   Indian pattern where only some Saturdays are off. */
+var workWeek={off:[0],satRule:'none'};
 var stateUpdatedAt=now();
 var appMode=localStorage.getItem(MODE_KEY)||'official';
 var personalTab='tasks';
@@ -970,10 +977,10 @@ function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;stateUpdatedAt=s.updatedAt||now();}
+function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
+function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;if(typeof rm.companyName==='string'&&rm.companyName&&!companyName)companyName=rm.companyName;}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;if(typeof rm.companyName==='string'&&rm.companyName&&!companyName)companyName=rm.companyName;if(rm.workWeek&&typeof rm.workWeek==='object'&&!workWeek._set)workWeek={off:Array.isArray(rm.workWeek.off)?rm.workWeek.off:[0],satRule:rm.workWeek.satRule||'none',_set:true};}
 function persist(){stateUpdatedAt=now();try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
 function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
@@ -1002,9 +1009,35 @@ const LOC=()=>locations.filter(x=>!x.deleted);
 const pname=id=>id==='me'||!id?(myProfile.name||'Me'):(P().find(p=>p.id===id)||{}).name||'—';
 const deptForOwner=oid=>oid==='me'||!oid?(myProfile.dept||''):(P().find(p=>p.id===oid)||{}).dept||'';
 const byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
+/* Which Saturday of the month a date is: 1st..5th. */
+function nthWeekdayOfMonth(ds){return Math.floor((+ds.slice(8,10)-1)/7)+1;}
+function isWeeklyOff(ds){const d=new Date(ds+'T12:00').getDay();
+  if((workWeek.off||[]).includes(d))return true;
+  if(d===6){const r=workWeek.satRule||'none';const n=nthWeekdayOfMonth(ds);
+    if(r==='all')return true;
+    if(r==='2_4')return n===2||n===4;
+    if(r==='1_3')return n===1||n===3;
+    if(r==='alt')return n%2===0;}
+  return false;}
+function weeklyOffLabel(ds){if(!isWeeklyOff(ds))return '';const d=new Date(ds+'T12:00').getDay();
+  return d===6?(nthWeekdayOfMonth(ds)+getOrdinal(nthWeekdayOfMonth(ds))+' Sat off'):'Weekly off';}
+function getOrdinal(n){return ['th','st','nd','rd'][(n%10>3||[11,12,13].includes(n%100))?0:n%10];}
 function lastLocEntry(){return LOC().slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0)[0]||null;}
-function locEntryOn(ds){const hits=LOC().filter(x=>x.date<=ds);return hits.length?hits.sort((a,b)=>a.date<b.date?1:-1)[0]:null;}
-function locOn(ds){const e=locEntryOn(ds);return e?e.city:'';}
+/* Carry-forward is only true of the past: you stayed in a city until you moved. Projecting it
+   into the future made editing look broken — changing one day appeared to repaint every later
+   day, because those days had no entry of their own and simply inherited the newest one.
+   Future days now show only what you actually set for them. */
+function locEntryOn(ds,opts){const hits=LOC().filter(x=>x.date<=ds);if(!hits.length)return null;
+  const e=hits.sort((a,b)=>a.date<b.date?1:-1)[0];
+  if(e.date===ds)return e;                                  // explicitly set for this day
+  if(!(opts&&opts.carryFuture)&&ds>today())return null;      // don't guess the future
+  return e;}
+function locExact(ds){return LOC().find(x=>x.date===ds)||null;}
+function locOn(ds,opts){const e=locEntryOn(ds,opts);return e?e.city:'';}
+function locIsCarried(ds){const e=locEntryOn(ds);return !!(e&&e.date!==ds);}
+function locChip(ds,extra){const e=locEntryOn(ds);const carried=!!(e&&e.date!==ds);
+  const txt=e?e.city:'Set location';
+  return `<span class="pill n lnk${carried?' loc-carried':''}" ${extra||''} title="${e?(carried?'Carried from '+fmtD(e.date)+' — click to set this day':'Set for this day'):'Set/confirm your location for this day'}">📍 ${esc(txt)}</span>`;}
 function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();if(ex){ex.city=city;ex.updated_at=n;}else locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});persist();}
 async function checkLocationConfirmation(){
   if(appMode!=='official')return;
@@ -1051,10 +1084,26 @@ const b64=b=>{let s='';const u=new Uint8Array(b);for(let i=0;i<u.length;i+=8192)
 const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 async function deriveKey(pass,saltB64){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:ub64(saltB64),iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
 async function encJson(json){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},_encKey,new TextEncoder().encode(json));return JSON.stringify({clarioEnc:1,salt:_encMeta.salt,iv:b64(iv),ct:b64(ct)});}
-async function decEnvelope(env){if(!_encKey){const pass=await askText('This file is encrypted. Enter passphrase:',{title:'Passphrase',type:'password',ok:'Unlock'});if(!pass)throw new Error('Passphrase required');_encKey=await deriveKey(pass,env.salt);if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
+/* One unlock per launch, shared by every caller. Previously each of saveToFile, gSave (twice on
+   a conflict retry), snapMaybe and snapNow prompted independently, so a single edit could raise
+   several passphrase dialogs. Concurrent callers now await the same promise. */
+let _encAsk=null;
+async function ensureEncKey(salt,interactive){
+  if(_encKey)return _encKey;
+  if(!interactive)return null;                       // background work never prompts
+  if(_encAsk)return _encAsk;                          // a prompt is already open — reuse it
+  _encAsk=(async()=>{const pass=await askText('Enter the passphrase for your encrypted db.json:',{title:'Unlock db.json',type:'password',ok:'Unlock'});
+    if(!pass)throw new Error('no pass');
+    _encKey=await deriveKey(pass,salt);return _encKey;})();
+  try{return await _encAsk;}finally{_encAsk=null;}}
+async function decEnvelope(env){if(!_encKey){await ensureEncKey(env.salt,true);
+    if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(env.iv)},_encKey,ub64(env.ct));return JSON.parse(new TextDecoder().decode(pt));}
 async function parseDb(text){const j=JSON.parse(text);if(j&&j.clarioEnc){try{return await decEnvelope(j);}catch(e){_encKey=null;toast('Wrong passphrase or corrupted file.');throw e;}}return j;}
-async function serializeDb(){const json=JSON.stringify(getState(),null,2);if(_encMeta&&_encMeta.on){if(!_encKey){const pass=await askText('Enter encryption passphrase to save:',{title:'Passphrase',type:'password',ok:'Save'});if(!pass)throw new Error('no pass');_encKey=await deriveKey(pass,_encMeta.salt);}return encJson(json);}return json;}
+async function serializeDb(opts){const json=JSON.stringify(getState(),null,2);
+  if(_encMeta&&_encMeta.on){const k=await ensureEncKey(_encMeta.salt,!(opts&&opts.silent));
+    if(!k)throw new Error('no pass');return encJson(json);}
+  return json;}
 async function enableEnc(){const p1=await askText('Choose an encryption passphrase (losing it means losing the synced file):',{title:'Encrypt db.json',type:'password',ok:'Next'});if(!p1)return;const p2=await askText('Repeat passphrase:',{title:'Confirm passphrase',type:'password',ok:'Encrypt'});if(p1!==p2){toast('Passphrases do not match.');return;}
   _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(p1,_encMeta.salt);localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));persist();if(_fsDir)await saveToFile();toast('db.json is now AES-256 encrypted.');renderView();}
 async function disableEnc(){if(!await askConfirm('Turn off encryption? db.json will be written as plain text.',{title:'Disable encryption',ok:'Turn off',danger:true}))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
@@ -1143,7 +1192,7 @@ async function snapNow(){if(!_fsDir&&!gActive()){toast('Link a folder or sign in
   }catch(e){toast('Snapshot failed: '+(e.message||e));}}
 async function snapMaybe(){const ym=snapDue();if(!ym)return;
   if(!_fsDir&&!gActive())return;                 // nowhere durable to put it yet
-  try{const out=await serializeDb();let ok=false;
+  try{const out=await serializeDb({silent:true});let ok=false;
     if(_fsDir){try{ok=await snapToFolder(ym,out)||ok;}catch(e){}}
     if(gActive()&&!_gNeedsReauth){try{ok=await snapToGraph(ym,out)||ok;}catch(e){}}
     if(ok)snapMark(ym);
@@ -2235,7 +2284,7 @@ function vDayPlanner(ds){const td=today();
   const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   return`<div class="grid31">
     <div>
-      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>'+birthdayBadge():''} <span class="pill n lnk" onclick="editDayLoc('${ds}')" title="Set/confirm your location for this day">📍 ${esc(locOn(ds)||'Set location')}</span></span>
+      <div class="card"><div class="ch"><span>${dn}${ds===td?' <span class="pill b">Today</span>'+birthdayBadge():''} ${locChip(ds,`onclick="editDayLoc('${ds}')"`)}</span>
         <span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="openMeeting(null,'${ds}')">+ Meeting</button><button class="btn xs" onclick="openTask(null,null,'${ds}')">+ Task</button></span></div>
         <div class="tl" style="height:${(H1-H0)*HPX}px">${hours}<div class="tl-blocks">${nowLine}${blockHtml}</div></div></div>
       <div class="card"><div class="ch"><span>Notes & reflection — ${fmtD(ds)}</span><button class="btn xs" onclick="saveJournal('${ds}')">Save</button></div>
@@ -2312,7 +2361,7 @@ function vPlanner(){const td=today();
     const start=mondayOf(first);const cells=[];for(let i=0;i<42;i++)cells.push(addDays(start,i));
     const grid=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="mg-h">${d}</div>`).join('')+
       cells.map(ds=>{const items=dayItems(ds);const inM=monthKey(ds)===mk;
-        return`<div class="mg-c ${inM?'':'dim'} ${ds===td?'todaycell':''} ${ds===selDay?'sel':''}" onclick="selDay='${ds}';renderView()">
+        return`<div class="mg-c ${inM?'':'dim'} ${ds===td?'todaycell':''} ${ds===selDay?'sel':''} ${isWeeklyOff(ds)?'weekoff':''}" onclick="selDay='${ds}';renderView()" ${isWeeklyOff(ds)?`title="${esc(weeklyOffLabel(ds))}"`:''}>
         <div class="dn num">${+ds.slice(8)}</div>
         ${items.slice(0,3).map(it=>{const ov=it.k==='t'&&it.o.due<td;return`<div class="mg-it ${ov?'ov':it.k}">${esc(it.s)}</div>`;}).join('')}
         ${items.length>3?`<div class="mg-more">+${items.length-3} more</div>`:''}</div>`;}).join('');
@@ -2326,10 +2375,10 @@ function vPlanner(){const td=today();
     const dayCols=[...Array(7)].map((_,i)=>{const ds=addDays(mon,i);const d=new Date(ds+'T12:00');
       const openT=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done');
       let cells='';for(let h=H0;h<H1;h++)cells+=`<div class="wcal-cell" onclick="quickCreateMeeting('${ds}','${String(h).padStart(2,'0')}:00')" title="Click to schedule a meeting at ${h}:00"></div>`;
-      return`<div class="wcal-col ${ds===td?'today':''}">
+      return`<div class="wcal-col ${ds===td?'today':''} ${isWeeklyOff(ds)?'weekoff':''}">
         <div class="wcal-col-head">
-          <div class="wch-top"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}</span><span class="dn num lnk" onclick="plTab='day';plAnchor='${ds}';renderView()" title="Open day">${d.getDate()}</span></div>
-          <div class="wch-loc"><span class="pill n lnk" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span></div>
+          <div class="wch-top"><span>${d.toLocaleDateString('en-IN',{weekday:'short'})}${isWeeklyOff(ds)?` <span class="pill n" title="${esc(weeklyOffLabel(ds))}">off</span>`:''}</span><span class="dn num lnk" onclick="plTab='day';plAnchor='${ds}';renderView()" title="Open day">${d.getDate()}</span></div>
+          <div class="wch-loc">${locChip(ds,`onclick="event.stopPropagation();editDayLoc('${ds}')"`)}</div>
           <div class="wch-tasks lnk" onclick="plTab='day';plAnchor='${ds}';renderView()" title="Open day">${openT.length} task${openT.length===1?'':'s'}</div>
         </div>
         <div class="wcal-col-body" style="height:${(H1-H0)*HPX}px">${cells}<div class="wcal-blocks-ov">${weekGridBlocks(ds,td)}</div></div>
@@ -2353,7 +2402,7 @@ function vPlanner(){const td=today();
     ${(plTab==='meet'||plTab==='week')?`<button class="btn gh2 sm" onclick="g('icsFile').click()">Import .ics</button><button class="btn gh2 sm" onclick="exportIcs()">Export .ics</button>`:''}`)+
   tabs+body;}
 function dayPanel(ds){if(!ds)return'';const items=dayItems(ds);const dn=new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
-  return`<div style="height:12px"></div>${seccard(dn+` <span class="pill n lnk" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set/confirm location">📍 ${esc(locOn(ds)||'Set location')}</span>`,items.length,(items.map(it=>it.k==='m'?mrowHtml(it.o):trow(it.o,{star:false})).join('')),'Nothing planned. Use + Task above or open the day view.',`<button class="btn xs" onclick="plTab='day';plAnchor='${ds}';renderView()">Open day ↗</button>`)}`;}
+  return`<div style="height:12px"></div>${seccard(dn+` ${locChip(ds,`onclick="event.stopPropagation();editDayLoc('${ds}')"`)}`,items.length,(items.map(it=>it.k==='m'?mrowHtml(it.o):trow(it.o,{star:false})).join('')),'Nothing planned. Use + Task above or open the day view.',`<button class="btn xs" onclick="plTab='day';plAnchor='${ds}';renderView()">Open day ↗</button>`)}`;}
 
 /* ═══ MEETING PAGE ═══ */
 function meetingAgenda(m){return AG().filter(a=>a.status==='open'&&((m.attendee_ids||[]).includes(a.person_id)||a.meeting_id===m.id));}
@@ -3300,6 +3349,12 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="srow"><span>PIN lock</span><b>${pinIsSet()?'On':'Off'}</b></div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
     <p class="note">A PIN gate on the Personal section (Money, Investments, personal tasks) so it isn't opened casually on an unlocked device. It re-locks on reload and after the app is in the background a few minutes; changing or removing it needs the current PIN. This is an access deterrent, not encryption — the data on this device is not encrypted at rest, so anyone with technical access to the browser storage can still read it. For real at-rest protection, keep a device passcode/disk encryption on and turn on db.json encryption above.</p></div>
+  <div class="setcard"><h4>Weekly offs</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${WEEKDAY_FULL.map((d,i)=>`<span class="attchip ${(workWeek.off||[]).includes(i)?'on':''}" onclick="toggleWeekOff(${i})" title="${esc(d)}">${esc(d.slice(0,3))}</span>`).join('')}</div>
+    <div class="fld"><label>Saturdays</label><select onchange="setSatRule(this.value)">
+      ${[['none','Working (unless ticked above)'],['2_4','2nd &amp; 4th Saturday off'],['1_3','1st &amp; 3rd Saturday off'],['alt','Alternate Saturdays off (even weeks)'],['all','All Saturdays off']].map(o=>`<option value="${o[0]}"${(workWeek.satRule||'none')===o[0]?' selected':''}>${o[1]}</option>`).join('')}
+    </select></div>
+    <p class="note">Off days are shaded in the week and month planner so you don't plan work into them. Ticking Saturday above makes every Saturday off; use the dropdown instead for the 2nd &amp; 4th pattern.</p></div>
   <div class="setcard"><h4>Backup & devices</h4>
     <div class="srow"><span>Monthly snapshot</span><b>${(()=>{const l=localStorage.getItem(SNAP_KEY);return l?'Last: '+finMonthLabel(l):((_fsDir||gActive())?'Due — runs shortly':'Needs folder or OneDrive');})()}</b></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -3351,6 +3406,8 @@ function archiveOldRecords(cutoff){const n=now();let count=0;
   decisions.filter(d=>!d.deleted&&!d.archived&&(d.date||(d.updated_at||'').slice(0,10))<cutoff).forEach(d=>{d.archived=true;d.updated_at=n;count++;});
   activities.filter(a=>!a.deleted&&!a.archived&&(a.at||a.updated_at||'').slice(0,10)<cutoff).forEach(a=>{a.archived=true;a.updated_at=n;count++;});
   return count;}
+function toggleWeekOff(i){const o=new Set(workWeek.off||[]);o.has(i)?o.delete(i):o.add(i);workWeek.off=[...o].sort();workWeek._set=true;persist();reRender();}
+function setSatRule(v){workWeek.satRule=v;workWeek._set=true;persist();reRender();}
 async function runArchiveOld(){const cutoff=monthsAgoDate(6);const preview=archivableCounts(cutoff);
   if(!preview){toast('Nothing older than 6 months to archive.');return;}
   if(!await askConfirm(preview+' completed record(s) older than 6 months (before '+fmtD(cutoff)+') will be archived — hidden from lists to keep the app fast, and fully recoverable anytime via Restore.',{title:'Archive old records',ok:'Archive'}))return;
@@ -3991,6 +4048,7 @@ try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
 applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
 setTimeout(()=>checkLocationConfirmation(),350);
+if(_encMeta&&_encMeta.on)setTimeout(()=>{ensureEncKey(_encMeta.salt,true).catch(()=>{});},900);
 setTimeout(()=>{try{finRunAutoDebits();}catch(e){}},1200);
 setTimeout(()=>{try{snapMaybe();}catch(e){}},6000);})();
 </script>
