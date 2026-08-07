@@ -249,7 +249,6 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .wcal-col-head .dn{font-size:14px;color:var(--t1)}
 .wcal-col.today .wch-top,.wcal-col.today .dn{color:var(--blue-d)}
 .wch-loc .pill{font-size:10px}
-.loc-carried{opacity:.62;font-style:italic}
 .mg-c.weekoff{background:repeating-linear-gradient(135deg,var(--sub),var(--sub) 6px,var(--bg) 6px,var(--bg) 12px)}
 .wcal-col.weekoff .wcal-col-head{background:var(--sub)}
 .wcal-col.weekoff{background:rgba(0,0,0,.015)}
@@ -1022,30 +1021,31 @@ function isWeeklyOff(ds){const d=new Date(ds+'T12:00').getDay();
 function weeklyOffLabel(ds){if(!isWeeklyOff(ds))return '';const d=new Date(ds+'T12:00').getDay();
   return d===6?(nthWeekdayOfMonth(ds)+getOrdinal(nthWeekdayOfMonth(ds))+' Sat off'):'Weekly off';}
 function getOrdinal(n){return ['th','st','nd','rd'][(n%10>3||[11,12,13].includes(n%100))?0:n%10];}
-function lastLocEntry(){return LOC().slice().sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0)[0]||null;}
-/* Carry-forward is only true of the past: you stayed in a city until you moved. Projecting it
-   into the future made editing look broken — changing one day appeared to repaint every later
-   day, because those days had no entry of their own and simply inherited the newest one.
-   Future days now show only what you actually set for them. */
-function locEntryOn(ds,opts){const hits=LOC().filter(x=>x.date<=ds);if(!hits.length)return null;
-  const e=hits.sort((a,b)=>a.date<b.date?1:-1)[0];
-  if(e.date===ds)return e;                                  // explicitly set for this day
-  if(!(opts&&opts.carryFuture)&&ds>today())return null;      // don't guess the future
-  return e;}
-function locExact(ds){return LOC().find(x=>x.date===ds)||null;}
-function locOn(ds,opts){const e=locEntryOn(ds,opts);return e?e.city:'';}
-function locIsCarried(ds){const e=locEntryOn(ds);return !!(e&&e.date!==ds);}
-function locChip(ds,extra){const e=locEntryOn(ds);const carried=!!(e&&e.date!==ds);
-  const txt=e?e.city:'Set location';
-  return `<span class="pill n lnk${carried?' loc-carried':''}" ${extra||''} title="${e?(carried?'Carried from '+fmtD(e.date)+' — click to set this day':'Set for this day'):'Set/confirm your location for this day'}">📍 ${esc(txt)}</span>`;}
-function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();if(ex){ex.city=city;ex.updated_at=n;}else locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});persist();}
+/* No carry-forward, in either direction. A day shows only the location recorded for that exact
+   day. Inheriting the most recent earlier entry made editing look broken (changing one day
+   appeared to repaint every later day) and invented history for days that were never confirmed.
+   Future days stay blank unless they are pre-blocked — i.e. set deliberately, in advance.
+   Empty-city rows are treated as "not set": older builds wrote them as carry-forward blockers. */
+function locExact(ds){return LOC().find(x=>x.date===ds&&x.city)||null;}
+function locOn(ds){const e=locExact(ds);return e?e.city:'';}
+/* Most recent confirmed location up to today — used only to pre-fill the once-a-day prompt,
+   never to paint a day the user hasn't confirmed. */
+function lastLocEntry(){const td=today();return LOC().filter(x=>x.city&&x.date<=td).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0)[0]||null;}
+function locChip(ds,extra){const e=locExact(ds);
+  return `<span class="pill n lnk" ${extra||''} title="${e?'Location for this day — click to change':'Set the location for this day'}">📍 ${esc(e?e.city:'Set location')}</span>`;}
+/* Blank city clears the day rather than storing an empty row — with carry-forward gone an
+   empty entry means nothing, and "clear this day" is the obvious reading of an emptied field. */
+function setLoc(ds,city){const ex=LOC().find(x=>x.date===ds);const n=now();
+  if(ex){if(city){ex.city=city;}else{ex.deleted=true;}ex.updated_at=n;}
+  else if(city)locations.push({id:uid(),date:ds,city,created_at:n,updated_at:n});
+  persist();}
 async function checkLocationConfirmation(){
   if(appMode!=='official')return;
   const td=today();
   if(localStorage.getItem(LOC_CHECK_KEY)===td)return;
   localStorage.setItem(LOC_CHECK_KEY,td);
   if(LOC().some(x=>x.date===td))return;
-  const last=locEntryOn(addDays(td,-1));
+  const last=lastLocEntry();
   if(!last){const v=await askText('Where are you based right now? You can change this anytime from the planner.',{title:'Set your location',placeholder:'e.g. Mumbai, Home office'});
     if(v&&v.trim())setLoc(td,v.trim());
     return;}
@@ -1234,7 +1234,10 @@ function setMode(m){if(m!=='personal'&&pinIsSet())_personalUnlocked=false;  // r
 function applyModeUI(){const personal=appMode==='personal';
   const mt=g('modeToggle');if(mt)mt.innerHTML=`<button class="${!personal?'on':''}" onclick="setMode('official')">Official</button><button class="${personal?'on':''}" onclick="setMode('personal')">Personal</button>`;
   const hide=el=>{if(el)el.style.display=personal?'none':'';};
-  hide(g('ghSearchWrap'));hide(g('navbar'));hide(g('ghNewWrap'));}
+  hide(g('navbar'));hide(g('ghNewWrap'));
+  /* Search stays in both modes — it just indexes a different world. */
+  const si=g('ghSearch');if(si){si.placeholder=personal?'Search tasks, money, investments, family…  (Ctrl+K)':'Search tasks, accounts, deals, people, meetings…  (Ctrl+K)';si.value='';}
+  const sr=g('srchres');if(sr)sr.classList.remove('on');}
 function renderNav(){const bb=g('ghBack');if(bb)bb.style.display=_navDepth>0?'':'none';
   if(appMode==='personal'){const nb=g('navbar');if(nb)nb.innerHTML='';const mm=g('moremenu');if(mm)mm.innerHTML='';return;}
   const td=today();
@@ -1275,7 +1278,31 @@ function reRender(){flushEditors();const y=window.pageYOffset||document.document
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
-function globalSearch(q){q=q.toLowerCase();const out=[];
+/* Two indexes, one box: Official searches the CRM, Personal searches money/investments/family.
+   The badge names the tab a hit lives in; the sub-line names what it actually is. */
+function globalSearch(q){return appMode==='personal'?personalSearch(q):officialSearch(q);}
+function personalGo(tab,fn){personalTab=tab;if(fn)fn();renderView();}
+function personalSearch(q){
+  if(pinIsSet()&&!_personalUnlocked)return [];   // the PIN gate covers search too
+  q=q.toLowerCase();const out=[];const hit=s=>(s||'').toLowerCase().includes(q);
+  TP().filter(t=>t.status!=='done'&&hit(t.title+' '+(t.notes||''))).slice(0,5)
+    .forEach(t=>out.push({k:'T',kl:'Task',label:t.title,sub:t.due?'Due '+fmtD(t.due):'Personal task',go:()=>personalGo('tasks',()=>setTimeout(()=>openPersonalTask(t.id),30))}));
+  FCAT().filter(c=>hit(c.name+' '+finGroupLbl(c.group))).slice(0,5)
+    .forEach(c=>out.push({k:'D',kl:'Money',label:c.name,sub:finGroupLbl(c.group)+(c.amount?' · '+fmtMoney(c.amount):''),go:()=>personalGo('money',()=>{finView='month';})}));
+  CARD().filter(c=>hit(c.name+' '+(c.last4||''))).slice(0,4)
+    .forEach(c=>out.push({k:'D',kl:'Money',label:c.name+(c.last4?' ••'+c.last4:''),sub:'Credit card',go:()=>personalGo('money',()=>{finView='month';})}));
+  LOAN().filter(l=>hit(l.name+' '+(l.lender||''))).slice(0,4)
+    .forEach(l=>out.push({k:'D',kl:'Money',label:l.name,sub:'Loan'+(l.lender?' · '+l.lender:'')+(l.emi?' · EMI '+fmtMoney(l.emi):''),go:()=>personalGo('money',()=>{finView='loans';})}));
+  IH().filter(h=>hit(h.name+' '+(h.kind||''))).slice(0,5)
+    .forEach(h=>out.push({k:'M',kl:'Invest',label:h.name,sub:h.kind||'Holding',go:()=>personalGo('invest',()=>{invView='holdings';})}));
+  PFA().filter(r=>hit(r.company)).slice(0,3)
+    .forEach(r=>out.push({k:'M',kl:'Invest',label:r.company||'(unnamed)',sub:'PF · '+fmtMoney(pfRowTotal(r)),go:()=>personalGo('invest',()=>{invView='pf';})}));
+  FA().filter(f=>hit(f.name)).slice(0,3)
+    .forEach(f=>out.push({k:'A',kl:'Family',label:f.name,sub:'Family',go:()=>personalGo('tasks',()=>setTimeout(()=>openFamily(f.id),30))}));
+  BD().filter(b=>hit(b.name)).slice(0,3)
+    .forEach(b=>out.push({k:'P',kl:'B-day',label:b.name,sub:b.date?fmtD(nextBirthday(b.date)):'Birthday',go:()=>personalGo('birthdays')}));
+  return out.slice(0,16);}
+function officialSearch(q){q=q.toLowerCase();const out=[];
   T().filter(t=>t.status!=='done'&&(t.title+' '+(t.notes||'')).toLowerCase().includes(q)).slice(0,5).forEach(t=>out.push({k:'T',label:t.title,sub:t.type==='call'?'Call':'Task',go:()=>openTask(t.id)}));
   CU().filter(c=>(c.name+' '+(c.city||'')).toLowerCase().includes(q)).slice(0,4).forEach(c=>out.push({k:'A',label:c.name,sub:c.city||'Account',go:()=>nav('accounts',c.id)}));
   DL().filter(d=>d.name.toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
@@ -1291,7 +1318,7 @@ function _srchGo(i){const box=g('srchres');if(_srchIdx[i]){box.classList.remove(
 g('ghSearch').addEventListener('input',e=>{const q=e.target.value.trim();const box=g('srchres');
   if(q.length<2){box.classList.remove('on');_srchSel=-1;return;}
   _srchIdx=globalSearch(q);_srchSel=_srchIdx.length?0:-1;
-  box.innerHTML=_srchIdx.length?_srchIdx.map((r,i)=>`<div class="sr-item${i===0?' sel':''}" data-i="${i}"><span class="sr-k ${r.k}">${r.k==='T'?'Task':r.k==='A'?'Acct':r.k==='D'?'Deal':r.k==='P'?'Pers':'Meet'}</span><span style="flex:1"><b>${esc(r.label)}</b> <span style="color:var(--t3);font-size:11px">· ${esc(r.sub)}</span></span></div>`).join(''):'<div class="sr-item" style="color:var(--t4)">No matches.</div>';
+  box.innerHTML=_srchIdx.length?_srchIdx.map((r,i)=>`<div class="sr-item${i===0?' sel':''}" data-i="${i}"><span class="sr-k ${r.k}">${esc(r.kl||(r.k==='T'?'Task':r.k==='A'?'Acct':r.k==='D'?'Deal':r.k==='P'?'Pers':'Meet'))}</span><span style="flex:1"><b>${esc(r.label)}</b> <span style="color:var(--t3);font-size:11px">· ${esc(r.sub)}</span></span></div>`).join(''):'<div class="sr-item" style="color:var(--t4)">No matches.</div>';
   box.classList.add('on');
   box.querySelectorAll('.sr-item[data-i]').forEach(el=>{el.onmouseenter=()=>{_srchSel=+el.dataset.i;_srchPaint();};el.onclick=()=>_srchGo(+el.dataset.i);});});
 g('ghSearch').addEventListener('keydown',e=>{const box=g('srchres');if(!box.classList.contains('on'))return;
@@ -2310,29 +2337,33 @@ function weekLocSummary(mon){const days=[...Array(7)].map((_,i)=>addDays(mon,i))
   const runs=[];let i=0;while(i<cities.length){let j=i;while(j+1<cities.length&&cities[j+1]===cities[i])j++;runs.push({city:cities[i],from:days[i],to:days[j]});i=j+1;}
   const chips=runs.filter(r=>r.city!=='—').map(r=>`<span class="pill n">📍 ${esc(r.city)}${r.from!==r.to?' ('+new Date(r.from+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+'–'+new Date(r.to+'T12:00').toLocaleDateString('en-IN',{weekday:'short'})+')':''}</span>`).join(' ');
   return chips||'<span class="note">No location set for this week — <a onclick="openPlanPrompt(\'week\',plAnchor)">plan ahead ✈</a></span>';}
+function clearLocRange(from,to){const n=now();let k=0;
+  LOC().filter(l=>l.date>=from&&(!to||l.date<=to)).forEach(l=>{l.deleted=true;l.updated_at=n;k++;});
+  if(k)persist();
+  return k;}
 async function clearWeekLocations(mon){
-  if(!await askConfirm('Clear locations for the week of '+fmtD(mon)+'? Every day goes back to "Set location" so you can plan each one fresh — this also stops last week\'s location carrying forward.',{title:'Clear week locations',ok:'Clear'}))return;
-  const end=addDays(mon,6);const n=now();
-  LOC().filter(l=>l.date>=mon&&l.date<=end).forEach(l=>{l.deleted=true;l.updated_at=n;});
-  setLoc(mon,'');
-  toast('Cleared — set each day\'s location as you plan.');
+  if(!await askConfirm('Clear locations for the week of '+fmtD(mon)+'? Every day in it goes back to "Set location".',{title:'Clear week locations',ok:'Clear'}))return;
+  toast(clearLocRange(mon,addDays(mon,6))?'Cleared — set each day\'s location as you plan.':'Nothing to clear.');
   renderView();}
 async function clearMonthLocations(mk){
   const first=mk+'-01';const d=new Date(first+'T12:00');const last=ymd(new Date(d.getFullYear(),d.getMonth()+1,0));
-  if(!await askConfirm('Clear locations for '+d.toLocaleDateString('en-IN',{month:'long',year:'numeric'})+'? Every day goes back to "Set location" — this also stops the previous month\'s location carrying forward.',{title:'Clear month locations',ok:'Clear'}))return;
-  const n=now();
-  LOC().filter(l=>l.date>=first&&l.date<=last).forEach(l=>{l.deleted=true;l.updated_at=n;});
-  setLoc(first,'');
-  toast('Cleared — set locations fresh as you plan.');
+  if(!await askConfirm('Clear locations for '+d.toLocaleDateString('en-IN',{month:'long',year:'numeric'})+'? Every day in it goes back to "Set location".',{title:'Clear month locations',ok:'Clear'}))return;
+  toast(clearLocRange(first,last)?'Cleared — set locations fresh as you plan.':'Nothing to clear.');
   renderView();}
 async function clearLocationsFromToday(){
   const td=today();
-  if(!await askConfirm('Clear every location from today onward — across the whole calendar, not just what\'s on screen? Past history stays untouched, and you can set each day fresh from here.',{title:'Clear calendar locations',ok:'Clear all forward'}))return;
-  const n=now();
-  LOC().filter(l=>l.date>=td).forEach(l=>{l.deleted=true;l.updated_at=n;});
-  setLoc(td,'');
-  toast('Cleared — nothing carries forward until you set it again.');
+  if(!await askConfirm('Clear every location from today onward — across the whole calendar, not just what\'s on screen? Past days are never touched.',{title:'Clear calendar locations',ok:'Clear all forward'}))return;
+  toast(clearLocRange(td)?'Cleared — today and every day after it are blank again.':'Nothing to clear.');
   renderView();}
+/* Settings cleanup. Strictly after today: today is already a confirmed, current fact and past
+   days are history — neither is something a "clear the future" action should be able to reach. */
+async function clearFutureLocations(){
+  const td=today();
+  const fut=LOC().filter(l=>l.date>td);
+  if(!fut.length){toast('No locations are set for any date after today.');return;}
+  if(!await askConfirm(fut.length+' location'+(fut.length>1?'s are':' is')+' set for date'+(fut.length>1?'s':'')+' after '+fmtD(td)+'. Clear them so upcoming days start blank? Today and every past day stay exactly as they are.',{title:'Clear future locations',ok:'Clear future'}))return;
+  const n=now();fut.forEach(l=>{l.deleted=true;l.updated_at=n;});
+  persist();toast(fut.length+' future location'+(fut.length>1?'s':'')+' cleared.');renderView();}
 function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
   const tally={};for(let day=1;day<=last;day++){const ds=mk+'-'+String(day).padStart(2,'0');const c=locOn(ds)||'—';tally[c]=(tally[c]||0)+1;}
   const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="pill n">📍 ${esc(c)} · ${n}d</span>`).join(' ');
@@ -2385,7 +2416,7 @@ function vPlanner(){const td=today();
       </div>`;}).join('');
     const calendar=`<div class="wcal-wrap"><div class="wcal-inner"><div class="wcal-gutter">${gutter}</div>${dayCols}</div></div>`;
     const priorities=planHtml('week',weekKey(mon),'Priorities — week of '+fmtD(mon),'What are the 3-4 outcomes this week is for?',4);
-    body=`<div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week to no location, so a carried-forward city doesn't get assumed while you plan">Clear week's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div>
+    body=`<div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${weekLocSummary(mon)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearWeekLocations('${mon}')" title="Reset every day this week back to no location">Clear week's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div>
       <div class="grid31">${calendar}${priorities}</div>`;
   }else{
     title='Meetings';
@@ -2797,6 +2828,7 @@ function vHelp(){
   ${faqItem('Top 3 / focus stars','Two ways to force priority. Top 3 in the Day view: the three outcomes the day is for. The ★ star on any task marks it as focus (max three) and pins it to Today’s focus on Home.')}
   ${faqItem('Shutdown ritual','At day end, press Run shutdown in the Day view. Every unfinished item rolls to tomorrow, but its original due date is kept — so slips stay visible and honest instead of resetting each night. The journal box saves your notes and reflections per day.')}
   ${faqItem('Week and Month','Week shows seven columns with everything scheduled, plus weekly priorities on top — add items straight into any day with its Add box. Month shows the grid with monthly goals above it; tap a date to see and add to that day. ‹ › arrows move through time; Today jumps back.')}
+  ${faqItem('Your location for the day','Every day in the planner carries a \ud83d\udccd chip. It shows only the location you set for that exact day — nothing is carried over from an earlier day, in either direction. Days you have not set stay blank, including future ones, unless you block them in advance for a planned trip. Clario asks you to confirm your location at most once a day, and Settings \u2192 Locations has a <b>Clear future locations</b> button that wipes everything set after today while leaving today and all past days untouched.')}
   ${faqItem('Meetings','Each meeting pulls the parked agenda items of its attendees automatically. Record decisions and actions during the meeting — actions assigned to others become chase items instantly — and capture rich-text minutes in the Minutes / discussion notes box. Close out asks the outcome: Held (marks done, raises agenda items, stamps the account log), Rescheduled (set a new date; a fresh meeting is created and the open agenda carries over), or Not attended. Summary opens a consolidated, printable page — title, attendees, agenda, decisions, actions and notes — with Print and Email buttons. The Meetings tab lists upcoming and past meetings with search and status filter; import/export Outlook .ics from there. Summary prints a Minutes of Meeting sheet.')}
   </div>
   <div class="card faq"><div class="ch">Commitments & chasing</div>
@@ -2833,6 +2865,7 @@ function vHelp(){
   ${faqItem('Improvement backlog','Capture every "we should fix this someday", score impact and effort 1–5, and read the quadrant: high impact + low effort = quick wins, do first. Track status open → in progress → done.')}
   </div>
   <div class="card faq"><div class="ch">Dashboards & review</div>
+  ${faqItem('Search box — one box, two sections','The search box in the top bar searches whichever section you are in. In Official it finds tasks, accounts, deals, people, contacts, meetings, decisions and improvements. In Personal it finds personal tasks, money categories, credit cards, loans, investments, PF accounts, family and birthdays, and opens each one on its own tab. If the Personal PIN lock is on and the section is locked, personal results are not returned at all. Ctrl+K (or /) jumps to the box; arrow keys move through results, Enter opens the highlighted one.')}
   ${faqItem('Searching this FAQ','Use the search box at the top of Help to filter these entries by keyword — matches expand automatically. Everything in Clario is cross-linked too: names of accounts, people and departments are clickable wherever they appear, and every number and row on the dashboards jumps to the underlying list.')}
   ${faqItem('Operations dashboard','Throughput trend (completed vs added, 8 weeks), overdue by department, a department scorecard with oldest slips, and delegation health per person — who’s sitting on what and for how long.')}
   ${faqItem('Sales dashboard','Open pipeline, weighted forecast, won this quarter, stage-wise value, stale deals, slipped close dates, and account next actions due.')}
@@ -3377,7 +3410,10 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
   <div class="setcard"><h4>Locations</h4>
     <div class="chips">${locationsList.map((l,i)=>`<span class="chip">${esc(l)}<button onclick="locationsList.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newLocation" placeholder="Add a standard location — e.g. Mumbai, Home office" style="flex:1"><button class="btn sm" onclick="addLocation()">Add</button></div>
-    <p class="note">Where you're usually based or travel to. Suggested whenever you set your day's location on the planner.</p></div>
+    <p class="note">Where you're usually based or travel to. Suggested whenever you set your day's location on the planner.</p>
+    <div class="srow" style="margin-top:12px"><span>Days set after today</span><b>${(()=>{const td=today();return LOC().filter(l=>l.date>td).length;})()}</b></div>
+    <div style="margin-top:8px"><button class="btn gh2 sm" onclick="clearFutureLocations()">Clear future locations</button></div>
+    <p class="note">A day shows only the location you set for that exact day — nothing carries forward, so upcoming days stay blank unless you block them in advance. Use this to wipe those pre-blocked days when a trip changes. <b>Today and every past day are never touched.</b></p></div>
   <div class="setcard"><h4>Archive</h4>
     <p class="note">Completed tasks, calls, meetings, decisions and logged notes older than 6 months can be archived — hidden from lists and searches to keep the app fast, without deleting anything. ${archivedCount()?archivedCount()+' record(s) currently archived.':''}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" onclick="runArchiveOld()">Archive records older than 6 months</button>${archivedCount()?`<button class="btn gh2 sm" onclick="restoreArchived()">Restore archived records</button>`:''}</div></div>
