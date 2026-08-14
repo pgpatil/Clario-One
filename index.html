@@ -909,8 +909,29 @@ const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+Stri
 const today=()=>ymd(new Date());
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 /* Long-list cap: render the first `cap` rows with a "Show all" button, so heavy tabs don't scroll forever. */
-function listCap(key,arr,cap){cap=cap||50;return (window['_all_'+key]||arr.length<=cap)?arr:arr.slice(0,cap);}
-function capMore(key,total,cap){cap=cap||50;const n=total-cap;return (!window['_all_'+key]&&n>0)?`<div style="text-align:center;padding:10px 0"><button class="btn gh2 sm" onclick="window._all_${key}=1;renderView()">Show all ${total} — ${n} more</button></div>`:'';}
+/* Progressive disclosure with a bounded step and a way back.
+   The previous control set a sticky window._all_<key>=1 that nothing in the UI could clear:
+   one click on "Show all 20000" put every row into the DOM — measured 280k nodes and 7.2s
+   per render at 20k tasks — and every later re-render paid it until the page was reloaded.
+   The 50-row default keeps rendering O(1) (measured 14–28ms at any size, 748 nodes); this
+   only ever widens it a page at a time, always offers the way back, and resets on navigation
+   so an expanded list can never follow you into another view. */
+/* 50 per step: measured, a page costs ~0.18ms/row to build and render, so 50 keeps every
+   expansion well inside 100ms. Past roughly 300 visible rows the cost turns superlinear
+   (550 rows measured at 277ms) — that is inherent to putting rows on screen, which is why
+   every app in this category paginates. The filter, not the scrollbar, is the tool for 20k. */
+const LIST_PAGE=50;
+var _shown={};
+function listShown(key,cap){return _shown[key]||cap||50;}
+function listCap(key,arr,cap){const n=listShown(key,cap);return arr.length<=n?arr:arr.slice(0,n);}
+function capMore(key,total,cap){cap=cap||50;const n=listShown(key,cap);
+  const bits=[];
+  if(n<total)bits.push(`<button class="btn gh2 sm" onclick="showMore('${key}',${cap})">Show ${Math.min(LIST_PAGE,total-n)} more — showing ${n} of ${total}</button>`);
+  if(n>cap)bits.push(`<button class="btn gh2 sm" onclick="showLess('${key}')">Show less</button>`);
+  return bits.length?`<div style="text-align:center;padding:10px 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${bits.join('')}</div>`:'';}
+/* reRender, not renderView: you are at the bottom of a list when you press these. */
+function showMore(key,cap){_shown[key]=listShown(key,cap)+LIST_PAGE;reRender();}
+function showLess(key){delete _shown[key];reRender();}
 const jss=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
 const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000);
@@ -1258,6 +1279,7 @@ var _navDepth=0;
 var _navStack=[];
 async function nav(v,arg,_fromPop,_fromGoBack){
   flushEditors();
+  if(view!==v)_shown={};                     // an expanded list must not follow you to another view
   if(!_fromGoBack&&(view!==v||viewArg!=(arg??null)))_navStack.push({view,arg:viewArg});
   persist();view=v;viewArg=arg??null;
   if(!_fromPop){try{history.pushState({view:v,arg:viewArg},'',location.pathname+location.search);_navDepth++;}catch(e){}}
@@ -1273,8 +1295,46 @@ function flushEditors(){try{
   if(view==='meeting'&&viewArg){const m=meetings.find(x=>x.id===viewArg);const el=g('mnText');if(m&&el){const h=sanitizeHtml(el.innerHTML);if((h||'')!==(m.notes_html||'')){m.notes_html=h;m.notes=htmlToText(h);m.updated_at=now();if(typeof logMeetingNotes==='function')logMeetingNotes(m);}}}
 }catch(e){}}
 function saveNav(){try{localStorage.setItem(NAV_KEY,JSON.stringify({view,viewArg,personalTab,invView,finView,mode:appMode}));}catch(e){}}
-function renderView(){flushEditors();renderNav();const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();saveNav();window.scrollTo(0,0);}
-function reRender(){flushEditors();const y=window.pageYOffset||document.documentElement.scrollTop||0;const m={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};renderNav();g('main').innerHTML=appMode==='personal'?vPersonal():(m[view]||vHome)();wire();saveNav();window.scrollTo(0,y);}
+/* Re-rendering replaces #main wholesale, which destroys anything the user is part-way through
+   typing. That is not only a self-inflicted click: gPull() ends in an unconditional reRender()
+   and runs off the 20-second OneDrive poll, so a change arriving from another device used to
+   silently wipe a half-written quick-capture line. Snapshot the focused field before the swap
+   and put it back after — value, caret and all.
+   Keyed by id and guarded on the view: navigating somewhere else must NOT resurrect a value
+   into whatever element happens to occupy the same position in the new page. */
+function captureFocus(){
+  const el=document.activeElement,main=g('main');
+  if(!el||!main||!main.contains(el))return null;
+  const tag=(el.tagName||'').toLowerCase();
+  if(!el.id||(tag!=='input'&&tag!=='textarea'&&tag!=='select'))return null;
+  let sel=null,end=null;try{sel=el.selectionStart;end=el.selectionEnd;}catch(e){}
+  return{id:el.id,tag,value:el.value,sel,end,at:view+'|'+appMode+'|'+personalTab};}
+function restoreFocus(f){
+  if(!f||f.at!==view+'|'+appMode+'|'+personalTab)return;
+  const el=g(f.id);
+  if(!el||(el.tagName||'').toLowerCase()!==f.tag)return;
+  try{
+    if(f.value!=null&&el.value!==f.value)el.value=f.value;
+    el.focus({preventScroll:true});
+    if(f.sel!=null&&el.setSelectionRange)el.setSelectionRange(f.sel,f.end);
+  }catch(e){}}
+const VIEWS={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};
+function paint(){g('main').innerHTML=appMode==='personal'?vPersonal():(VIEWS[view]||vHome)();wire();saveNav();}
+/* Jumping to the top is a *navigation* behaviour, not a *rendering* one. renderView() is called
+   from ~60 mutation handlers as well as from nav(), and every one of those mutations used to
+   fling the page back to the top — reported three separate times (saving in Money, completing
+   a task in Commitments, row actions). Rather than audit every call site, decide here: if the
+   destination is the same page we were already on, this is a redraw and the position is kept.
+   Anything that changes page, tab or sub-view is a move, and a move starts at the top. */
+const subKey=()=>['plTab','finView','invView','cTab','personalTab'].map(k=>{try{return String(window[k]??'');}catch(e){return'';}}).join(',');
+const paintKey=()=>view+'|'+(viewArg??'')+'|'+appMode+'|'+subKey();
+let _lastPaintKey='';
+function renderView(){flushEditors();const f=captureFocus();
+  const k=paintKey(),same=k===_lastPaintKey;
+  const y=window.pageYOffset||document.documentElement.scrollTop||0;
+  renderNav();paint();
+  window.scrollTo(0,same?y:0);_lastPaintKey=k;restoreFocus(f);}
+function reRender(){flushEditors();const f=captureFocus();const y=window.pageYOffset||document.documentElement.scrollTop||0;renderNav();paint();window.scrollTo(0,y);_lastPaintKey=paintKey();restoreFocus(f);}
 function pagehead(crumb,title,sub,actions){return`<div class="ph"><div class="ph-l"><div class="crumb">${crumb}</div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div><div class="ph-r">${actions||''}</div></div>`;}
 
 /* ═══ GLOBAL SEARCH ═══ */
@@ -2614,7 +2674,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const _tN=list.length;list=listCap('tasks',list);
   const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
-  const filters=`<div class="filters"><input placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:220px">
+  const filters=`<div class="filters"><input id="tqFilter" placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(reRender,260)" style="min-width:220px">
     <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
     <select data-ssel onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
     <select onchange="window._tDp=this.value;renderView()"><option value="">All departments</option>${depts2.map(d=>`<option${dp===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
