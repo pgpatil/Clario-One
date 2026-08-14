@@ -1544,26 +1544,148 @@ function mrowHtml(m){const ag=meetingAgenda(m).length;
   ${m.status==='done'?'<span class="pill g">Done</span>':`<span class="pill b">${ag} agenda</span>`}</div>`;}
 
 /* ═══ QUICK ADD ═══ */
-function parseQA(txt){txt=txt.trim();const r={type:'task',title:txt,due:null,time:null,priority:'medium',owner:'me'};
-  if(/^call\s/i.test(txt))r.type='call';
-  if(/!high|urgent/i.test(txt))r.priority='high';if(/!low/i.test(txt))r.priority='low';
-  const at=txt.match(/@(\w[\w\s]*?)(?=\s|$)/);let pMatch=null;
-  if(at)pMatch=P().find(p=>p.name.toLowerCase().startsWith(at[1].toLowerCase()));
-  if(!pMatch)for(const p of P()){if(new RegExp('\\b'+p.name.split(' ')[0]+'\\b','i').test(txt)){pMatch=p;break;}}
+/* ═══ NATURAL-LANGUAGE CAPTURE ═══
+   Consumes what it recognises out of the typed line and leaves the rest as the title.
+   Order is load-bearing: longer, more specific phrases must be eaten before the shorter
+   ones they contain, or "every 3 days" loses its interval to a bare "3 days" and
+   "3 days before friday" loses its anchor to a bare "friday".
+   The bias is deliberately conservative -- a parser that finds a date in every sentence is
+   worse than one that finds none, so bare numbers, bare years and bare month names are
+   left alone. tests/w3-capture.js pins that down with explicit negative cases. */
+const NL_MON=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const NL_DOW=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const NL_DOW_RE=NL_DOW.join('|');
+const NL_MON_RE=NL_MON.join('|');
+function nlYmd(y,m,d){return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+/* Nearest upcoming <dow>. `strict` pushes past today, for "next friday" said on a Friday. */
+function nlDow(dow,strict){const d=new Date(today()+'T12:00');
+  let delta=(dow-d.getDay()+7)%7; if(strict&&delta===0)delta=7;
+  d.setDate(d.getDate()+delta);return ymd(d);}
+function nlEom(ds){const d=new Date((ds||today())+'T12:00');
+  return nlYmd(d.getFullYear(),d.getMonth(),daysInMonth(d.getFullYear(),d.getMonth()));}
+/* A day number with no month: this month if it is still ahead, otherwise next. */
+function nlDayOfMonth(day){const t=new Date(today()+'T12:00');
+  let y=t.getFullYear(),m=t.getMonth();
+  if(day<t.getDate()){m++;if(m>11){m=0;y++;}}
+  return nlYmd(y,m,Math.min(day,daysInMonth(y,m)));}
+/* A day+month with no year: this year if still ahead, otherwise next. */
+function nlDayMonth(day,mon,year){
+  const t=new Date(today()+'T12:00');
+  let y=year!=null?year:t.getFullYear();
+  if(year==null){const cand=nlYmd(y,mon,Math.min(day,daysInMonth(y,mon)));if(cand<today())y++;}
+  return nlYmd(y,mon,Math.min(day,daysInMonth(y,mon)));}
+
+function parseQA(txt){
+  txt=String(txt||'').trim();
+  const r={type:'task',title:txt,due:null,time:null,priority:'medium',owner:'me',
+           labels:[],duration:null,repeat:'',repeat_interval:null,repeat_weekdays:null};
+  let s=' '+txt+' ';
+  const eat=(re,fn)=>{const m=s.match(re);if(!m)return false;
+    if(fn&&fn(m)===false)return false;s=s.replace(m[0],' ');return true;};
+
+  if(/^\s*call\s+/i.test(s)){r.type='call';s=s.replace(/^\s*call\s+/i,' ');}
+
+  /* ── recurrence, before anything that would eat its numbers or weekdays ── */
+  eat(new RegExp('\\bevery\\s+(\\d{1,2})(?:st|nd|rd|th)\\s+('+NL_DOW_RE+')\\b','i'),m=>{
+    r.repeat='monthly';r.repeat_month_mode='weekday';r.repeat_month_nth=+m[1];
+    r.repeat_month_weekday=NL_DOW.indexOf(m[2].toLowerCase());})
+  ||eat(/\bevery\s+weekdays?\b/i,()=>{r.repeat='weekly';r.repeat_interval=1;r.repeat_weekdays=[1,2,3,4,5];})
+  ||eat(/\bevery\s+weekends?\b/i,()=>{r.repeat='weekly';r.repeat_interval=1;r.repeat_weekdays=[0,6];})
+  ||eat(new RegExp('\\bevery\\s+('+NL_DOW_RE+')\\b','i'),m=>{
+    r.repeat='weekly';r.repeat_interval=1;r.repeat_weekdays=[NL_DOW.indexOf(m[1].toLowerCase())];})
+  ||eat(/\bevery\s+other\s+(day|week|month|year)\b/i,m=>{
+    r.repeat={day:'daily',week:'weekly',month:'monthly',year:'yearly'}[m[1].toLowerCase()];r.repeat_interval=2;})
+  ||eat(/\bevery\s+(\d{1,3})\s*(day|week|month|year)s?\b/i,m=>{
+    r.repeat={day:'daily',week:'weekly',month:'monthly',year:'yearly'}[m[2].toLowerCase()];r.repeat_interval=+m[1];})
+  ||eat(/\bevery\s+(day|week|month|year)\b/i,m=>{
+    r.repeat={day:'daily',week:'weekly',month:'monthly',year:'yearly'}[m[1].toLowerCase()];r.repeat_interval=1;})
+  ||eat(/\b(daily|weekly|fortnightly|monthly|yearly|annually)\b/i,m=>{
+    const k=m[1].toLowerCase();r.repeat=k==='annually'?'yearly':k;r.repeat_interval=1;});
+
+  /* ── explicit dates ── */
+  eat(/\bend of (?:the )?month\b/i,()=>{r.due=nlEom();})
+  ||eat(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+('+NL_MON_RE+')[a-z]*\\.?(?:\\s+(\\d{4}))?\\b','i'),m=>{
+    r.due=nlDayMonth(+m[1],NL_MON.indexOf(m[2].toLowerCase()),m[3]?+m[3]:null);})
+  ||eat(new RegExp('\\b('+NL_MON_RE+')[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?\\b','i'),m=>{
+    r.due=nlDayMonth(+m[2],NL_MON.indexOf(m[1].toLowerCase()),m[3]?+m[3]:null);})
+  ||eat(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/,m=>{      // day first, Indian convention
+    const day=+m[1],mon=+m[2]-1;if(mon<0||mon>11||day<1||day>31)return false;
+    let y=m[3]?+m[3]:null;if(y!=null&&y<100)y+=2000;r.due=nlDayMonth(day,mon,y);})
+  ||eat(/\bon\s+the\s+(\d{1,2})(?:st|nd|rd|th)\b/i,m=>{r.due=nlDayOfMonth(+m[1]);});
+
+  /* ── relative dates ── */
+  if(!r.due){
+    eat(/\bday after tomorrow\b/i,()=>{r.due=addDays(today(),2);})
+    ||eat(/\btomorrow\b/i,()=>{r.due=addDays(today(),1);})
+    ||eat(/\btoday\b/i,()=>{r.due=today();})
+    ||eat(/\bin\s+(\d{1,3})\s*(day|week|month)s?\b/i,m=>{const n=+m[1],u=m[2].toLowerCase();
+      r.due=u==='day'?addDays(today(),n):u==='week'?addDays(today(),n*7):addDays(today(),n*30);})
+    ||eat(/\bnext\s+week\b/i,()=>{r.due=addDays(today(),7);})
+    ||eat(/\bnext\s+month\b/i,()=>{r.due=addDays(today(),30);})
+    /* anchored offsets before the bare weekday rule, which would otherwise eat the anchor */
+    ||eat(new RegExp('\\b(\\d{1,2})\\s+days?\\s+before\\s+('+NL_DOW_RE+')\\b','i'),m=>{
+      r.due=addDays(nlDow(NL_DOW.indexOf(m[2].toLowerCase()),false),-(+m[1]));})
+    ||eat(new RegExp('\\b(\\d{1,2})\\s+days?\\s+after\\s+('+NL_DOW_RE+')\\b','i'),m=>{
+      r.due=addDays(nlDow(NL_DOW.indexOf(m[2].toLowerCase()),false),+m[1]);})
+    ||eat(new RegExp('\\bnext\\s+('+NL_DOW_RE+')\\b','i'),m=>{r.due=nlDow(NL_DOW.indexOf(m[1].toLowerCase()),true);})
+    ||eat(new RegExp('\\b(?:this\\s+|coming\\s+)?('+NL_DOW_RE+')\\b','i'),m=>{r.due=nlDow(NL_DOW.indexOf(m[1].toLowerCase()),false);});
+  }else{
+    /* date already known, but a stray weekday word should still leave the title */
+    eat(new RegExp('\\b(?:next\\s+|this\\s+|coming\\s+)?('+NL_DOW_RE+')\\b','i'));
+  }
+
+  /* ── time of day ── */
+  eat(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i,m=>{let h=+m[1];const mi=+m[2];
+    const ap=(m[3]||'').toLowerCase();
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0;
+    if(h>23||mi>59)return false;
+    r.time=String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');})
+  ||eat(/\b(\d{1,2})\s*(am|pm)\b/i,m=>{let h=+m[1];const ap=m[2].toLowerCase();
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0;
+    if(h>23)return false;
+    r.time=String(h).padStart(2,'0')+':00';})
+  ||eat(/\bat\s+(\d{1,2})(?!\s*[:\d])\b/i,m=>{const h=+m[1];if(h>23)return false;
+    r.time=String(h).padStart(2,'0')+':00';});
+
+  /* ── duration, after times so "3pm" is long gone ── */
+  eat(/\bfor\s+(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes)\b/i,m=>{
+    const v=parseFloat(m[1]);r.duration=Math.round(/^h/i.test(m[2])?v*60:v);})
+  ||eat(/\b(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours|min|mins|minute|minutes)\b/i,m=>{
+    const v=parseFloat(m[1]);r.duration=Math.round(/^h/i.test(m[2])?v*60:v);})
+  ||eat(/\b(\d{1,3})m\b/,m=>{r.duration=+m[1];});
+
+  /* ── labels ── */
+  let lm;const lre=/#([\w-]+)/g;
+  while((lm=lre.exec(s))!==null)r.labels.push(lm[1]);
+  if(r.labels.length)s=s.replace(/#[\w-]+/g,' ');
+
+  /* ── priority ── */
+  eat(/\bp([1-4])\b/i,m=>{r.priority=({1:'high',2:'medium',3:'medium',4:'low'})[+m[1]];})
+  ||eat(/!high\b|\burgent\b/i,()=>{r.priority='high';})
+  ||eat(/!low\b/i,()=>{r.priority='low';});
+  eat(/!high\b|!low\b|\burgent\b/i);
+
+  /* ── owner: @name first, then a bare first-name match against People ── */
+  let pMatch=null;
+  const at=s.match(/@(\w[\w]*)/);
+  if(at){pMatch=P().find(p=>p.name.toLowerCase().startsWith(at[1].toLowerCase()));s=s.replace(/@\w[\w]*/g,' ');}
+  if(!pMatch)for(const p of P()){const f=p.name.split(' ')[0];
+    if(f&&new RegExp('\\b'+f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(s)){pMatch=p;break;}}
   if(pMatch&&r.type!=='call')r.owner=pMatch.id;
   if(pMatch&&r.type==='call')r.callee=pMatch;
-  const td=today();
-  if(/\btoday\b/i.test(txt))r.due=td;else if(/\btomorrow\b/i.test(txt))r.due=addDays(td,1);else if(/\bnext week\b/i.test(txt))r.due=addDays(td,7);
-  const days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-  days.forEach((d,i)=>{if(new RegExp('\\b'+d+'\\b','i').test(txt)){const dt=new Date();dt.setDate(dt.getDate()+((i-dt.getDay()+7)%7||7));r.due=ymd(dt);}});
-  const tm=txt.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-  if(tm){let h=+tm[1],mi=tm[2]?+tm[2]:0;if(tm[3].toLowerCase()==='pm'&&h<12)h+=12;if(tm[3].toLowerCase()==='am'&&h===12)h=0;r.time=String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0');}
-  r.title=txt.replace(/^call\s+/i,'').replace(/@\w[\w]*/g,'').replace(/\btoday\b|\btomorrow\b|\bnext week\b/gi,'').replace(new RegExp('\\b('+days.join('|')+')\\b','gi'),'').replace(/\b\d{1,2}(?::\d{2})?\s*(am|pm)\b/gi,'').replace(/!high|!low|urgent/gi,'').replace(/\s+/g,' ').trim().replace(/\s+(by|on|to)$/i,'')||txt;
+
+  /* ── whatever is left is the title, minus the connective words the tokens hung off ── */
+  let title=s.replace(/\s+/g,' ').trim();
+  for(let i=0;i<4;i++)
+    title=title.replace(/\s+(on|by|at|due|in|for|with|to|from|every|the|of|a)\s*$/i,'')
+               .replace(/^(on|by|at|due|in|for|every|the)\s+/i,'').trim();
+  r.title=title||txt;
   return r;}
 function quickAdd(dueOverride){const inp=g('qaInput');const v=(inp?inp.value:'').trim();if(!v)return;const r=parseQA(v);if(dueOverride)r.due=dueOverride;const n=now();
-  if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
-  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deptForOwner(r.owner),customer_id:null,notes:'',created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
-  if(inp)inp.value='';persist();renderView();}
+  if(r.type==='call'){tasks.push({id:uid(),type:'call',title:r.title,phone:r.callee?.phone||'',when:r.due?(r.due+'T'+(r.time||'10:00')):null,owner:'me',person_id:r.callee?.id||null,priority:r.priority,status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',labels:r.labels||[],repeat:r.repeat||'',repeat_interval:r.repeat_interval||null,repeat_weekdays:r.repeat_weekdays||null,repeat_month_mode:r.repeat_month_mode||null,repeat_month_nth:r.repeat_month_nth??null,repeat_month_weekday:r.repeat_month_weekday??null,created_at:n,updated_at:n});toast('Call logged'+(r.due?' · '+fmtD(r.due):''));}
+  else{const deleg=r.owner!=='me';tasks.push({id:uid(),type:'task',title:r.title,owner:r.owner,due:r.due,original_due:r.due,at:r.time||null,estimate_min:r.duration||30,follow_up:deleg?defaultFollowUp(r.due):null,priority:r.priority,status:deleg?'waiting':'open',dept:deptForOwner(r.owner),customer_id:null,notes:'',labels:r.labels||[],repeat:r.repeat||'',repeat_interval:r.repeat_interval||null,repeat_weekdays:r.repeat_weekdays||null,repeat_month_mode:r.repeat_month_mode||null,repeat_month_nth:r.repeat_month_nth??null,repeat_month_weekday:r.repeat_month_weekday??null,created_at:n,updated_at:n});toast((deleg?'Delegated to '+pname(r.owner):'Task added')+(r.due?' · due '+fmtD(r.due):''));}
+  (r.labels||[]).forEach(l=>{if(!taskLabels.includes(l))taskLabels.push(l);});
+  if(inp)inp.value='';persist();reRender();}
 function startVoice(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){toast('Voice needs Edge/Chrome.');return;}const r=new SR();r.lang='en-IN';r.onresult=e=>{const i=g('qaInput');if(i){i.value=e.results[0][0].transcript;i.focus();}};r.onerror=()=>toast('Voice capture failed.');r.start();toast('Listening…');}
 
 /* ═══ TINY CHARTS (canvas) ═══ */
@@ -2388,7 +2510,7 @@ function vHome(){const td=today();
     :'';
   return pagehead(dt.toLocaleDateString('en-IN',{weekday:'long'}).toUpperCase(),dt.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+birthdayBadge(),'Your day at a glance',
     `<button class="btn gh2 sm" onclick="plTab='day';plAnchor=today();nav('planner')">Plan my day</button><button class="btn sm" onclick="openTask()">+ New</button>`)+
-  `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1" placeholder="Capture anything — 'call Rajesh tomorrow 3pm' · '@Priya MIS by friday' · 'review capex today !high'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
+  `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1" placeholder="Capture anything — '@Priya MIS by friday' · 'call Rajesh 20 Aug 3pm' · 'GST filing every 3 months #finance p1'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
   <div class="kpis">
     <div class="kpi ${dueMe.length?'warn':'good'}" onclick="cTab='mine';nav('commit')"><div class="kv num">${dueMe.length}</div><div class="kl">Due today</div></div>
     <div class="kpi ${overdue.length?'bad':''}" onclick="cTab='mine';nav('commit')"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
@@ -2983,7 +3105,7 @@ function vHelp(){
   return pagehead('HELP','How Clario works','Every feature, what it does, and how to use it','')+
   `<div class="card"><div class="cb"><input id="faqQ" placeholder="Search the FAQ — e.g. 'follow up', 'encryption', 'kanban'" value="${esc(window._faqQ||'')}" oninput="faqSearch(this.value)" style="width:100%"><div id="faqNo" class="note" style="display:none;margin-top:6px">No matches.</div></div></div>`+
   `<div class="card faq"><div class="ch">Capturing work</div>
-  ${faqItem('Quick capture bar (Home)','Type anything and press Add. Clario reads the sentence: <code>@Priya MIS by friday</code> delegates to Priya with a Friday due date and starts chasing it. <code>call Rajesh tomorrow 3pm</code> creates a call scheduled for 3 pm tomorrow. <code>!high</code> or <code>urgent</code> sets priority. <code>today / tomorrow / monday…sunday / next week</code> set dates. No date at all sends it to the Brain dump. The 🎙 button dictates instead of typing (Edge/Chrome).')}
+  ${faqItem('Quick capture bar (Home)','Type a whole sentence and press Add \u2014 Clario pulls the details out and leaves the rest as the title. <b>Who:</b> <code>@Priya</code> delegates and starts chasing; a bare first name works too. <b>When:</b> <code>today</code>, <code>tomorrow</code>, <code>day after tomorrow</code>, <code>friday</code>, <code>next monday</code>, <code>next week</code>, <code>in 3 days</code>, <code>in 2 weeks</code>, <code>20 Aug</code>, <code>Sept 1</code>, <code>20/08</code>, <code>on the 25th</code>, <code>end of month</code>, and anchored forms like <code>3 days before friday</code>. <b>Time:</b> <code>3pm</code>, <code>11:30am</code>, <code>15:00</code>, <code>at 9</code>. <b>Repeat:</b> <code>every day</code>, <code>every monday</code>, <code>every 3 days</code>, <code>every other week</code>, <code>every weekday</code>, <code>every weekend</code>, <code>every 3rd thursday</code>, <code>monthly</code>, <code>yearly</code>. <b>How long:</b> <code>for 45m</code>, <code>90 mins</code>, <code>2h</code> \u2014 becomes the time estimate the capacity bar uses. <b>Labels:</b> <code>#finance</code>, as many as you like. <b>Priority:</b> <code>p1</code>\u2013<code>p4</code>, or <code>!high</code> / <code>urgent</code> / <code>!low</code>. Starting the line with <code>call</code> makes it a call instead of a task. It stays deliberately cautious \u2014 a bare number, a bare year or a lone month name is left in the title rather than guessed at as a date. No date at all sends it to the Brain dump.')}
   ${faqItem('Keyboard shortcuts (desktop)','On a laptop or desktop, single keys work when you are not typing in a field: t new task, c new call, m new meeting, a new account, p new person, g Home, l Planner, k Tasks, / or Ctrl+K to search, ? for help. In the search box, arrow keys move through results and Enter opens the highlighted one. Inside any add/edit window, Enter saves.')}
   ${faqItem('+ New menu','The + New button in the top bar creates anything from anywhere: tasks, calls, brain-dump ideas, meetings, accounts, deals, people, decisions and improvement ideas. Inside the task window, the small + buttons beside Owner, Department and Account create a new person, department or account without leaving the form.')}
   ${faqItem('Brain dump','A holding area for ideas that have no date yet, so they never clutter today. Add from the + New menu, from the capture bar (just omit any date word), or from the Brain dump box in the Day planner. When ready, open the Day view and tap "This day" or "Next" to schedule an idea, or open it and give it a date.')}
