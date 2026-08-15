@@ -283,6 +283,10 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .top3-it{display:flex;gap:8px;align-items:flex-start;padding:7px 12px;border-bottom:1px solid var(--bdr)}
 .top3-it .rank{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 
+.svbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.chip.sv{cursor:pointer;user-select:none}
+.chip.sv.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.chip.sv.on button{color:#fff;opacity:.8}
 .tl-rz{position:absolute;left:0;right:0;bottom:0;height:9px;cursor:ns-resize;touch-action:none}
 .tl-rz::after{content:"";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:22px;height:2px;border-radius:2px;background:currentColor;opacity:0;transition:opacity .12s}
 .tl-b:hover .tl-rz::after{opacity:.45}
@@ -1070,7 +1074,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -1090,7 +1094,7 @@ var _finCollapse={};
 function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -1515,6 +1519,52 @@ function setSort(scope,key){const s=_sort[scope]||{};if(s.key===key)s.dir=s.dir=
 function sortHead(scope,key,label,cls){const s=_sort[scope]||{};const ar=s.key===key?(s.dir===1?'▲':'▼'):'⇅';return`<th class="srt ${cls||''}" onclick="setSort('${scope}','${key}')">${label} <span class="ar">${ar}</span></th>`;}
 /* Reusable sort control for lists that aren't sortable tables (Commitments, Meetings).
    Sortable tables keep using applySort/sortHead; this covers card/row lists. */
+/* ═══ SAVED VIEWS ═══
+   A filter set you have tuned is a thing you want back tomorrow, not something to rebuild.
+   Rather than hard-code one per screen, each filterable list registers the globals that make
+   up its filter state; saving snapshots those, applying writes them back. Views live in the
+   synced tables, so a view defined on the laptop is there on the phone.
+   Deliberately not a new nav item -- they appear as chips on the list they belong to. */
+const VIEW_FILTERS={
+  tasks:['_tq','_tSt','_tOwn','_tDp','_tLbl','_tDateField','_tDateFrom','_tDateTo'],
+  commit:['_cd','_cp','_cDoneField','_cDoneFrom','_cDoneTo'],
+};
+const SV=()=>savedviews.filter(v=>!v.deleted);
+const svFor=k=>SV().filter(v=>v.scope===k).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+function svSnapshot(k){const f={};(VIEW_FILTERS[k]||[]).forEach(n=>{const v=window[n];if(v)f[n]=v;});
+  const extra={};
+  if(k==='tasks'&&_sort.tasks)extra.sort=_sort.tasks;
+  if(k==='commit'){extra.tab=cTab;extra.lsort=listSort('commit','due');}
+  return{f,extra};}
+/* Is the current filter state identical to this saved one? Drives the "on" chip. */
+function svActive(v){const cur=svSnapshot(v.scope);
+  return JSON.stringify(cur.f)===JSON.stringify(v.f||{})&&JSON.stringify(cur.extra)===JSON.stringify(v.extra||{});}
+function svIsClean(k){const cur=svSnapshot(k);return !Object.keys(cur.f).length;}
+async function svSave(k){
+  const cur=svSnapshot(k);
+  if(!Object.keys(cur.f).length&&!Object.keys(cur.extra).length){toast('Set some filters first, then save the view.');return;}
+  const name=await askText('Name this view:',{title:'Save view',placeholder:'e.g. Overdue in Ops',ok:'Save'});
+  if(!name||!name.trim())return;
+  const n=now();const ex=svFor(k).find(v=>v.name.toLowerCase()===name.trim().toLowerCase());
+  if(ex){ex.f=cur.f;ex.extra=cur.extra;ex.updated_at=n;}
+  else savedviews.push({id:uid(),scope:k,name:name.trim(),f:cur.f,extra:cur.extra,created_at:n,updated_at:n});
+  persist();reRender();toast('View saved.');}
+function svApply(id){const v=SV().find(x=>x.id===id);if(!v)return;
+  (VIEW_FILTERS[v.scope]||[]).forEach(nm=>{window[nm]='';});
+  Object.entries(v.f||{}).forEach(([nm,val])=>{window[nm]=val;});
+  if(v.scope==='tasks'){if(v.extra&&v.extra.sort)_sort.tasks=v.extra.sort;else delete _sort.tasks;}
+  if(v.scope==='commit'){if(v.extra&&v.extra.tab)cTab=v.extra.tab;if(v.extra&&v.extra.lsort)_lsort.commit=v.extra.lsort;}
+  reRender();}
+function svClear(k){(VIEW_FILTERS[k]||[]).forEach(nm=>{window[nm]='';});
+  if(k==='tasks'){window._tSt='open';delete _sort.tasks;}
+  reRender();}
+async function svDel(id){const v=SV().find(x=>x.id===id);if(!v)return;
+  if(!await askConfirm('Delete the saved view "'+v.name+'"?',{ok:'Delete',danger:true}))return;
+  v.deleted=true;v.updated_at=now();persist();reRender();toast('View deleted.');}
+/* Chip strip rendered above a list's filter row. */
+function svBar(k){const views=svFor(k);
+  const chips=views.map(v=>`<span class="chip sv ${svActive(v)?'on':''}" onclick="svApply('${v.id}')" title="Apply this view">${esc(v.name)}<button title="Delete view" onclick="event.stopPropagation();svDel('${v.id}')">\u2715</button></span>`).join('');
+  return `<div class="svbar">${chips}<button class="btn gh2 xs" onclick="svSave('${k}')" title="Save the current filters as a named view">\u2606 Save view</button>${views.length?`<button class="btn gh2 xs" onclick="svClear('${k}')">Reset filters</button>`:''}</div>`;}
 var _lsort={};
 function listSort(scope,def){return _lsort[scope]||def;}
 function setListSort(scope,v){_lsort[scope]=v;renderView();}
@@ -2967,6 +3017,7 @@ function vCommit(){const td=today();
     <button class="tab ${cTab==='mine'?'on':''}" onclick="cTab='mine';renderView()">My plate <span class="num">(${mine.length})</span></button>
     <button class="tab ${cTab==='calls'?'on':''}" onclick="cTab='calls';renderView()">Calls <span class="num">(${calls.length})</span></button>
     <button class="tab ${cTab==='done'?'on':''}" onclick="cTab='done';renderView()">Done</button></div>
+  ${svBar('commit')}
   <div class="filters"><select onchange="window._cd=this.value;renderView()"><option value="">All departments</option>${depts.map(d=>`<option${dv===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
     ${listSortSelect('commit',TASK_SORTS,'due')}
     ${(()=>{const base=cTab==='chase'?chase:cTab==='mine'?mine:cTab==='calls'?calls:doneAll;
@@ -3057,7 +3108,7 @@ function vTasks(){const td=today();const q=(window._tq||'').toLowerCase();const 
   const _tN=list.length;list=listCap('tasks',list);
   const owners=[...new Set(T().map(t=>t.owner).filter(o=>o&&o!=='me'))].sort((a,b)=>pname(a).localeCompare(pname(b)));
   const depts2=[...new Set(T().map(t=>t.dept).filter(Boolean))].sort();
-  const filters=`<div class="filters"><input id="tqFilter" placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(reRender,260)" style="min-width:220px">
+  const filters=svBar('tasks')+`<div class="filters"><input id="tqFilter" placeholder="Search title, account, owner, dept" value="${esc(window._tq||'')}" oninput="window._tq=this.value;clearTimeout(window._tqt);window._tqt=setTimeout(reRender,260)" style="min-width:220px">
     <select onchange="window._tSt=this.value;renderView()"><option value="open"${st==='open'?' selected':''}>Open</option><option value="overdue"${st==='overdue'?' selected':''}>Overdue</option><option value="done"${st==='done'?' selected':''}>Done</option></select>
     <select data-ssel onchange="window._tOwn=this.value;renderView()"><option value="">All owners</option><option value="me"${own==='me'?' selected':''}>Me</option>${owners.map(o=>`<option value="${o}"${own===o?' selected':''}>${esc(pname(o))}</option>`).join('')}</select>
     <select onchange="window._tDp=this.value;renderView()"><option value="">All departments</option>${depts2.map(d=>`<option${dp===d?' selected':''}>${esc(d)}</option>`).join('')}</select>
