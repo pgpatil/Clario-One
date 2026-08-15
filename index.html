@@ -283,6 +283,21 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .top3-it{display:flex;gap:8px;align-items:flex-start;padding:7px 12px;border-bottom:1px solid var(--bdr)}
 .top3-it .rank{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 
+.ritsteps{display:flex;gap:0;padding:10px 18px 0;flex:0 0 auto}
+.ritsteps i{flex:1;height:3px;border-radius:2px;background:var(--bdr);margin-right:4px;transition:background .18s}
+.ritsteps i:last-child{margin-right:0}
+.ritsteps i.on{background:var(--blue)}
+.ritsteps i.done{background:var(--grn)}
+.rit-h{font-size:14px;font-weight:800;margin-bottom:3px}
+.rit-sub{font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.5}
+.rit-item{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr)}
+.rit-item:last-child{border-bottom:0}
+.rit-item .t{flex:1;font-size:12.5px;font-weight:600}
+.rit-item .acts{display:flex;gap:4px;flex-wrap:wrap}
+.rit-win{display:flex;gap:7px;align-items:baseline;padding:5px 0;font-size:12.5px}
+.rit-win::before{content:"\2713";color:var(--grn);font-weight:800}
+.rit-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12.5px}
+.rit-stat b{font-variant-numeric:tabular-nums}
 .svbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .chip.sv{cursor:pointer;user-select:none}
 .chip.sv.on{background:var(--blue);color:#fff;border-color:var(--blue)}
@@ -902,6 +917,15 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
   <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
+</div></div>
+
+<!-- Guided ritual (daily shutdown / weekly review) -->
+<div class="ovl" id="mRitual"><div class="modal" style="max-width:640px">
+  <h3 id="ritTitle">Shutdown<button class="mx" type="button" onclick="closeM()">&#10005;</button></h3>
+  <div class="ritsteps" id="ritSteps"></div>
+  <div class="mbody" id="ritBody"></div>
+  <div class="macts"><button class="btn gh2" id="ritBack" onclick="ritGo(-1)">Back</button>
+  <div class="rr"><button class="btn" id="ritNext" onclick="ritGo(1)">Next</button></div></div>
 </div></div>
 
 <!-- Summary modal (in-app — window.open() has no back/close chrome in an iOS standalone PWA) -->
@@ -2865,12 +2889,155 @@ function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t
 function addDump(){const i=g('dumpInp');const v=(i?i.value:'').trim();if(!v)return;const n=now();
   tasks.push({id:uid(),type:'task',title:v,owner:'me',due:null,estimate_min:30,priority:'medium',status:'open',dept:deptForOwner('me'),customer_id:null,notes:'',created_at:n,updated_at:n});
   if(i)i.value='';persist();renderView();}
-async function shutdownDay(ds){if(ds===today())await checkLocationConfirmation();
-  const open=T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));
-  if(!open.length){toast('Nothing open. Clean close — well done.');return;}
-  if(!await askConfirm(open.length+' unfinished item(s). Carry to tomorrow? Original due dates are kept for ageing.',{title:'Run shutdown',ok:'Carry over'}))return;
-  const tm=addDays(ds,1);open.forEach(t=>{if(!t.original_due)t.original_due=t.due;t.due=tm;t.at=null;t.rolled=true;t.updated_at=now();});
-  persist();renderView();toast(open.length+' carried to '+fmtD(tm)+'. Original dates preserved.');}
+/* ═══ GUIDED RITUALS ═══
+   Both rituals existed but as a single act: shutdown was one confirm that swept every
+   unfinished item to tomorrow, and the weekly review was a page you read. Neither walked you
+   through anything, which is the part that makes a ritual a ritual.
+   Steps are modelled on the two flows Sunsama documents. Where a step is omitted the reason is
+   stated next to it rather than left as a silent gap. */
+var _rit=null;
+
+function ritStepsFor(kind){
+  if(kind==='shutdown')return[
+    {k:'wins',  label:'Today'},
+    {k:'open',  label:'Unfinished'},
+    {k:'next',  label:'Tomorrow'},
+    {k:'note',  label:'Reflect'}];
+  return[
+    {k:'done',  label:'Achieved'},
+    {k:'slip',  label:'Slipped'},
+    {k:'time',  label:'Where time went'},
+    {k:'plan',  label:'Next week'}];}
+
+function ritOpen(kind,ds){
+  _rit={kind,ds:ds||today(),step:0,steps:ritStepsFor(kind)};
+  g('ritTitle').firstChild.textContent=(kind==='shutdown'?'Shutdown · '+fmtD(_rit.ds):'Weekly review')+' ';
+  g('mRitual').classList.add('open');ritRender();}
+function ritGo(d){
+  if(!_rit)return;
+  const cur=_rit.steps[_rit.step];
+  if(d>0&&typeof window['ritSave_'+cur.k]==='function')window['ritSave_'+cur.k]();
+  const n=_rit.step+d;
+  if(n<0)return;
+  if(n>=_rit.steps.length){ritFinish();return;}
+  _rit.step=n;ritRender();}
+function ritFinish(){
+  const kind=_rit.kind;closeM();_rit=null;persist();renderView();
+  toast(kind==='shutdown'?'Day closed. See you tomorrow.':'Week reviewed. Next week is set.');}
+function ritRender(){
+  const st=_rit.steps[_rit.step];
+  g('ritSteps').innerHTML=_rit.steps.map((s,i)=>`<i class="${i<_rit.step?'done':i===_rit.step?'on':''}" title="${esc(s.label)}"></i>`).join('');
+  g('ritBody').innerHTML=window['ritView_'+st.k](_rit.ds);
+  g('ritBack').style.visibility=_rit.step?'':'hidden';
+  g('ritNext').textContent=_rit.step===_rit.steps.length-1?(_rit.kind==='shutdown'?'Close the day':'Finish'):'Next';}
+function ritRefresh(){if(_rit)ritRender();}
+
+/* ── daily shutdown ───────────────────────────────────────────── */
+function ritDoneToday(ds){return T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)===ds);}
+function ritOpenItems(ds){return T().filter(t=>t.type!=='call'&&t.status==='open'&&t.due&&t.due<=ds&&(t.owner==='me'||!t.owner));}
+function ritView_wins(ds){
+  const done=ritDoneToday(ds);const mt=M().filter(m=>m.date===ds);
+  return `<div class="rit-h">What you finished</div>
+    <div class="rit-sub">Start with the wins — a day rarely feels as productive as it was.</div>
+    ${done.length?done.map(t=>`<div class="rit-win">${esc(t.title)}</div>`).join(''):'<div class="empty">Nothing ticked off today. That happens — the next step is what matters.</div>'}
+    ${mt.length?`<div class="rit-stat" style="margin-top:10px"><span>Meetings attended</span><b>${mt.length}</b></div>`:''}`;}
+function ritView_open(ds){
+  const open=ritOpenItems(ds);const tm=addDays(ds,1);
+  if(!open.length)return `<div class="rit-h">Nothing left open</div><div class="rit-sub">A clean close.</div>`;
+  return `<div class="rit-h">${open.length} unfinished</div>
+    <div class="rit-sub">Decide each one rather than sweeping the lot forward. Original due dates are kept either way, so ageing stays honest.</div>
+    ${open.map(t=>`<div class="rit-item">
+      <div class="t">${esc(t.title)}${t.due<ds?`<span class="pill r" style="margin-left:6px">since ${fmtD(t.original_due||t.due)}</span>`:''}</div>
+      <div class="acts">
+        <button class="btn gh2 xs" onclick="ritRoll('${t.id}','${tm}')">Tomorrow</button>
+        <button class="btn gh2 xs" onclick="ritRoll('${t.id}','${addDays(ds,7)}')">Next week</button>
+        <button class="btn gh2 xs" onclick="ritDrop('${t.id}')" title="Delete it — saying no is a decision too">Drop</button>
+      </div></div>`).join('')}
+    <div style="margin-top:12px"><button class="btn gh2 sm" onclick="ritRollAll('${ds}','${tm}')">Move all to tomorrow</button></div>`;}
+function ritRoll(id,to){const t=tasks.find(x=>x.id===id);if(!t)return;
+  if(!t.original_due)t.original_due=t.due;t.due=to;t.at=null;t.rolled=true;t.updated_at=now();persist();ritRefresh();}
+function ritDrop(id){const t=tasks.find(x=>x.id===id);if(!t)return;
+  t.deleted=true;t.updated_at=now();persist();ritRefresh();}
+function ritRollAll(ds,to){ritOpenItems(ds).forEach(t=>{if(!t.original_due)t.original_due=t.due;
+  t.due=to;t.at=null;t.rolled=true;t.updated_at=now();});persist();ritRefresh();}
+function ritView_next(ds){
+  const tm=addDays(ds,1);
+  const blocks=timedBlocks(tm);
+  const due=T().filter(t=>t.type!=='call'&&t.due===tm&&t.status!=='done');
+  const mins=due.reduce((a,t)=>a+(+t.estimate_min||30),0)+blocks.filter(b=>b.k==='m').reduce((a,b)=>a+b.dur,0);
+  const focus=T().filter(t=>t.focus&&t.status!=='done');
+  return `<div class="rit-h">Tomorrow — ${fmtD(tm)}</div>
+    <div class="rit-sub">A quick look so tomorrow-you is not surprised.</div>
+    <div class="rit-stat"><span>Items due</span><b>${due.length}</b></div>
+    <div class="rit-stat"><span>Meetings</span><b>${blocks.filter(b=>b.k==='m').length}</b></div>
+    <div class="rit-stat"><span>Planned load</span><b>${Math.round(mins/60*10)/10}h of 8h</b></div>
+    ${mins>480?'<div class="note" style="color:var(--red);margin-top:8px">That is over a full day. Consider moving something now rather than at 6pm tomorrow.</div>':''}
+    ${focus.length?`<div style="margin-top:12px"><div class="rit-h" style="font-size:12.5px">Focus carried over</div>${focus.map(t=>`<div class="rit-win">${esc(t.title)}</div>`).join('')}</div>`:''}`;}
+function ritView_note(ds){
+  const j=getJournal(ds);
+  return `<div class="rit-h">Anything worth remembering?</div>
+    <div class="rit-sub">One line is enough. It shows up in the weekly review.</div>
+    <textarea id="ritNote" style="width:100%;min-height:96px" placeholder="What went well, what got in the way, what to carry forward…">${esc(j?j.text:'')}</textarea>`;}
+/* saveJournal() reads the planner page's textarea; the ritual has its own, so write directly. */
+function ritSave_note(){const el=g('ritNote');if(!el)return;const key=_rit.ds,n=now();
+  const j=getJournal(key);
+  if(j){j.text=el.value;j.updated_at=n;}
+  else if(el.value.trim())journals.push({id:uid(),key,text:el.value,created_at:n,updated_at:n});
+  persist();}
+
+/* ── weekly review ────────────────────────────────────────────── */
+function ritWeekStart(){return addDays(today(),-7);}
+function ritView_done(){
+  const wk=ritWeekStart();
+  const done=T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=wk);
+  const won=DL().filter(d=>d.stage==='Won'&&(d.won_at||d.updated_at||'').slice(0,10)>=wk);
+  const mt=M().filter(m=>m.date>=wk&&m.date<=today());
+  return `<div class="rit-h">What you achieved</div>
+    <div class="rit-sub">The last seven days, before you judge the next seven.</div>
+    <div class="rit-stat"><span>Completed</span><b>${done.length}</b></div>
+    <div class="rit-stat"><span>Meetings held</span><b>${mt.length}</b></div>
+    ${won.length?`<div class="rit-stat"><span>Deals won</span><b>${won.length} · ${fmtMoney(won.reduce((a,d)=>a+(+d.value||0),0))}</b></div>`:''}
+    ${done.length?`<div style="margin-top:10px;max-height:150px;overflow:auto">${done.slice(0,12).map(t=>`<div class="rit-win">${esc(t.title)}</div>`).join('')}</div>`:''}`;}
+function ritView_slip(){
+  const td=today();
+  const overdue=T().filter(t=>t.status!=='done'&&t.type!=='call'&&t.due&&t.due<td);
+  const stuck=waiting().filter(t=>t.follow_up&&t.follow_up<td);
+  const oldest=overdue.slice().sort((a,b)=>((a.original_due||a.due)+'').localeCompare((b.original_due||b.due)+'')).slice(0,5);
+  return `<div class="rit-h">What slipped</div>
+    <div class="rit-sub">Not to feel bad about — to decide about. Anything here that is still not moving next week probably is not going to.</div>
+    <div class="rit-stat"><span>Overdue</span><b>${overdue.length}</b></div>
+    <div class="rit-stat"><span>Waiting on others, past follow-up</span><b>${stuck.length}</b></div>
+    ${oldest.length?`<div style="margin-top:10px"><div class="rit-h" style="font-size:12.5px">Oldest first</div>
+      ${oldest.map(t=>`<div class="rit-item"><div class="t">${esc(t.title)}<span class="pill r" style="margin-left:6px">since ${fmtD(t.original_due||t.due)}</span></div>
+      <div class="acts"><button class="btn gh2 xs" onclick="ritRoll('${t.id}','${addDays(td,7)}')">Next week</button>
+      <button class="btn gh2 xs" onclick="ritDrop('${t.id}')">Drop</button></div></div>`).join('')}</div>`:''}`;}
+function ritView_time(){
+  const wk=ritWeekStart();
+  const done=T().filter(t=>t.status==='done'&&(t.completed_at||t.updated_at||'').slice(0,10)>=wk);
+  const mt=M().filter(m=>m.date>=wk&&m.date<=today());
+  const byDept={};
+  done.forEach(t=>{const d=t.dept||'Unassigned';byDept[d]=(byDept[d]||0)+(+t.estimate_min||30);});
+  const meetMin=mt.reduce((a,m)=>a+(+m.duration||60),0);
+  if(meetMin)byDept['Meetings']=(byDept['Meetings']||0)+meetMin;
+  const rows=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
+  const total=rows.reduce((a,r)=>a+r[1],0)||1;
+  return `<div class="rit-h">Where the time went</div>
+    <div class="rit-sub">Estimated effort on what you finished, plus meeting time. A rough shape, not a timesheet — Clario does not track time, so this reads from your estimates.</div>
+    ${rows.length?rows.map(([d,m])=>`<div class="rit-stat"><span>${esc(d)}</span><b>${Math.round(m/60*10)/10}h · ${Math.round(m/total*100)}%</b></div>`).join(''):'<div class="empty">Nothing completed this week to measure.</div>'}`;}
+function ritView_plan(){
+  const wkKey=weekKey(addDays(today(),7));
+  const items=planItems('week',wkKey);
+  return `<div class="rit-h">Next week</div>
+    <div class="rit-sub">Three outcomes beats a list of twenty. These become next week's goals in the planner.</div>
+    ${items.length?items.map(p=>`<div class="rit-win">${esc(p.text)}</div>`).join(''):''}
+    <div class="addline" style="margin-top:8px"><input id="ritPlanInp" placeholder="An outcome for next week…" onkeydown="if(event.key==='Enter')ritAddPlan()"><button class="btn sm" onclick="ritAddPlan()">Add</button></div>`;}
+function ritAddPlan(){const i=g('ritPlanInp');const v=(i?i.value:'').trim();if(!v)return;
+  const n=now();plans.push({id:uid(),scope:'week',key:weekKey(addDays(today(),7)),text:v,done:false,created_at:n,updated_at:n});
+  if(i)i.value='';persist();ritRefresh();}
+
+/* The old one-shot sweep is kept as the non-interactive path used by tests and callers that
+   just want the carry-over; the button now opens the guided flow. */
+async function shutdownDay(ds){if(ds===today())await checkLocationConfirmation();ritOpen('shutdown',ds);}
 
 function vPlanner(){const td=today();
   const tabs=`<div class="tabs">${[['day','Day'],['week','Week'],['month','Month'],['meet','Meetings']].map(([k,l])=>`<button class="tab ${plTab===k?'on':''}" onclick="plTab='${k}';renderView()">${l}</button>`).join('')}</div>`;
@@ -3823,7 +3990,7 @@ function vReview(){const td=today(),wk=addDays(td,-7);
   const wkGoals=planItems('week',weekKey(td));
   const oldest5=overdue.filter(t=>t.type!=='call').sort((a,b)=>((a.original_due||a.due)+'').localeCompare((b.original_due||b.due)+'')).slice(0,5);
   const wonW=DL().filter(d=>d.stage==='Won'&&(d.won_at||d.updated_at||'').slice(0,10)>=wk);
-  return pagehead('REVIEW','Weekly review','Look back, then set next week',`<button class="btn gh2 sm" onclick="window.print()">Print</button><button class="btn sm" onclick="exportReview()">Export .md</button>`)+
+  return pagehead('REVIEW','Weekly review','Look back, then set next week',`<button class="btn gh2 sm" onclick="window.print()">Print</button><button class="btn gh2 sm" onclick="exportReview()">Export .md</button><button class="btn sm" onclick="ritOpen('review')">Run guided review \u2192</button>`)+
   `<div class="kpis">
     <div class="kpi good"><div class="kv num">${doneW.length}</div><div class="kl">Done · 7d</div></div>
     <div class="kpi"><div class="kv num">${createdW.length}</div><div class="kl">Added · 7d</div></div>
