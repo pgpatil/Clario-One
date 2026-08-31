@@ -226,7 +226,7 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 /* 1fr tracks carry an implicit min-width:auto, and .mg-it is nowrap -- so one long task title
    used to blow its column out to 119px while the empty ones collapsed to 27px, pushing four
    days past the clipped edge on a phone. min-width:0 lets 1fr actually mean a seventh. */
-.mg-c{min-width:0}
+.mg-c{min-width:0;display:flex;flex-direction:column}
 /* Location bands. Eight pairs, each checked at >=6.3:1 text-on-band (AA needs 4.5). */
 .lc0{background:#e6ecf3;color:#2b4a6b}.lc1{background:#e2f0e8;color:#1c6039}
 .lc2{background:#faecd9;color:#7d5111}.lc3{background:#ebe8f6;color:#453a86}
@@ -256,6 +256,21 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .mg-it.m{background:var(--blue-l);color:var(--blue-d)}
 .mg-it.c{background:var(--grn-l);color:var(--grn)}
 .mg-it.ov{background:var(--red-l);color:var(--red)}
+.mg-it.done{background:var(--sub);color:var(--t4);text-decoration:line-through}
+.mg-it[data-bid]{cursor:grab;touch-action:none}
+.mg-it[data-bid]:active{cursor:grabbing}
+.mg-it.drag-src{opacity:.5}
+/* compact: one dot per item, so a six-item day fits the space three titles took */
+.mg-dots{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px}
+.mg-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;cursor:grab;touch-action:none;background:var(--t4)}
+.mg-dot.t{background:var(--t3)}.mg-dot.m{background:var(--blue)}.mg-dot.c{background:var(--grn)}
+.mg-dot.ov{background:var(--red)}.mg-dot.done{background:var(--bdr2)}
+.mg-dot.drag-src{opacity:.5}
+/* load: how full the day already is, against eight hours */
+.mg-load{height:3px;border-radius:2px;background:var(--bdr);overflow:hidden;margin-top:auto;flex:0 0 auto}
+.mg-load i{display:block;height:100%;background:var(--grn)}
+.mg-load.over i{background:var(--red)}
+.mg-c.drop-live{outline:2px dashed var(--blue);outline-offset:-2px;background:var(--blue-l)}
 .mg-more{font-size:10px;color:var(--t4)}
 
 /* ═══ planner: week (hourly calendar) ═══ */
@@ -1669,11 +1684,37 @@ function snoozeFollow(id){const t=tasks.find(x=>x.id===id);if(!t)return;
   const baseDate=fd&&fd>=today()?fd:today();
   t.follow_up=addDays(baseDate,1)+'T'+ft;t.updated_at=now();persist();reRender();toast('Follow-up '+fmtDT(t.follow_up)+'.');}
 function seccard(title,n,inner,emptyMsg,extra){return`<div class="card"><div class="ch"><span>${title} ${n?`<span class="n num">(${n})</span>`:''}</span>${extra||''}</div>${n?inner:`<div class="empty">${emptyMsg}</div>`}</div>`;}
-function dayItems(ds){
-  const mt=M().filter(m=>m.date===ds).map(m=>({k:'m',s:(m.time||'')+' '+m.title,o:m,sort:'0'+(m.time||'')}));
-  const cl=T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds&&t.status!=='done').map(t=>({k:'c',s:'Call: '+t.title,o:t,sort:'1'+t.when}));
-  const tk=T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done').map(t=>({k:'t',s:t.title,o:t,sort:'2'+(t.at||'99')}));
+/* opts.done includes finished work. Off everywhere by default -- a day view is about what is
+   left -- but a month is as much "what did we do" as "what is coming", so the month grid can
+   ask for it. A finished month rendering empty was the state before this. */
+function dayItems(ds,opts){
+  const wantDone=!!(opts&&opts.done);
+  const keep=t=>wantDone||t.status!=='done';
+  const mt=M().filter(m=>m.date===ds).map(m=>({k:'m',s:(m.time||'')+' '+m.title,o:m,done:m.status==='done',sort:'0'+(m.time||'')}));
+  const cl=T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds&&keep(t)).map(t=>({k:'c',s:'Call: '+t.title,o:t,done:t.status==='done',sort:'1'+t.when}));
+  const tk=T().filter(t=>t.type!=='call'&&t.due===ds&&keep(t)).map(t=>({k:'t',s:t.title,o:t,done:t.status==='done',sort:'2'+(t.at||'99')}));
   return[...mt,...cl,...tk].sort((a,b)=>a.sort.localeCompare(b.sort));}
+/* ═══ MONTH GRID: LOAD, DENSITY, COMPLETED ═══
+   A month grid that only lists titles tells you what is on a day but not whether the day is
+   already full -- which is the question you are actually asking when you look at a month.
+   Load reuses the day view's arithmetic: estimates on open tasks plus meeting minutes, against
+   an eight-hour day. */
+const DAY_CAP=480;
+function dayLoad(ds){
+  const mins=M().filter(m=>m.date===ds&&m.status!=='done').reduce((a,m)=>a+(+m.duration||60),0)
+    +T().filter(t=>t.type!=='call'&&t.due===ds&&t.status!=='done').reduce((a,t)=>a+(+t.estimate_min||30),0)
+    +T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds&&t.status!=='done').reduce((a,t)=>a+(+t.estimate_min||30),0);
+  return{mins,pct:Math.min(100,Math.round(mins/DAY_CAP*100)),over:mins>DAY_CAP};}
+function loadBarHtml(ds){
+  const l=dayLoad(ds);if(!l.mins)return'';
+  const h=Math.round(l.mins/60*10)/10;
+  return `<div class="mg-load ${l.over?'over':''}" title="${h}h planned against an 8h day"><i style="width:${l.pct}%"></i></div>`;}
+var mDensity=(()=>{try{return localStorage.getItem('cx_mdens')||'full';}catch(e){return'full';}})();
+var mShowDone=false;
+var _mExpand={};
+function setDensity(v){mDensity=v;try{localStorage.setItem('cx_mdens',v);}catch(e){}reRender();}
+function toggleMonthDone(){mShowDone=!mShowDone;reRender();}
+function expandDay(ds){_mExpand[ds]=!_mExpand[ds];reRender();}
 function mrowHtml(m){const ag=meetingAgenda(m).length;
   return`<div class="mrow" onclick="nav('meeting','${m.id}')"><div class="mwhen"><div class="md">${fmtD(m.date)}</div><div class="mt num">${m.time||''}</div></div>
   <div style="flex:1"><div class="mtitle">${esc(m.title)}${m.repeat?` <span class="pill b" title="Repeats ${esc(m.repeat)}">↻</span>`:''}</div><div class="msub">${(m.attendee_ids||[]).map(pname).join(', ')||'No attendees'}${m.customer_id?' · '+esc(cname(m.customer_id)):''}${m.dept?' · '+esc(m.dept):''}</div></div>
@@ -2725,17 +2766,21 @@ function dragTimeAt(px){
   return String(H0+Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');}
 function dragBodyUnder(x,y){
   return document.elementsFromPoint(x,y).find(e=>e.classList&&
-    (e.classList.contains('tl-blocks')||e.classList.contains('wcal-col-body')))||null;}
+    (e.classList.contains('tl-blocks')||e.classList.contains('wcal-col-body')||e.classList.contains('mg-c')))||null;}
+/* A month cell is a whole day, not a position within one: dropping there moves the date and
+   deliberately leaves the time of day alone. */
+const dragIsMonthCell=el=>!!(el&&el.classList&&el.classList.contains('mg-c'));
 function dragDateOf(body){return body?(body.dataset.date||plAnchor||today()):null;}
 
 /* Write a new time (and possibly day) onto whatever kind of thing was dragged. */
+/* time===null means "keep whatever time it already had" -- a month drop reschedules the day. */
 function dragApplyMove(kind,id,ds,time){
   const n=now();
   if(kind==='m'){const m=meetings.find(x=>x.id===id);if(!m)return false;
-    m.date=ds;m.time=time;m.updated_at=n;}
+    m.date=ds;if(time!==null)m.time=time;m.updated_at=n;}
   else{const t=tasks.find(x=>x.id===id);if(!t)return false;
-    if(kind==='c'){t.when=ds+'T'+time;}
-    else{t.due=ds;if(!t.original_due)t.original_due=ds;t.at=time;}
+    if(kind==='c'){const keep=time!==null?time:((t.when||'').slice(11,16)||'10:00');t.when=ds+'T'+keep;}
+    else{t.due=ds;if(!t.original_due)t.original_due=ds;if(time!==null)t.at=time;}
     t.updated_at=n;}
   persist();return true;}
 function dragApplyResize(kind,id,mins){
@@ -2772,6 +2817,11 @@ function dragMove(e){
     dragGhost(mins>=60?(Math.floor(mins/60)+'h'+(mins%60?' '+(mins%60)+'m':'')):(mins+'m'));
   }else{
     if(!body){dragGhost('Drop on the grid');}
+    else if(dragIsMonthCell(body)){
+      body.classList.add('drop-live');
+      const ds=dragDateOf(body);
+      _drag.pendTime=null;_drag.pendDate=ds;_drag.pendBody=body;
+      dragGhost(new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'}));}
     else{body.classList.add('drop-live');
       const rect=body.getBoundingClientRect();
       const time=dragTimeAt(e.clientY-rect.top-(_drag.grabOff||0));
@@ -2783,7 +2833,16 @@ function dragMove(e){
       dragGhost(time+' · '+new Date(ds+'T12:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric'}));}
   }
   const gh=g('dragGhost');
-  if(gh){gh.style.left=(e.clientX+14)+'px';gh.style.top=(e.clientY+14)+'px';}}
+  if(gh){gh.style.left=(e.clientX+14)+'px';gh.style.top=(e.clientY+14)+'px';}
+  dragEdgeScroll(e.clientY);}
+/* Only about three month rows fit on a phone, so without this you could never drag from the
+   first week to the last -- the target is simply not on screen, and a drop resolves by
+   hit-testing what is under the pointer. Nudge the page when the pointer nears an edge. */
+const EDGE_PX=70, EDGE_STEP=14;
+function dragEdgeScroll(y){
+  const h=window.innerHeight;
+  if(y<EDGE_PX)window.scrollBy(0,-EDGE_STEP);
+  else if(y>h-EDGE_PX)window.scrollBy(0,EDGE_STEP);}
 
 function dragEnd(e){
   if(!_drag)return;
@@ -2797,7 +2856,7 @@ function dragEnd(e){
   if(!d.moved)return;
   let ok=false;
   if(d.mode==='resize'&&d.pendMins)ok=dragApplyResize(d.kind,d.id,d.pendMins);
-  else if(d.pendTime&&d.pendDate){
+  else if(d.pendDate&&(d.pendTime||d.pendTime===null)){
     ok=dragApplyMove(d.kind||'t',d.id,d.pendDate,d.pendTime);
     if(ok&&d.mode==='place')toast('Scheduled '+d.pendTime+' · '+fmtD(d.pendDate));}
   reRender();
@@ -2812,13 +2871,15 @@ function wireDragScheduling(){
     const rz=e.target.closest('.tl-rz');
     const blk=e.target.closest('.tl-b[data-bid]');
     const src=e.target.closest('[data-drag-task]');
-    if(!rz&&!blk&&!src)return;
+    const mit=e.target.closest('[data-mit]');
+    if(!rz&&!blk&&!src&&!mit)return;
     const touch=e.pointerType==='touch';
     const start=()=>{
       if(rz){const b=rz.closest('.tl-b');
         dragBegin(e,'resize',{el:b,kind:b.dataset.bkind,id:b.dataset.bid,startH:b.getBoundingClientRect().height});}
       else if(blk){const r=blk.getBoundingClientRect();
         dragBegin(e,'move',{el:blk,kind:blk.dataset.bkind,id:blk.dataset.bid,grabOff:e.clientY-r.top});}
+      else if(mit){dragBegin(e,'move',{el:mit,kind:mit.dataset.bkind,id:mit.dataset.bid,grabOff:0});}
       else dragBegin(e,'place',{el:null,kind:'t',id:src.dataset.dragTask,grabOff:0});
     };
     if(touch){
@@ -3139,14 +3200,30 @@ function vPlanner(){const td=today();
     title=d0.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
     const start=mondayOf(first);const cells=[];for(let i=0;i<42;i++)cells.push(addDays(start,i));
     const grid=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="mg-h">${d}</div>`).join('')+
-      cells.map((ds,ci)=>{const items=dayItems(ds);const inM=monthKey(ds)===mk;
-        return`<div class="mg-c ${inM?'':'dim'} ${ds===td?'todaycell':''} ${ds===selDay?'sel':''} ${isWeeklyOff(ds)?'weekoff':''}" onclick="selDay='${ds}';renderView()" ${isWeeklyOff(ds)?`title="${esc(weeklyOffLabel(ds))}"`:''}>
+      cells.map((ds,ci)=>{const items=dayItems(ds,{done:mShowDone});const inM=monthKey(ds)===mk;
+        const compact=mDensity==='compact';
+        const cap=compact?12:3;
+        const open=!!_mExpand[ds];
+        const shown=open?items:items.slice(0,cap);
+        const itHtml=shown.map(it=>{
+          const ov=!it.done&&it.k==='t'&&it.o.due<td;
+          const cls=(it.done?'done':ov?'ov':it.k);
+          /* data-bid/-bkind make each item a drag source; the engine moves it to whichever day
+             it is dropped on and leaves its time of day alone. */
+          const drag=`data-bid="${it.o.id}" data-bkind="${it.k}" data-mit="1"`;
+          return compact
+            ? `<span class="mg-dot ${cls}" ${drag} title="${esc(it.s)}"></span>`
+            : `<div class="mg-it ${cls}" ${drag} title="${esc(it.s)}">${esc(it.s)}</div>`;}).join('');
+        const hidden=items.length-shown.length;
+        return`<div class="mg-c ${inM?'':'dim'} ${ds===td?'todaycell':''} ${ds===selDay?'sel':''} ${isWeeklyOff(ds)?'weekoff':''}" data-date="${ds}" onclick="selDay='${ds}';renderView()" ${isWeeklyOff(ds)?`title="${esc(weeklyOffLabel(ds))}"`:''}>
         <div class="dn num">${+ds.slice(8)}</div>
         ${locBandHtml(ds,ci%7)}
-        ${items.slice(0,3).map(it=>{const ov=it.k==='t'&&it.o.due<td;return`<div class="mg-it ${ov?'ov':it.k}">${esc(it.s)}</div>`;}).join('')}
-        ${items.length>3?`<div class="mg-more">+${items.length-3} more</div>`:''}</div>`;}).join('');
+        ${compact?`<div class="mg-dots">${itHtml}</div>`:itHtml}
+        ${hidden>0?`<div class="mg-more" onclick="event.stopPropagation();expandDay('${ds}')">+${hidden} more</div>`:''}
+        ${open&&items.length>cap?`<div class="mg-more" onclick="event.stopPropagation();expandDay('${ds}')">show less</div>`:''}
+        ${loadBarHtml(ds)}</div>`;}).join('');
     body=planHtml('month',mk,'Goals — '+title,'What must this month deliver? Three to five goals.')+
-      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${monthLocSummary(mk)}</div><span style="display:flex;gap:6px"><button class="btn xs" onclick="openTrip()" title="Set one place across a run of days">\u2708 Set a trip</button><button class="btn gh2 xs" onclick="clearMonthLocations('${mk}')" title="Reset every day this month to no location">Clear month's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
+      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${monthLocSummary(mk)}</div><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn xs" onclick="openTrip()" title="Set one place across a run of days">\u2708 Set a trip</button><button class="btn gh2 xs" onclick="toggleMonthDone()" title="Include work already finished">${mShowDone?'\u2713 ':''}Completed</button><button class="btn gh2 xs" onclick="setDensity('${mDensity==='compact'?'full':'compact'}')" title="${mDensity==='compact'?'Show titles':'Dots instead of titles \u2014 fits a busy day'}">${mDensity==='compact'?'\u2637 Titles':'\u2059 Compact'}</button><button class="btn gh2 xs" onclick="clearMonthLocations('${mk}')" title="Reset every day this month to no location">Clear month's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
