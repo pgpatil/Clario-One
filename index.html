@@ -223,6 +223,27 @@ th.srt{cursor:pointer;user-select:none;white-space:nowrap}th.srt:hover{color:var
 .subbar i{display:block;height:100%;background:var(--grn);transition:width .18s ease}
 .pill.lbl{font-weight:600;letter-spacing:.01em}
 .mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;background:var(--bdr)}
+/* 1fr tracks carry an implicit min-width:auto, and .mg-it is nowrap -- so one long task title
+   used to blow its column out to 119px while the empty ones collapsed to 27px, pushing four
+   days past the clipped edge on a phone. min-width:0 lets 1fr actually mean a seventh. */
+.mg-c{min-width:0}
+/* Location bands. Eight pairs, each checked at >=6.3:1 text-on-band (AA needs 4.5). */
+.lc0{background:#e6ecf3;color:#2b4a6b}.lc1{background:#e2f0e8;color:#1c6039}
+.lc2{background:#faecd9;color:#7d5111}.lc3{background:#ebe8f6;color:#453a86}
+.lc4{background:#dcefee;color:#145c58}.lc5{background:#f8e5e9;color:#8a2c42}
+.lc6{background:#e5e7fa;color:#343a8d}.lc7{background:#e9eed8;color:#4c5a18}
+.locband{display:block;font-size:9.5px;font-weight:800;letter-spacing:.02em;line-height:1.5;
+  padding:1px 5px;margin:0 -6px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.locband:hover{filter:brightness(.96)}
+.locband.cont{color:transparent}                 /* a run continues: keep the colour, drop the repeat */
+.locband.cont::after{content:"\00a0"}
+.locband.none{background:transparent;color:var(--t4);border:1px dashed var(--bdr2);font-weight:600;
+  margin:0 -3px 4px;border-radius:3px;opacity:0;transition:opacity .12s}
+.mg-c:hover .locband.none{opacity:1}
+.mg-c.sel .locband.none,.mg-c.todaycell .locband.none{opacity:1}
+@media(pointer:coarse){.locband.none{opacity:1}}
+.locleg{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;
+  padding:2px 7px;border-radius:10px;margin-right:5px}
 .mg-h{background:var(--sub);padding:6px 4px;text-align:center;font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--t3)}
 .mg-c{background:#fff;min-height:92px;padding:5px 6px;cursor:pointer;font-size:11px}
 .mg-c:hover{background:var(--blue-l)}
@@ -917,6 +938,21 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
   <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
+</div></div>
+
+<!-- Set a location across a span of days -->
+<div class="ovl" id="mTrip"><div class="modal" style="max-width:430px">
+  <h3>Set a trip<button class="mx" type="button" onclick="closeM()">&#10005;</button></h3>
+  <div class="mbody">
+    <div class="fld"><label>Where</label><input id="tripCity" list="tripCityDL" placeholder="e.g. Mumbai, Home office"><datalist id="tripCityDL"></datalist></div>
+    <div class="g2">
+      <div class="fld"><label>From</label><input type="date" id="tripFrom"></div>
+      <div class="fld"><label>To</label><input type="date" id="tripTo"></div>
+    </div>
+    <p class="note">Writes the same place onto every day in the range. Nothing carries past the last day &mdash; days outside it stay exactly as they are.</p>
+  </div>
+  <div class="macts"><button class="btn gh2" onclick="clearTrip()">Clear this range</button>
+  <div class="rr"><button class="btn" onclick="saveTrip()">Set</button></div></div>
 </div></div>
 
 <!-- Guided ritual (daily shutdown / weekly review) -->
@@ -2880,9 +2916,62 @@ async function clearFutureLocations(){
   if(!await askConfirm(fut.length+' location'+(fut.length>1?'s are':' is')+' set for date'+(fut.length>1?'s':'')+' after '+fmtD(td)+'. Clear them so upcoming days start blank? Today and every past day stay exactly as they are.',{title:'Clear future locations',ok:'Clear future'}))return;
   const n=now();fut.forEach(l=>{l.deleted=true;l.updated_at=n;});
   persist();toast(fut.length+' future location'+(fut.length>1?'s':'')+' cleared.');renderView();}
+/* ═══ LOCATION ON THE MONTH GRID ═══
+   Where you are decides what work is even possible that day, so on a month view location is
+   the first layer, not a detail. Each city gets a stable colour, so a month reads as a travel
+   map at a glance -- a block of one colour is a stretch at base, a different block is a trip.
+   With carry-forward gone, unset days are genuinely unset; they show a faint "Set" affordance
+   rather than nothing, because an empty day is the thing you are meant to fill in. */
+function locColor(city){
+  let h=0;const s=(city||'').toLowerCase().trim();
+  for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+  return 'lc'+(h%8);}
+/* A run continues only if yesterday is the same city AND we are not at the start of a row --
+   a wrapped week breaks the visual run, so the label has to repeat there. */
+function locIsRunCont(ds,colIndex){
+  if(colIndex===0)return false;
+  const c=locOn(ds);if(!c)return false;
+  return locOn(addDays(ds,-1))===c;}
+function locBandHtml(ds,colIndex){
+  const city=locOn(ds);
+  if(!city)return `<div class="locband none" onclick="event.stopPropagation();editDayLoc('${ds}')" title="Set where you are on ${esc(fmtD(ds))}">+ where?</div>`;
+  const cont=locIsRunCont(ds,colIndex);
+  return `<div class="locband ${locColor(city)}${cont?' cont':''}" onclick="event.stopPropagation();editDayLoc('${ds}')" title="${esc(city)} · click to change">📍 ${esc(city)}</div>`;}
+
+/* ── set a whole trip in one action ──
+   Setting a five-day trip a day at a time was the friction that removing carry-forward left
+   behind. This is the answer to it: pick a city and a span, write every day in the range. */
+function openTrip(){
+  const td=today();
+  g('tripCity').value='';g('tripFrom').value=plAnchor||td;g('tripTo').value=plAnchor||td;
+  g('tripCityDL').innerHTML=locationSuggestions().map(l=>`<option value="${esc(l)}">`).join('');
+  g('mTrip').classList.add('open');setTimeout(()=>g('tripCity').focus(),50);}
+function saveTrip(){
+  const city=g('tripCity').value.trim();
+  let a=g('tripFrom').value, b=g('tripTo').value;
+  if(!city){toast('Which place?');return;}
+  if(!a||!b){toast('Pick both dates.');return;}
+  if(a>b){const t=a;a=b;b=t;}
+  const days=Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/86400000)+1;
+  if(days>366){toast('That is over a year — narrow the range.');return;}
+  ensureLocation(city);
+  for(let i=0;i<days;i++)setLoc(addDays(a,i),city);
+  closeM();persist();renderView();
+  toast(city+' set for '+days+' day'+(days>1?'s':'')+'.');}
+/* Clear a span without touching anything outside it. */
+function clearTrip(){
+  let a=g('tripFrom').value,b=g('tripTo').value;
+  if(!a||!b){toast('Pick both dates.');return;}
+  if(a>b){const t=a;a=b;b=t;}
+  const n=now();let k=0;
+  LOC().filter(l=>l.date>=a&&l.date<=b).forEach(l=>{l.deleted=true;l.updated_at=n;k++;});
+  closeM();persist();renderView();
+  toast(k?k+' day'+(k>1?'s':'')+' cleared.':'Nothing set in that range.');}
 function monthLocSummary(mk){const first=mk+'-01';const d=new Date(first+'T12:00');const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();
   const tally={};for(let day=1;day<=last;day++){const ds=mk+'-'+String(day).padStart(2,'0');const c=locOn(ds)||'—';tally[c]=(tally[c]||0)+1;}
-  const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="pill n">📍 ${esc(c)} · ${n}d</span>`).join(' ');
+  const unset=tally['—']||0;
+  const chips=Object.entries(tally).filter(([c])=>c!=='—').sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="locleg ${locColor(c)}">📍 ${esc(c)} · ${n}d</span>`).join('')
+    +(unset?`<span class="locleg" style="border:1px dashed var(--bdr2);color:var(--t4)">${unset} day${unset>1?'s':''} unset</span>`:'');
   return chips||'<span class="note">No location set for this month — <a onclick="openPlanPrompt(\'month\',plAnchor)">plan ahead ✈</a></span>';}
 function setTaskAt(id,val){const t=tasks.find(x=>x.id===id);if(t&&val){t.at=val;t.updated_at=now();persist();renderView();}}
 function setTaskDue(id,ds){const t=tasks.find(x=>x.id===id);if(t){t.due=ds;if(!t.original_due)t.original_due=ds;t.updated_at=now();persist();renderView();}}
@@ -3050,13 +3139,14 @@ function vPlanner(){const td=today();
     title=d0.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
     const start=mondayOf(first);const cells=[];for(let i=0;i<42;i++)cells.push(addDays(start,i));
     const grid=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="mg-h">${d}</div>`).join('')+
-      cells.map(ds=>{const items=dayItems(ds);const inM=monthKey(ds)===mk;
+      cells.map((ds,ci)=>{const items=dayItems(ds);const inM=monthKey(ds)===mk;
         return`<div class="mg-c ${inM?'':'dim'} ${ds===td?'todaycell':''} ${ds===selDay?'sel':''} ${isWeeklyOff(ds)?'weekoff':''}" onclick="selDay='${ds}';renderView()" ${isWeeklyOff(ds)?`title="${esc(weeklyOffLabel(ds))}"`:''}>
         <div class="dn num">${+ds.slice(8)}</div>
+        ${locBandHtml(ds,ci%7)}
         ${items.slice(0,3).map(it=>{const ov=it.k==='t'&&it.o.due<td;return`<div class="mg-it ${ov?'ov':it.k}">${esc(it.s)}</div>`;}).join('')}
         ${items.length>3?`<div class="mg-more">+${items.length-3} more</div>`:''}</div>`;}).join('');
     body=planHtml('month',mk,'Goals — '+title,'What must this month deliver? Three to five goals.')+
-      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${monthLocSummary(mk)}</div><span style="display:flex;gap:6px"><button class="btn gh2 xs" onclick="clearMonthLocations('${mk}')" title="Reset every day this month to no location">Clear month's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
+      `<div style="margin:8px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px"><div>${monthLocSummary(mk)}</div><span style="display:flex;gap:6px"><button class="btn xs" onclick="openTrip()" title="Set one place across a run of days">\u2708 Set a trip</button><button class="btn gh2 xs" onclick="clearMonthLocations('${mk}')" title="Reset every day this month to no location">Clear month's locations</button><button class="btn gh2 xs" onclick="clearLocationsFromToday()" title="Reset every day from today onward, across the whole calendar">Clear all forward</button></span></div><div class="mgrid">${grid}</div>`+dayPanel(selDay);
   }else if(plTab==='week'){
     const mon=mondayOf(plAnchor);
     title=fmtD(mon)+' – '+fmtD(addDays(mon,6));
