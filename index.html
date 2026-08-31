@@ -801,6 +801,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="g2">
     <div class="fld"><label>Account name <span class="req">*</span></label><input id="cName"></div>
     <div class="fld"><label>Segment</label><input id="cSeg" placeholder="QSR / Hotel / Retail…"></div>
+    <div class="fld"><label>Parent group</label><input id="cGroup" list="cGroupDL" placeholder="Leave blank if standalone"><datalist id="cGroupDL"></datalist></div>
     <div class="fld"><label>City</label><input id="cCity"></div>
     <div class="fld"><label>Department</label><div style="display:flex;gap:6px"><select id="cDept" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New department" onclick="quickNew('dept','cDept')">+</button></div></div>
     <div class="fld"><label>Key account manager</label><div style="display:flex;gap:6px"><select id="cKam" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New person" onclick="quickNewKam()">+</button></div></div>
@@ -835,7 +836,10 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <div class="ovl" id="mContact"><div class="modal" style="max-width:460px">
   <h3><span id="mContactTitle">New Contact</span><button class="mx" type="button" onclick="closeM()">✕</button></h3>
   <div class="mbody">
-  <div class="fld"><label>Account</label><div style="display:flex;gap:6px"><select id="coCust" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','coCust')">+</button></div></div>
+  <div class="fld"><label>Acts for</label><select id="coScope" onchange="contactScopeUI()"><option value="company">One company</option><option value="group">The whole group (shared)</option></select></div>
+  <div class="fld" id="fCoGroup" style="display:none"><label>Group</label><input id="coGroup" list="coGroupDL" placeholder="e.g. Acme Group"><datalist id="coGroupDL"></datalist>
+    <p class="note">A shared person reaches every company under the group, including ones added later.</p></div>
+  <div class="fld" id="fCoCust"><label>Account</label><div style="display:flex;gap:6px"><select id="coCust" style="flex:1"></select><button class="btn gh2 sm" type="button" title="New account" onclick="quickNew('cust','coCust')">+</button></div></div>
   <div class="g2">
     <div class="fld"><label>Name <span class="req">*</span></label><input id="coEName"></div>
     <div class="fld"><label>Role</label><input id="coERole" placeholder="Head of purchasing…"></div>
@@ -1155,6 +1159,7 @@ var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
 var locationsList=[];
 var taskLabels=[];
+var acctGroups=[];
 var myProfile={name:'',dept:'',role:'',phone:'',email:'',notes:''};
 var companyName='';
 /* Weekly offs. off = weekday numbers that are non-working (0=Sun). satRule handles the common
@@ -1170,10 +1175,10 @@ function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
+function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,acctGroups,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
+function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.acctGroups))acctGroups=s.acctGroups;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.taskLabels))taskLabels=[...new Set([...taskLabels,...rm.taskLabels])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;if(typeof rm.companyName==='string'&&rm.companyName&&!companyName)companyName=rm.companyName;if(rm.workWeek&&typeof rm.workWeek==='object'&&!workWeek._set)workWeek={off:Array.isArray(rm.workWeek.off)?rm.workWeek.off:[0],satRule:rm.workWeek.satRule||'none',_set:true};}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.taskLabels))taskLabels=[...new Set([...taskLabels,...rm.taskLabels])];if(Array.isArray(rm.acctGroups))acctGroups=[...new Set([...acctGroups,...rm.acctGroups])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;if(typeof rm.companyName==='string'&&rm.companyName&&!companyName)companyName=rm.companyName;if(rm.workWeek&&typeof rm.workWeek==='object'&&!workWeek._set)workWeek={off:Array.isArray(rm.workWeek.off)?rm.workWeek.off:[0],satRule:rm.workWeek.satRule||'none',_set:true};}
 function persist(){stateUpdatedAt=now();_subIdx=null;try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
 function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
@@ -1517,7 +1522,7 @@ function restoreFocus(f){
     el.focus({preventScroll:true});
     if(f.sel!=null&&el.setSelectionRange)el.setSelectionRange(f.sel,f.end);
   }catch(e){}}
-const VIEWS={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};
+const VIEWS={home:vHome,planner:vPlanner,commit:vCommit,people:vPeople,accounts:vAccounts,group:vGroup,pipeline:vPipeline,decide:vDecide,dash:vDash,review:vReview,settings:vSettings,meeting:vMeeting,deal:vDeal,contacts:vContacts,contact:vContact,tasks:vTasks,meetings:vMeetings,task:vTask,help:vHelp};
 function paint(){_subIdx=null;g('main').innerHTML=appMode==='personal'?vPersonal():(VIEWS[view]||vHome)();wire();saveNav();}
 /* Jumping to the top is a *navigation* behaviour, not a *rendering* one. renderView() is called
    from ~60 mutation handlers as well as from nav(), and every one of those mutations used to
@@ -1645,6 +1650,35 @@ function listSort(scope,def){return _lsort[scope]||def;}
 function setListSort(scope,v){_lsort[scope]=v;renderView();}
 function listSortSelect(scope,opts,def){const cur=listSort(scope,def);
   return `<select title="Sort this list" onchange="setListSort('${scope}',this.value)">${opts.map(o=>`<option value="${o[0]}"${cur===o[0]?' selected':''}>Sort: ${o[1]}</option>`).join('')}</select>`;}
+/* ═══ ACCOUNT GROUPS ═══
+   Two levels, deliberately: a parent group and the companies under it. Stored as a name on the
+   account, the same way regions and departments already work -- no extra table, and it merges
+   and sorts for free.
+   A contact is scoped one of two ways. Company-scoped is the default and unchanged: customer_id
+   set. Group-scoped means the person acts for the whole group -- a group CPO, a group quality
+   head -- so they carry a group instead, and reach every company under it including ones added
+   later. That is the point: the alternative, duplicating them per company, splits one person's
+   call history across records that never reconcile. */
+const GROUPS=()=>[...new Set([...acctGroups,...CU().map(c=>c.group),...CO().map(c=>c.group)])].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+const acctGroupOf=cid=>{const c=CU().find(x=>x.id===cid);return (c&&c.group)||'';};
+const groupMembers=grp=>grp?CU().filter(c=>c.group===grp).sort(byName):[];
+const isGroupContact=co=>!!(co&&co.group&&!co.customer_id);
+/* Everyone reachable from an account: its own people, plus its group's shared people. */
+function contactsFor(cid){
+  const grp=acctGroupOf(cid);
+  return CO().filter(x=>x.customer_id===cid||(grp&&isGroupContact(x)&&x.group===grp));}
+/* Everyone under a group: the shared people plus every member company's own. */
+function contactsInGroup(grp){
+  if(!grp)return[];
+  const ids=new Set(groupMembers(grp).map(c=>c.id));
+  return CO().filter(x=>(isGroupContact(x)&&x.group===grp)||ids.has(x.customer_id));}
+function ensureGroup(gname){const v=(gname||'').trim();if(v&&!acctGroups.includes(v))acctGroups.push(v);return v;}
+/* Label for a contact: their company, or the group they serve. */
+function contactOwnerLabel(co){
+  if(!co)return'';
+  if(isGroupContact(co))return co.group;
+  return cname(co.customer_id);}
+function groupBadge(co){return isGroupContact(co)?`<span class="pill p" title="Shared across every company in ${esc(co.group)}">Group</span>`:'';}
 function fprName(t){const c=t&&t.contact_id?CO().find(x=>x.id===t.contact_id):null;return c?c.name:'';}
 /* Shared task sort. 'due' folds in the date each kind of row actually shows
    (task due, call time, follow-up), so one control works across all four tabs. */
@@ -3471,7 +3505,7 @@ async function copySummary(){const node=g('summaryDoc');const btn=g('summaryCpy'
     catch(_){btn.textContent='Copy failed — select & copy manually';}}}
 function pnameAny(id){const p=P().find(x=>x.id===id);if(p)return p.name;const c=CO().find(x=>x.id===id);return c?c.name:pname(id);}
 function attendeeCompanyOf(id){if(id==='me'||P().some(p=>p.id===id))return companyName||'Our Team';
-  const c=CO().find(x=>x.id===id);if(c){const acct=CU().find(x=>x.id===c.customer_id);return acct?acct.name:'External';}
+  const c=CO().find(x=>x.id===id);if(c){if(isGroupContact(c))return c.group;const acct=CU().find(x=>x.id===c.customer_id);return acct?acct.name:'External';}
   return'Other';}
 function attendeeSummaryLines(ids){const byCo={};
   ids.forEach(id=>{const co=attendeeCompanyOf(id);(byCo[co]=byCo[co]||[]).push(pnameAny(id));});
@@ -3506,7 +3540,7 @@ function meetingSummaryText(m,present){const ids=present||m.attendee_ids||[];con
   L.push('',SUMMARY_SIGNOFF);
   return L.join('\r\n');}
 async function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
-  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!m.customer_id||c.customer_id===m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · FPR'}))];
+  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...(m.customer_id?contactsFor(m.customer_id):CO()).filter(c=>!m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · FPR'}))];
   let present=[...(m.attendee_ids||[]),...(m.contact_ids||[])];
   const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;
   m.attendee_ids=chosen.filter(id=>id==='me'||P().some(p=>p.id===id));m.contact_ids=chosen.filter(id=>CO().some(c=>c.id===id));m.updated_at=now();persist();
@@ -3600,7 +3634,7 @@ function taskSummaryText(t,present){const dd=t.type==='call'?(t.when||'').slice(
   L.push('',SUMMARY_SIGNOFF);
   return L.join('\r\n');}
 async function taskSummary(id){const t=T().find(x=>x.id===id)||tasks.find(x=>x.id===id);if(!t)return;
-  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...CO().filter(c=>!t.customer_id||c.customer_id===t.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
+  const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...(t.customer_id?contactsFor(t.customer_id):CO()).filter(c=>!t.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · contact'}))];
   let present=t.contact_id?[t.contact_id]:[];
   if(t.owner==='me'||!t.owner)present=[...new Set(['me',...present])];
   const chosen=await askPeople('Who was on this '+(t.type==='call'?'call':'task')+'?',pool,present,{title:'People present',ok:'Generate'});if(chosen===null)return;present=chosen;
@@ -3726,14 +3760,15 @@ function visitDue(c){if(!c.visit_cadence||!CADENCE_DAYS[c.visit_cadence])return 
 function logOrderToday(cid){const c=customers.find(x=>x.id===cid);if(!c)return;c.last_order=today();c.updated_at=now();logActivity('note','Order logged',cid,null);persist();renderView();toast('Order dated today.');}
 function vAccounts(){
   if(viewArg){const c=CU().find(x=>x.id===viewArg);if(c)return acctPage(c);}
-  const q=(window._cq||'').toLowerCase();const td=today();const kf=window._caKam||'';const sf=window._caSeg||'';const rf=window._caReg||'';
-  let list=CU().filter(c=>(!q||(c.name+' '+(c.city||'')+' '+(c.segment||'')).toLowerCase().includes(q))
-    &&(!kf||(kf==='__none'?!c.kam_id:c.kam_id===kf))&&(!sf||(c.segment||'')===sf)&&(!rf||(c.region||'')===rf));
+  const q=(window._cq||'').toLowerCase();const td=today();const kf=window._caKam||'';const sf=window._caSeg||'';const rf=window._caReg||'';const gf=window._caGrp||'';
+  let list=CU().filter(c=>(!q||(c.name+' '+(c.city||'')+' '+(c.segment||'')+' '+(c.group||'')).toLowerCase().includes(q))
+    &&(!kf||(kf==='__none'?!c.kam_id:c.kam_id===kf))&&(!sf||(c.segment||'')===sf)&&(!rf||(c.region||'')===rf)
+    &&(!gf||(gf==='__none'?!c.group:(c.group||'')===gf)));
   const meta=c=>{const dls=openDeals().filter(d=>d.customer_id===c.id);return{
-    nCo:CO().filter(x=>x.customer_id===c.id).length,
+    nCo:contactsFor(c.id).length,
     open:T().filter(t=>t.customer_id===c.id&&t.status!=='done').length,
     dls:dls.length,dv:dls.reduce((a,d)=>a+(+d.value||0),0),nt:acctNextTask(c.id)};};
-  const getters={name:c=>c.name,kam:c=>c.kam_id?pname(c.kam_id):'',segment:c=>c.segment||'',city:c=>c.city||'',
+  const getters={name:c=>c.name,group:c=>c.group||'zzz',kam:c=>c.kam_id?pname(c.kam_id):'',segment:c=>c.segment||'',city:c=>c.city||'',
     deals:c=>meta(c).dv,open:c=>meta(c).open,na:c=>{const t=acctNextTask(c.id);return t&&t.due?t.due:'9999';}};
   list=applySort('accounts',list,getters);
   if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
@@ -3746,31 +3781,33 @@ function vAccounts(){
     <select data-ssel onchange="window._caKam=this.value;renderView()"><option value="">All KAMs</option><option value="__none"${kf==='__none'?' selected':''}>— No KAM —</option>${kams.map(id=>`<option value="${id}"${kf===id?' selected':''}>${esc(pname(id))}</option>`).join('')}</select>
     <select onchange="window._caSeg=this.value;renderView()"><option value="">All segments</option>${segs.map(x=>`<option${sf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
     <select onchange="window._caReg=this.value;renderView()"><option value="">All regions</option>${regs.map(x=>`<option${rf===x?' selected':''}>${esc(x)}</option>`).join('')}</select>
+    ${GROUPS().length?`<select onchange="window._caGrp=this.value;renderView()" title="Filter by parent group"><option value="">All groups</option>${GROUPS().map(x=>`<option${gf===x?' selected':''}>${esc(x)}</option>`).join('')}<option value="__none"${gf==='__none'?' selected':''}>Standalone only</option></select>`:''}
     ${(kf||sf||rf||q)?`<button class="btn gh2 sm" onclick="window._cq='';window._caKam='';window._caSeg='';window._caReg='';renderView()">Clear</button>`:''}
     ${viewToggle('accounts',view)}</div>`;
   let body;
   if(!list.length){body='<div class="card"><div class="empty">No accounts match. Add one, or clear the filters.</div></div>';}
   else if(view==='card'){
-    body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>
+    body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>${c.group?`<div style="margin-bottom:4px"><span class="pill p lnk" onclick="event.stopPropagation();nav('group','${esc(c.group)}')">${esc(c.group)}</span></div>`:''}
       <div class="ameta">${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.region?' · '+esc(c.region):''}${c.kam_id?' · KAM '+esc(pname(c.kam_id)):''}</div>
       <div class="astats"><span>Contacts <b class="num">${m.nCo}</b></span><span>Open <b class="num">${m.open}</b></span>${m.dls?`<span>Deals <b class="num">${m.dls}</b> · ${fmtMoney(m.dv)}</span>`:''}</div>
       ${m.nt?`<div class="ameta" style="margin-top:6px"><span class="due ${m.nt.due&&m.nt.due<td?'over':m.nt.due===td?'today':''}">${m.nt.due?fmtD(m.nt.due):''}</span> ${esc(m.nt.title)}</div>`:'<div class="ameta" style="margin-top:6px;color:var(--t4)">No next action</div>'}</div>`;}).join('')}</div>`;
   }else{
     const rows=list.map(c=>{const m=meta(c);const na=m.nt?esc(m.nt.title):'<span style="color:var(--t4)">—</span>';
       const nad=m.nt&&m.nt.due?`<span class="due ${m.nt.due<td?'over':m.nt.due===td?'today':''}">${fmtD(m.nt.due)}</span>`:'';
-      return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td><td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
-    body=`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('accounts','name','Account')}${sortHead('accounts','kam','KAM')}${sortHead('accounts','segment','Segment')}${sortHead('accounts','city','City')}${sortHead('accounts','na','Next action')}${sortHead('accounts','deals','Open deals','r')}${sortHead('accounts','open','Open items','r')}</tr>${rows}</table></div>`;
+      return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td>${GROUPS().length?`<td>${c.group?`<span class="pill p lnk" onclick="event.stopPropagation();nav('group','${esc(c.group)}')">${esc(c.group)}</span>`:'<span style="color:var(--t4)">—</span>'}</td>`:''}<td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
+    body=`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('accounts','name','Account')}${GROUPS().length?sortHead('accounts','group','Group'):''}${sortHead('accounts','kam','KAM')}${sortHead('accounts','segment','Segment')}${sortHead('accounts','city','City')}${sortHead('accounts','na','Next action')}${sortHead('accounts','deals','Open deals','r')}${sortHead('accounts','open','Open items','r')}</tr>${rows}</table></div>`;
   }
   return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body+capMore('accounts',_aN);}
 
-function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c.id).sort(byName);
+function acctPage(c){const td=today();const cos=contactsFor(c.id).sort(byName);
+  const grpLink=c.group?`<span class="pill p lnk" onclick="nav('group','${esc(c.group)}')" title="Open the group rollup">\u25f1 ${esc(c.group)}</span>`:'';
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
   const dls=DL().filter(d=>d.customer_id===c.id);
   const acts=AC().filter(a=>a.customer_id===c.id).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,25);
   const meets=M().filter(m=>m.customer_id===c.id&&m.status!=='done');
   const nm=esc(c.name);
   return`<span class="backlink" onclick="nav('accounts')">← Accounts</span>`+
-  pagehead('ACCOUNT',nm,`${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM: '+personLink(c.kam_id,'pill b'):''}${c.address?' · '+esc(c.address):''}`,
+  pagehead('ACCOUNT',nm,`${grpLink}${grpLink?' · ':''}${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.kam_id?' · KAM: '+personLink(c.kam_id,'pill b'):''}${c.address?' · '+esc(c.address):''}`,
     `<button class="btn gh2 sm" onclick="openCust('${c.id}')">Edit</button><button class="btn gh2 sm" onclick="openTask(null,null,null,'${c.id}','call')">+ Call</button><button class="btn gh2 sm" onclick="openDeal(null,'${c.id}')">+ Deal</button><button class="btn sm" onclick="openTask(null,null,null,'${c.id}')">+ Task</button>`)+
   nextActionCard(c)+
   `${c.cadence?`<div class="card" style="border-left:4px solid ${supplyLapsed(c)?'var(--red)':supplyDue(c)?'var(--amb)':'var(--grn)'}"><div class="ch"><span>Supply — ${esc(c.cadence)}</span>${c.last_order?`<span class="due ${supplyLapsed(c)?'over':''}">last order ${fmtD(c.last_order)} · ${ageDays(c.last_order)}d ago</span>`:'<span class="pill a">no order logged</span>'}</div>
@@ -3778,7 +3815,7 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
   <div class="grid31"><div>
     ${dls.length?seccard('Deals',dls.length,`<table class="t"><tr><th>Deal</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${dls.map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(d.name)}</td><td><span class="pill ${d.stage==='Won'?'g':d.stage==='Lost'?'r':'b'}">${d.stage}</span></td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${fmtD(d.close_date)}</td></tr>`).join('')}</table>`,''):''}
     <div class="card"><div class="ch"><span>Contact persons</span><span class="n num">${cos.length}</span></div>
-    ${cos.map(x=>`<div class="row"><div class="bd" style="cursor:pointer" onclick="openContact('${x.id}')"><div class="tt">${esc(x.name)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" title="Edit" onclick="openContact('${x.id}')">✎</button><button class="iconb" title="Remove" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
+    ${cos.map(x=>`<div class="row"><div class="bd" style="cursor:pointer" onclick="openContact('${x.id}')"><div class="tt">${esc(x.name)} ${groupBadge(x)}</div><div class="meta">${x.role?`<span>${esc(x.role)}</span>`:''}${x.phone?`<a class="telbtn" href="tel:${esc(x.phone)}" onclick="event.stopPropagation()">✆ ${esc(x.phone)}</a>`:''}${x.email?`<a href="mailto:${esc(x.email)}" style="font-size:11.5px" onclick="event.stopPropagation()">${esc(x.email)}</a>`:''}</div></div><div class="rowacts"><button class="iconb" title="Edit" onclick="openContact('${x.id}')">✎</button><button class="iconb" title="Remove" onclick="contactDel('${x.id}')">✕</button></div></div>`).join('')||'<div class="empty">No contacts yet.</div>'}
     <div class="addline"><input id="coName" placeholder="Name" style="flex:1.2"><input id="coRole" placeholder="Role" style="flex:1"><input id="coPhone" placeholder="Phone" style="flex:1"><input id="coEmail" placeholder="Email" style="flex:1.2"><button class="btn sm" onclick="contactAdd('${c.id}')">Add</button></div></div>
     ${(()=>{const ids=c.people_ids||[];const ppl=P().filter(x=>ids.includes(x.id)).sort(byName);const avail=P().filter(x=>!ids.includes(x.id)).sort(byName);
       return `<div class="card"><div class="ch"><span>Our team on this account</span><span class="n num">${ppl.length}</span></div>
@@ -3794,6 +3831,73 @@ function acctPage(c){const td=today();const cos=CO().filter(x=>x.customer_id===c
     <div id="npText" class="rte" contenteditable="true" data-ph="Write notes as points — save, then turn any point into a task…"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sm" onclick="capLog('note','${c.id}')">Save note</button><button class="btn gh2 sm" onclick="capLog('call','${c.id}')">Log as call</button></div></div>
     <div class="cb"><div class="atl">${acts.map(a=>actItem(a,c.id,null)).join('')||'<div style="color:var(--t4);font-size:12px">No notes or calls yet. Completed calls and meetings also land here.</div>'}</div></div></div>
+  </div></div>`;}
+/* ═══ GROUP ROLLUP ═══
+   The account page answers "how is this company doing". When companies sit under one parent,
+   the question that has no home is "how is the relationship doing" -- pipeline, activity and
+   commitments summed across every company you deal with under that roof. This is that page.
+   Everything here is derived from the member accounts; a group holds no records of its own,
+   which is why the numbers can never drift from the accounts they came from. */
+function groupRollup(grp){
+  const ids=groupMembers(grp).map(c=>c.id), idset=new Set(ids), td=today();
+  const deals=DL().filter(d=>idset.has(d.customer_id));
+  const open=deals.filter(d=>d.stage!=='Won'&&d.stage!=='Lost');
+  const tasks_=T().filter(t=>idset.has(t.customer_id)&&t.status!=='done');
+  return{
+    members:groupMembers(grp),
+    contacts:contactsInGroup(grp),
+    shared:CO().filter(x=>isGroupContact(x)&&x.group===grp),
+    deals, open,
+    openValue:open.reduce((a,d)=>a+(+d.value||0),0),
+    weighted:open.reduce((a,d)=>a+(+d.value||0)*(STAGE_P[d.stage]||0)/100,0),
+    won:deals.filter(d=>d.stage==='Won'),
+    tasks:tasks_,
+    overdue:tasks_.filter(t=>t.due&&t.due<td),
+    meetings:M().filter(m=>idset.has(m.customer_id)&&m.date>=td).sort((a,b)=>(a.date||'').localeCompare(b.date||'')),
+    acts:AC().filter(a=>idset.has(a.customer_id)).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,12),
+  };}
+function vGroup(){
+  const grp=viewArg;
+  const R=groupRollup(grp);
+  if(!R.members.length){nav('accounts');return'';}
+  const td=today();
+  const memberRow=c=>{
+    const d=DL().filter(x=>x.customer_id===c.id&&x.stage!=='Won'&&x.stage!=='Lost');
+    const t=T().filter(x=>x.customer_id===c.id&&x.status!=='done');
+    const od=t.filter(x=>x.due&&x.due<td).length;
+    const na=acctNextTask(c.id);
+    return`<tr class="click" onclick="nav('accounts','${c.id}')">
+      <td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td>
+      <td>${c.city?esc(c.city):'<span style="color:var(--t4)">—</span>'}</td>
+      <td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td>
+      <td class="r num">${d.length||''}</td>
+      <td class="r num">${d.length?fmtMoney(d.reduce((a,x)=>a+(+x.value||0),0)):''}</td>
+      <td class="r num">${t.length||''}</td>
+      <td class="r num">${od?`<span style="color:var(--red);font-weight:700">${od}</span>`:''}</td>
+      <td>${na?esc(na.title.slice(0,34)):'<span style="color:var(--t4)">none set</span>'}</td></tr>`;};
+  return`<span class="backlink" onclick="nav('accounts')">← Accounts</span>`+
+  pagehead('GROUP',esc(grp),`${R.members.length} companies · ${R.contacts.length} people`,
+    `<button class="btn gh2 sm" onclick="openContact(null)">+ Shared person</button>`)+
+  `<div class="kpis">
+    <div class="kpi"><div class="kv num">${R.members.length}</div><div class="kl">Companies</div></div>
+    <div class="kpi"><div class="kv num">${fmtMoney(R.openValue)}</div><div class="kl">Open pipeline</div></div>
+    <div class="kpi"><div class="kv num">${fmtMoney(R.weighted)}</div><div class="kl">Weighted</div></div>
+    <div class="kpi ${R.overdue.length?'bad':''}"><div class="kv num">${R.overdue.length}</div><div class="kl">Overdue</div></div>
+    <div class="kpi"><div class="kv num">${R.tasks.length}</div><div class="kl">Open items</div></div>
+  </div>
+  <div class="grid31"><div>
+    ${seccard('Companies in this group',R.members.length,
+      `<table class="t"><tr><th>Company</th><th>City</th><th>KAM</th><th class="r">Deals</th><th class="r">Pipeline</th><th class="r">Open</th><th class="r">Overdue</th><th>Next action</th></tr>${R.members.map(memberRow).join('')}</table>`,'')}
+    ${seccard('Shared people — act for every company here',R.shared.length,
+      R.shared.sort(byName).map(x=>`<div class="row"><div class="bd" style="cursor:pointer" onclick="openContact('${x.id}')"><div class="tt">${esc(x.name)} ${groupBadge(x)}</div><div class="meta">${x.role?esc(x.role):''}${x.phone?` · <a class="telbtn" href="tel:${esc(x.phone)}">✆ ${esc(x.phone)}</a>`:''}</div></div></div>`).join(''),
+      'No shared people yet. Add someone who acts for the whole group — a group CPO or quality head — rather than duplicating them per company.')}
+    ${R.open.length?seccard('Open deals across the group',R.open.length,
+      `<table class="t"><tr><th>Deal</th><th>Company</th><th>Stage</th><th class="r">Value</th><th class="r">Close</th></tr>${R.open.sort((a,b)=>(+b.value||0)-(+a.value||0)).map(d=>`<tr class="click" onclick="nav('deal','${d.id}')"><td style="font-weight:600">${esc(d.name)}</td><td>${esc(cname(d.customer_id))}</td><td>${esc(d.stage)}</td><td class="r num">${fmtMoney(d.value)}</td><td class="r num">${d.close_date?fmtD(d.close_date):''}</td></tr>`).join('')}</table>`,''):''}
+    ${seccard('Open items across the group',R.tasks.length,listCap('grouptasks',R.tasks.sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'))).map(t=>trow(t,{star:false})).join('')+capMore('grouptasks',R.tasks.length),'Nothing open across the group.')}
+  </div><div>
+    ${R.meetings.length?seccard('Upcoming meetings',R.meetings.length,R.meetings.map(mrowHtml).join(''),''):''}
+    <div class="card"><div class="ch"><span>Recent activity</span></div>
+      <div class="cb"><div class="atl">${R.acts.map(a=>actItem(a,a.customer_id,null)).join('')||'<div style="color:var(--t4);font-size:12px">Nothing logged against these companies yet.</div>'}</div></div></div>
   </div></div>`;}
 /* Account next action = a real task tagged to the account (is_next_action), so it flows to Home, planner, commitments. */
 function acctNextTask(cid){return T().filter(t=>t.customer_id===cid&&t.is_next_action&&t.status!=='done').sort((a,b)=>(a.due||'')<(b.due||'')?-1:1)[0]||null;}
@@ -3901,10 +4005,21 @@ let editCo=null;
 function openContact(id,presetCust){editCo=id?contacts.find(x=>x.id===id):null;const x=editCo;
   g('mContactTitle').textContent=x?'Edit Contact':'New Contact';
   fillCust('coCust',x?.customer_id||presetCust||'');
+  g('coScope').value=isGroupContact(x)?'group':'company';
+  g('coGroup').value=x?.group||(presetCust?acctGroupOf(presetCust):'');
+  g('coGroupDL').innerHTML=GROUPS().map(gr=>`<option value="${esc(gr)}">`).join('');
+  contactScopeUI();
   g('coEName').value=x?.name||'';g('coERole').value=x?.role||'';g('coEPhone').value=x?.phone||'';g('coEEmail').value=x?.email||'';g('coENotes').value=x?.notes||'';
   g('coDel').style.display=x?'':'none';g('mContact').classList.add('open');setTimeout(()=>g('coEName').focus(),60);}
+function contactScopeUI(){const grp=g('coScope').value==='group';
+  g('fCoGroup').style.display=grp?'':'none';g('fCoCust').style.display=grp?'none':'';}
 function saveContact(){const nm=g('coEName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const d={customer_id:g('coCust').value||null,name:nm,role:g('coERole').value.trim(),phone:g('coEPhone').value.trim(),email:g('coEEmail').value.trim(),notes:g('coENotes').value.trim(),updated_at:n};
+  /* Exactly one of the two is set: a person acts for one company, or for the whole group. */
+  const grp=g('coScope').value==='group';
+  const gname=grp?ensureGroup(g('coGroup').value):'';
+  if(grp&&!gname){toast('Which group?');return;}
+  const d={customer_id:grp?null:(g('coCust').value||null),group:gname,name:nm,role:g('coERole').value.trim(),
+    phone:g('coEPhone').value.trim(),email:g('coEEmail').value.trim(),notes:g('coENotes').value.trim(),updated_at:n};
   if(editCo)Object.assign(editCo,d);else contacts.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();renderView();toast('Contact saved.');}
 async function delContact(){if(editCo&&await askConfirm('Delete '+editCo.name+'?',{ok:'Delete',danger:true})){editCo.deleted=true;editCo.updated_at=now();closeM();persist();renderView();toast('Deleted.');}}
@@ -4237,6 +4352,10 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="chips">${regions.map((r,i)=>`<span class="chip">${esc(r)}<button onclick="regions.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newRegion" placeholder="Add region" style="flex:1"><button class="btn sm" onclick="addRegion()">Add</button></div>
     <p class="note">Group accounts by region so travel plans can surface everyone nearby.</p></div>
+  <div class="setcard"><h4>Account groups</h4>
+    <div class="chips">${GROUPS().map(gr=>`<span class="chip"><span class="lnk" onclick="nav('group','${esc(gr)}')">${esc(gr)}</span> <span class="n num">${groupMembers(gr).length}</span><button onclick="delAcctGroup('${esc(gr)}')">\u2715</button></span>`).join('')||'<span class="note">None yet.</span>'}</div>
+    <div style="display:flex;gap:7px;margin-top:10px"><input id="newAcctGroup" placeholder="Add a parent group \u2014 e.g. Acme Group" style="flex:1"><button class="btn sm" onclick="addAcctGroup()">Add</button></div>
+    <p class="note">Companies you deal with that sit under one parent. Set the group on each account, then a person can act for the whole group instead of being duplicated per company. The group page rolls up pipeline, commitments and activity across its members.</p></div>
   <div class="setcard"><h4>Locations</h4>
     <div class="chips">${locationsList.map((l,i)=>`<span class="chip">${esc(l)}<button onclick="locationsList.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newLocation" placeholder="Add a standard location — e.g. Mumbai, Home office" style="flex:1"><button class="btn sm" onclick="addLocation()">Add</button></div>
@@ -4254,6 +4373,13 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
 function addRegion(){const v=g('newRegion').value.trim();if(v&&!regions.includes(v)){regions.push(v);persist();renderView();}}
+function addAcctGroup(){const v=g('newAcctGroup').value.trim();if(v&&!acctGroups.includes(v)){acctGroups.push(v);persist();renderView();}}
+/* Removes the name from the master list. Accounts and shared people keep theirs, so nothing
+   silently loses its grouping -- the name simply stops being offered. */
+async function delAcctGroup(gr){
+  const used=groupMembers(gr).length;
+  if(used&&!await askConfirm(`"${gr}" is set on ${used} account${used>1?'s':''}. Remove it from the list? Those accounts keep the group until you change them.`,{ok:'Remove',danger:true}))return;
+  acctGroups=acctGroups.filter(x=>x!==gr);persist();renderView();}
 function addLocation(){const v=g('newLocation').value.trim();if(v&&!locationsList.includes(v)){locationsList.push(v);persist();renderView();}}
 function saveCompanyName(){companyName=g('companyNameInp').value.trim();persist();renderView();toast('Company name saved.');}
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
@@ -4551,7 +4677,7 @@ function fillDept(sel,val){g(sel).innerHTML='<option value="">—</option>'+dept
 function fillOwner(sel,val){g(sel).innerHTML=`<option value="me">${esc(myProfile.name||'Me')}</option>`+P().sort(byName).map(p=>`<option value="${p.id}"${p.id===val?' selected':''}>${esc(p.name)}</option>`).join('');ssel(sel);}
 function fillCust(sel,val){g(sel).innerHTML='<option value="">—</option>'+CU().sort(byName).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
 function fillProd(sel,val){g(sel).innerHTML='<option value="">—</option>'+products.sort((a,b)=>a.localeCompare(b)).map(p=>`<option${p===val?' selected':''}>${esc(p)}</option>`).join('');}
-function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+CO().filter(c=>!cid||c.customer_id===cid).sort(byName).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
+function fillContact(sel,cid,val){g(sel).innerHTML='<option value="">—</option>'+(cid?contactsFor(cid):CO()).sort(byName).map(c=>`<option value="${c.id}"${c.id===val?' selected':''}>${esc(c.name)}</option>`).join('');ssel(sel);}
 
 let editT=null;
 function taskAnchorDate(){return g('tType').value==='call'?(g('tWhen').value||'').slice(0,10):g('tDue').value;}
@@ -4726,11 +4852,12 @@ async function delPerson(){if(editP&&await askConfirm('Delete '+editP.name+'? Th
 let editC=null;
 function openCust(id){editC=id?customers.find(x=>x.id===id):null;
   g('mCustTitle').textContent=editC?'Edit Account':'New Account';
-  g('cName').value=editC?.name||'';g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
+  g('cName').value=editC?.name||'';g('cGroup').value=c?.group||'';g('cGroupDL').innerHTML=GROUPS().map(gr=>`<option value="${esc(gr)}">`).join('');
+  g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
   fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');fillRegion('cRegion',editC?.region||'');g('cVisitCadence').value=editC?.visit_cadence||'';g('cAddr').value=editC?.address||'';g('cCadence').value=editC?.cadence||'';g('cLastOrder').value=editC?.last_order||'';g('cSupplyNote').value=editC?.supply_note||'';g('cNotes').value=editC?.notes||'';
   g('cDel').style.display=editC?'':'none';g('mCust').classList.add('open');setTimeout(()=>g('cName').focus(),50);}
 function saveCust(){const nm=g('cName').value.trim();if(!nm){toast('Name required.');return;}const n=now();
-  const kam=g('cKam').value;const d={name:nm,segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,region:g('cRegion').value||'',visit_cadence:g('cVisitCadence').value||'',cadence:g('cCadence').value||'',last_order:g('cLastOrder').value||null,supply_note:g('cSupplyNote').value.trim(),address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
+  const kam=g('cKam').value;const d={name:nm,group:ensureGroup(g('cGroup').value),segment:g('cSeg').value.trim(),city:g('cCity').value.trim(),dept:g('cDept').value,kam_id:kam==='me'?null:kam,region:g('cRegion').value||'',visit_cadence:g('cVisitCadence').value||'',cadence:g('cCadence').value||'',last_order:g('cLastOrder').value||null,supply_note:g('cSupplyNote').value.trim(),address:g('cAddr').value.trim(),notes:g('cNotes').value.trim(),updated_at:n};
   if(editC)Object.assign(editC,d);else editC2push(d,n);
   if(d.kam_id){const cc=editC||customers[customers.length-1];cc.people_ids=cc.people_ids||[];if(!cc.people_ids.includes(d.kam_id))cc.people_ids.push(d.kam_id);}
   closeM();persist();renderView();}
