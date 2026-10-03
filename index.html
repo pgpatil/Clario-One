@@ -136,6 +136,11 @@ table.t td.r,table.t th.r{text-align:right}
 .pill.n{background:var(--bg);color:var(--t2)}
 /* investment analysis. Gain text uses --grn-d: --grn is 4.19:1 on the selected-row tint, --grn-d 5.88 */
 .neg{color:var(--red)}.pos{color:var(--grn-d)}
+.co-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);flex-wrap:wrap}
+.co-row .co-bd{flex:1;min-width:160px;font-size:13px}.co-row .co-act{display:flex;gap:6px;flex-wrap:wrap}
+.gh-co{font-size:12px;font-weight:700;color:var(--blue-d);background:var(--blue-l);border:1px solid var(--blue-b);border-radius:12px;padding:3px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.gh-co:hover{border-color:var(--blue)}
+@media(max-width:600px){.gh-co{max-width:96px;font-size:11px;padding:2px 8px}}
 .attr{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px}
 .attr .ak{flex:0 0 150px;color:var(--t2)}
 .attr .ab{flex:1;min-width:40px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
@@ -597,6 +602,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <header id="gh">
   <button class="gh-sync" id="ghBack" onclick="goBack()" title="Back" style="display:none">←</button>
   <button class="gh-brand lnk" onclick="nav('home')" title="Home" type="button"><img class="gh-logo" src="logo-mark.png" alt="Clario One" width="32" height="32"><span>Clario One</span></button>
+  <button class="gh-co" id="ghCo" type="button" onclick="nav('settings');setTimeout(()=>{const c=g('coCard');if(c)c.scrollIntoView({block:'center'});},60)" title="Company — change it in Settings" style="display:none"></button>
   <div class="gh-search" id="ghSearchWrap"><span class="mag">⌕</span><input id="ghSearch" placeholder="Search tasks, accounts, deals, people, meetings…  (Ctrl+K)" autocomplete="off"><div id="srchres"></div></div>
   <div class="gh-right">
     <div class="vtog" id="modeToggle"></div>
@@ -1207,12 +1213,96 @@ function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
 const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx','nwsnap'];
-function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,acctGroups,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
-function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.acctGroups))acctGroups=s.acctGroups;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
+/* ═══ COMPANIES ═══
+   Official data is kept per company; Personal data is one set shared by every company.
+   In memory the globals (tasks, people, customers…) always hold the ACTIVE company; inactive
+   companies wait in _coStore. The first company has the fixed id "home" so every device migrates
+   old data into the same one, and its data stays at the top level of the saved state, exactly
+   where it always lived -- a phone still on an older version keeps working on it, and its pushes
+   merge into "home" only. Other companies are saved under state.co[id].
+   Day locations are deliberately NOT per company: where you are on a date is one fact. */
+const CO_KEY='cx_company', CO_HOME='home';
+const CO_TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','savedviews'];
+const DEF_DEPTS=[...depts], DEF_PRODUCTS=[...products];
+var companies=[], _coStore={};
+var activeCo=(()=>{try{return localStorage.getItem(CO_KEY)||CO_HOME;}catch(e){return CO_HOME;}})();
+const isCoTask=t=>t.scope!=='personal';          // personal tasks (and their subtasks) are shared
+const COMP=()=>companies.filter(c=>!c.deleted);
+const coName=id=>{const c=companies.find(x=>x.id===id);return c?c.name||'':'';};
+const coLabel=id=>coName(id)||(id===CO_HOME?'My company':'Untitled company');
+const normWW=w=>w&&typeof w==='object'?{off:Array.isArray(w.off)?w.off:[0],satRule:w.satRule||'none',...(w._set?{_set:true}:{})}:{off:[0],satRule:'none'};
+function coEmpty(){const b={};CO_TABLES.forEach(t=>b[t]=[]);
+  return Object.assign(b,{depts:[...DEF_DEPTS],products:[...DEF_PRODUCTS],regions:[],acctGroups:[],workWeek:{off:[0],satRule:'none'}});}
+function coFromGlobals(){const b={};CO_TABLES.forEach(t=>b[t]=t==='tasks'?tasks.filter(isCoTask):window[t]);
+  return Object.assign(b,{depts,products,regions,acctGroups,workWeek});}
+function coToGlobals(b){b=b||coEmpty();
+  CO_TABLES.forEach(t=>{const a=Array.isArray(b[t])?b[t]:[];
+    if(t==='tasks')tasks=tasks.filter(x=>!isCoTask(x)).concat(a.filter(isCoTask));else window[t]=a;});
+  depts=Array.isArray(b.depts)&&b.depts.length?b.depts:[...DEF_DEPTS];
+  products=Array.isArray(b.products)&&b.products.length?b.products:[...DEF_PRODUCTS];
+  regions=Array.isArray(b.regions)?b.regions:[];acctGroups=Array.isArray(b.acctGroups)?b.acctGroups:[];
+  workWeek=normWW(b.workWeek);}
+const coBucket=id=>id===activeCo?coFromGlobals():(_coStore[id]||coEmpty());
+/* Swap the globals over to another company. No persist, no render -- callers decide. */
+function coActivate(id){if(id===activeCo)return;
+  _coStore[activeCo]=coFromGlobals();coToGlobals(_coStore[id]);delete _coStore[id];
+  activeCo=id;companyName=coName(id);}
+const _union=(a,b)=>[...new Set([...(a||[]),...(Array.isArray(b)?b:[])])];
+function coMergeInto(id,rb){if(!rb||typeof rb!=='object')return;
+  const live=id===activeCo, b=live?null:(_coStore[id]||(_coStore[id]=coEmpty()));
+  CO_TABLES.forEach(t=>{const r=Array.isArray(rb[t])?rb[t]:[];
+    if(!live){b[t]=mergeArr(b[t]||[],r.filter(x=>t!=='tasks'||isCoTask(x)));return;}
+    if(t==='tasks')tasks=mergeArr(tasks,r.filter(isCoTask));else window[t]=mergeArr(window[t],r);});
+  const L=live?{depts,products,regions,acctGroups,workWeek}:b;
+  L.depts=_union(L.depts,rb.depts);L.products=_union(L.products,rb.products);
+  L.regions=_union(L.regions,rb.regions);L.acctGroups=_union(L.acctGroups,rb.acctGroups);
+  if(rb.workWeek&&typeof rb.workWeek==='object'&&!(L.workWeek&&L.workWeek._set))L.workWeek={...normWW(rb.workWeek),_set:true};
+  if(live){({depts,products,regions,acctGroups,workWeek}=L);}}
+function coEnsureHome(name){if(!companies.some(c=>c.id===CO_HOME))
+  companies.unshift({id:CO_HOME,name:name||'',created_at:'',updated_at:''});}   // empty stamp: any real rename wins a merge
+function getState(){const home=coBucket(CO_HOME);
+  const s={version:APP_VER,updatedAt:stateUpdatedAt,locationsList,taskLabels,myProfile,companyName:coName(CO_HOME),
+    depts:home.depts,products:home.products,regions:home.regions,acctGroups:home.acctGroups,workWeek:home.workWeek,companies};
+  TABLES.forEach(t=>s[t]=CO_TABLES.includes(t)?home[t]:window[t]);
+  s.tasks=activeCo===CO_HOME?tasks:tasks.filter(x=>!isCoTask(x)).concat(home.tasks);
+  s.co={};companies.forEach(c=>{if(c.id!==CO_HOME)s.co[c.id]=coBucket(c.id);});
+  return s;}
+function applyState(s){if(!s||typeof s!=='object')return;
+  // the top level is Personal + the home company, as it always was
+  TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});
+  depts=Array.isArray(s.depts)&&s.depts.length?s.depts:[...DEF_DEPTS];products=Array.isArray(s.products)&&s.products.length?s.products:[...DEF_PRODUCTS];
+  regions=Array.isArray(s.regions)?s.regions:[];acctGroups=Array.isArray(s.acctGroups)?s.acctGroups:[];workWeek=normWW(s.workWeek);
+  if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.locationsList))locationsList=s.locationsList;
+  if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;
+  companies=Array.isArray(s.companies)?s.companies:[];coEnsureHome(typeof s.companyName==='string'?s.companyName:'');
+  _coStore={};const co=s.co&&typeof s.co==='object'?s.co:{};
+  Object.keys(co).forEach(id=>{if(id!==CO_HOME&&co[id]&&typeof co[id]==='object')_coStore[id]=co[id];});
+  const want=COMP().some(c=>c.id===activeCo)?activeCo:CO_HOME;
+  activeCo=CO_HOME;companyName=coName(CO_HOME);coActivate(want);
+  stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
-function mergeRemote(rm){if(!rm||typeof rm!=='object')return;TABLES.forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});if(Array.isArray(rm.depts))depts=[...new Set([...depts,...rm.depts])];if(Array.isArray(rm.products))products=[...new Set([...products,...rm.products])];if(Array.isArray(rm.taskLabels))taskLabels=[...new Set([...taskLabels,...rm.taskLabels])];if(Array.isArray(rm.acctGroups))acctGroups=[...new Set([...acctGroups,...rm.acctGroups])];if(Array.isArray(rm.regions))regions=[...new Set([...regions,...rm.regions])];if(Array.isArray(rm.locationsList))locationsList=[...new Set([...locationsList,...rm.locationsList])];if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;if(typeof rm.companyName==='string'&&rm.companyName&&!companyName)companyName=rm.companyName;if(rm.workWeek&&typeof rm.workWeek==='object'&&!workWeek._set)workWeek={off:Array.isArray(rm.workWeek.off)?rm.workWeek.off:[0],satRule:rm.workWeek.satRule||'none',_set:true};}
+function mergeRemote(rm){if(!rm||typeof rm!=='object')return;
+  TABLES.filter(t=>!CO_TABLES.includes(t)).forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});
+  const rt=Array.isArray(rm.tasks)?rm.tasks:[];
+  tasks=mergeArr(tasks,rt.filter(x=>!isCoTask(x)));                  // personal rows: shared
+  // top-level official data is ALWAYS the home company -- also when it comes from an older version
+  const hb={};CO_TABLES.forEach(t=>hb[t]=rm[t]);
+  Object.assign(hb,{depts:rm.depts,products:rm.products,regions:rm.regions,acctGroups:rm.acctGroups,workWeek:rm.workWeek});
+  coMergeInto(CO_HOME,hb);
+  if(rm.co&&typeof rm.co==='object')Object.keys(rm.co).forEach(id=>{if(id!==CO_HOME)coMergeInto(id,rm.co[id]);});
+  if(Array.isArray(rm.companies))companies=mergeArr(companies,rm.companies);
+  coEnsureHome('');
+  const h=companies.find(c=>c.id===CO_HOME);
+  if(h&&!h.name&&typeof rm.companyName==='string'&&rm.companyName)h.name=rm.companyName;
+  if(!COMP().some(c=>c.id===activeCo))coActivate(CO_HOME);        // the active company was deleted on another device
+  companyName=coName(activeCo);
+  if(Array.isArray(rm.taskLabels))taskLabels=_union(taskLabels,rm.taskLabels);
+  if(Array.isArray(rm.locationsList))locationsList=_union(locationsList,rm.locationsList);
+  if(rm.myProfile&&typeof rm.myProfile==='object'&&!myProfile.name)myProfile=rm.myProfile;}
 function persist(){stateUpdatedAt=now();_subIdx=null;try{localStorage.setItem(LS_KEY,JSON.stringify(getState()));}catch(e){toast('Local storage full — export a backup.');}if(_fsDir)schedSave();if(gActive())gSched();renderNav();}
-function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}migrateNextActions();}
+function loadLS(){try{const r=localStorage.getItem(LS_KEY);if(r)applyState(JSON.parse(r));}catch(e){}
+  coEnsureHome(companyName);if(!COMP().some(c=>c.id===activeCo))activeCo=CO_HOME;companyName=coName(activeCo);
+  migrateNextActions();}
 function migrateNextActions(){let m=0;const n=now();customers.filter(c=>!c.deleted&&c.next_action).forEach(c=>{
   const dup=tasks.find(t=>t.customer_id===c.id&&t.is_next_action&&t.status!=='done');
   if(!dup){const owner=c.kam_id||'me';const due=c.next_action_due||addDays(today(),3);
@@ -1496,6 +1586,8 @@ function applyModeUI(){const personal=appMode==='personal';
   const si=g('ghSearch');if(si){si.placeholder=personal?'Search tasks, money, investments, family…  (Ctrl+K)':'Search tasks, accounts, deals, people, meetings…  (Ctrl+K)';si.value='';}
   const sr=g('srchres');if(sr)sr.classList.remove('on');}
 function renderNav(){const bb=g('ghBack');if(bb)bb.style.display=_navDepth>0?'':'none';
+  // which company Official is showing -- only worth the space once there is more than one
+  const cc=g('ghCo');if(cc){const show=appMode!=='personal'&&COMP().length>1;cc.style.display=show?'':'none';if(show)cc.textContent=coLabel(activeCo);}
   if(appMode==='personal'){const nb=g('navbar');if(nb)nb.innerHTML='';const mm=g('moremenu');if(mm)mm.innerHTML='';return;}
   const td=today();
   const nHome=openMine().filter(t=>t.type!=='call'&&t.due&&t.due<=td).length;
@@ -3998,7 +4090,7 @@ async function meetingSummary(mid){const m=M().find(x=>x.id===mid);if(!m)return;
   const pool=[{id:'me',name:myProfile.name||'Me',role:''},...P().map(p=>({id:p.id,name:p.name,role:p.role})),...(m.customer_id?contactsFor(m.customer_id):CO()).filter(c=>!m.customer_id).map(c=>({id:c.id,name:c.name,role:(c.role||'')+' · FPR'}))];
   let present=[...(m.attendee_ids||[]),...(m.contact_ids||[])];
   const chosen=await askPeople('Who was present? (for the minutes)',pool,present,{title:'Attendees present',ok:'Generate'});if(chosen===null)return;present=chosen;
-  m.attendee_ids=chosen.filter(id=>id==='me'||P().some(p=>p.id===id));m.contact_ids=chosen.filter(id=>CO().some(c=>c.id===id));m.updated_at=now();persist();
+  m.attendee_ids=chosen.filter(id=>id==='me'||P().some(p=>p.id===id));m.contact_ids=chosen.filter(id=>COMP().some(c=>c.id===id));m.updated_at=now();persist();
   openSummaryWindow(m.title+' — Minutes of Meeting',buildMeetingSummary(m,present),meetingSummaryText(m,present));}
 
 function vMeetings(){const td=today();const sf=window._mSt||'upcoming';const q=(window._mq||'').toLowerCase();
@@ -4763,9 +4855,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     ${myProfile.role?`<div class="srow"><span>Role</span><b>${esc(myProfile.role)}</b></div>`:''}
     <div style="margin-top:10px"><button class="btn sm" onclick="openMyProfile()">${myProfile.name?'Edit':'Set your name'}</button></div>
     <p class="note">Your name replaces "Me" as the owner on tasks, calls and meeting actions — in the app and in summaries printed or sent to Outlook.</p></div>
-  <div class="setcard"><h4>Your company</h4>
-    <div style="display:flex;gap:7px"><input id="companyNameInp" placeholder="e.g. Acme Foods Pvt Ltd" value="${esc(companyName)}" style="flex:1"><button class="btn sm" onclick="saveCompanyName()">Save</button></div>
-    <p class="note">Used to group your own team's attendees in meeting/call summaries — shown as "${esc(companyName)||'Your Company'} → Name", alongside each account's contacts grouped under "Account name → Name".</p></div>
+  ${companiesCard()}
   ${gCard()}
   <div class="setcard"><h4>OneDrive folder sync (desktop Edge/Chrome)</h4>
     <div class="srow"><span>Folder</span><b>${_fsDir?esc(_fsDir.name):'Not linked'}</b></div>
@@ -4782,7 +4872,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div class="srow"><span>PIN lock</span><b>${pinIsSet()?'On':'Off'}</b></div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
     <p class="note">A PIN gate on the Personal section (Money, Investments, personal tasks) so it isn't opened casually on an unlocked device. It re-locks on reload and after the app is in the background a few minutes; changing or removing it needs the current PIN. This is an access deterrent, not encryption — the data on this device is not encrypted at rest, so anyone with technical access to the browser storage can still read it. For real at-rest protection, keep a device passcode/disk encryption on and turn on db.json encryption above.</p></div>
-  <div class="setcard"><h4>Weekly offs</h4>
+  <div class="setcard"><h4>Weekly offs${coTag()}</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${WEEKDAY_FULL.map((d,i)=>`<span class="attchip ${(workWeek.off||[]).includes(i)?'on':''}" onclick="toggleWeekOff(${i})" title="${esc(d)}">${esc(d.slice(0,3))}</span>`).join('')}</div>
     <div class="fld"><label>Saturdays</label><select onchange="setSatRule(this.value)">
       ${[['none','Working (unless ticked above)'],['2_4','2nd &amp; 4th Saturday off'],['1_3','1st &amp; 3rd Saturday off'],['alt','Alternate Saturdays off (even weeks)'],['all','All Saturdays off']].map(o=>`<option value="${o[0]}"${(workWeek.satRule||'none')===o[0]?' selected':''}>${o[1]}</option>`).join('')}
@@ -4797,17 +4887,17 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <p class="note">Once a month Clario keeps a dated copy (db-YYYY-MM.json) beside db.json — last ${SNAP_KEEP} are kept — so a bad merge or corrupt write can be rolled back. Phones can't hold a folder link — export/import the same db.json via the OneDrive app there. Imports merge record-by-record; newer edits win.</p></div>
   ${bulkCard()}
   </div><div>
-  <div class="setcard"><h4>Departments</h4>
+  <div class="setcard"><h4>Departments${coTag()}</h4>
     <div class="chips">${depts.map((d,i)=>`<span class="chip">${esc(d)}<button onclick="depts.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newDept" placeholder="Add department" style="flex:1"><button class="btn sm" onclick="addDept()">Add</button></div></div>
-  <div class="setcard"><h4>Products & services</h4>
+  <div class="setcard"><h4>Products & services${coTag()}</h4>
     <div class="chips">${products.map((d,i)=>`<span class="chip">${esc(d)}<button onclick="products.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newProd" placeholder="Add product / service" style="flex:1"><button class="btn sm" onclick="addProd()">Add</button></div></div>
-  <div class="setcard"><h4>Regions</h4>
+  <div class="setcard"><h4>Regions${coTag()}</h4>
     <div class="chips">${regions.map((r,i)=>`<span class="chip">${esc(r)}<button onclick="regions.splice(${i},1);persist();renderView()">✕</button></span>`).join('')}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newRegion" placeholder="Add region" style="flex:1"><button class="btn sm" onclick="addRegion()">Add</button></div>
     <p class="note">Group accounts by region so travel plans can surface everyone nearby.</p></div>
-  <div class="setcard"><h4>Account groups</h4>
+  <div class="setcard"><h4>Account groups${coTag()}</h4>
     <div class="chips">${GROUPS().map(gr=>`<span class="chip"><span class="lnk" onclick="nav('group','${esc(gr)}')">${esc(gr)}</span> <span class="n num">${groupMembers(gr).length}</span><button onclick="delAcctGroup('${esc(gr)}')">\u2715</button></span>`).join('')||'<span class="note">None yet.</span>'}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newAcctGroup" placeholder="Add a parent group \u2014 e.g. Acme Group" style="flex:1"><button class="btn sm" onclick="addAcctGroup()">Add</button></div>
     <p class="note">Companies you deal with that sit under one parent. Set the group on each account, then a person can act for the whole group instead of being duplicated per company. The group page rolls up pipeline, commitments and activity across its members.</p></div>
@@ -4836,10 +4926,53 @@ async function delAcctGroup(gr){
   if(used&&!await askConfirm(`"${gr}" is set on ${used} account${used>1?'s':''}. Remove it from the list? Those accounts keep the group until you change them.`,{ok:'Remove',danger:true}))return;
   acctGroups=acctGroups.filter(x=>x!==gr);persist();renderView();}
 function addLocation(){const v=g('newLocation').value.trim();if(v&&!locationsList.includes(v)){locationsList.push(v);persist();renderView();}}
-function saveCompanyName(){companyName=g('companyNameInp').value.trim();persist();renderView();toast('Company name saved.');}
+function saveCompanyName(){const c=companies.find(x=>x.id===activeCo);if(!c)return;
+  c.name=g('companyNameInp').value.trim();c.updated_at=now();companyName=c.name;persist();renderView();toast('Company name saved.');}
+/* ── company management (Settings) ── */
+function coCounts(id){const b=coBucket(id),live=r=>!r.deleted;
+  return{tasks:(b.tasks||[]).filter(t=>live(t)&&!t.parent_id&&!t.archived&&t.status!=='done').length,
+    accounts:(b.customers||[]).filter(live).length,people:(b.people||[]).filter(live).length};}
+async function addCompany(){const i=g('coNewInp');const v=(i?i.value:'').trim();
+  if(!v){toast('Type the company name first.');if(i)i.focus();return;}
+  if(COMP().some(c=>(c.name||'').toLowerCase()===v.toLowerCase())){toast('You already have a company called '+v+'.');return;}
+  const n=now(),id=uid();companies.push({id,name:v,created_at:n,updated_at:n});_coStore[id]=coEmpty();
+  persist();renderView();
+  if(await askConfirm(`${v} starts with an empty Official section: no tasks, accounts or people. Personal stays as it is. Switch to it now?`,{title:'Company added',ok:'Switch to '+v}))switchCompany(id);}
+function switchCompany(id){if(id===activeCo||!COMP().some(c=>c.id===id))return;
+  flushEditors();coActivate(id);try{localStorage.setItem(CO_KEY,id);}catch(e){}
+  // filters, history and expanded lists point at the old company's records and lists
+  Object.values(VIEW_FILTERS).flat().forEach(nm=>{window[nm]='';});window._tSt='open';
+  _navStack=[];_shown={};if(view!=='settings'&&view!=='help')view='home';viewArg=null;
+  persist();applyModeUI();renderView();toast('Now in '+coLabel(id)+'.');}
+async function renameCompany(id){const c=companies.find(x=>x.id===id);if(!c)return;
+  const v=await askText('Company name:',{title:'Rename company',ok:'Save',value:c.name||''});
+  if(v==null||!v.trim())return;
+  if(COMP().some(x=>x.id!==id&&(x.name||'').toLowerCase()===v.trim().toLowerCase())){toast('You already have a company called '+v.trim()+'.');return;}
+  c.name=v.trim();c.updated_at=now();if(id===activeCo)companyName=c.name;persist();renderView();}
+async function deleteCompany(id){const c=companies.find(x=>x.id===id);if(!c)return;
+  if(id===CO_HOME){toast('The first company can be renamed but not removed.');return;}
+  if(id===activeCo){toast('Switch to another company before removing this one.');return;}
+  const k=coCounts(id);
+  const v=await askText(`This removes ${coLabel(id)} and everything in it (${k.tasks} open tasks, ${k.accounts} accounts, ${k.people} people) from every synced device. Type the company name to confirm:`,{title:'Remove company',ok:'Remove',placeholder:c.name});
+  if(v==null||v.trim().toLowerCase()!==(c.name||'').toLowerCase()){if(v!=null)toast('Name did not match — nothing removed.');return;}
+  c.deleted=true;c.updated_at=now();persist();renderView();toast(coLabel(id)+' removed.');}
+/* the lists below the Companies card belong to the active company -- say so once there are several */
+const coTag=()=>COMP().length>1?` <span class="note" style="font-weight:500">· ${esc(coLabel(activeCo))}</span>`:'';
+const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+function companiesCard(){const list=COMP();
+  const row=c=>{const k=coCounts(c.id),on=c.id===activeCo;
+    return `<div class="co-row${on?' on':''}"><div class="co-bd"><b>${esc(coLabel(c.id))}</b>${on?' <span class="pill b">Active</span>':''}
+      <div class="note">${plural(k.tasks,'open task')} · ${plural(k.accounts,'account')} · ${k.people===1?'1 person':k.people+' people'}</div></div>
+      <div class="co-act">${on?'':`<button class="btn sm" onclick="switchCompany('${c.id}')">Switch</button>`}
+      <button class="btn gh2 sm" onclick="renameCompany('${c.id}')">Rename</button>
+      ${c.id===CO_HOME||on?'':`<button class="btn gh2 sm" style="color:var(--red)" onclick="deleteCompany('${c.id}')">Remove</button>`}</div></div>`;};
+  return `<div class="setcard" id="coCard"><h4>Companies</h4>
+    ${list.map(row).join('')}
+    <div style="display:flex;gap:7px;margin-top:10px"><input id="coNewInp" placeholder="Add a company, e.g. Acme Foods Pvt Ltd" style="flex:1" onkeydown="if(event.key==='Enter')addCompany()"><button class="btn sm" onclick="addCompany()">+ Add</button></div>
+    <p class="note">Each company has its own tasks, accounts, contacts, people, meetings, deals, plans, saved views, and its own departments, products, regions, groups and work week. Personal, your profile and day locations are shared. Switching changes what Official shows on this device. The company name also labels your own team's attendees in meeting summaries ("${esc(coLabel(activeCo))} → Name").</p></div>`;}
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
 function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.sort((a,b)=>a.localeCompare(b)).map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
-async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
+async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);companies=[];_coStore={};activeCo=CO_HOME;try{localStorage.removeItem(CO_KEY);}catch(e){}coEnsureHome('');companyName='';coToGlobals(coEmpty());persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
 function monthsAgoDate(n){const d=new Date();d.setMonth(d.getMonth()-n);return ymd(d);}
 function archivableCounts(cutoff){
   const tk=tasks.filter(t=>!t.deleted&&!t.archived&&t.status==='done'&&(t.completed_at||t.updated_at||t.created_at||'').slice(0,10)<cutoff).length;
