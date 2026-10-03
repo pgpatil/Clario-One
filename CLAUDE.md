@@ -46,6 +46,13 @@ Two independent, unrelated sync systems — check which one is relevant before d
 
 **The app now makes zero third-party requests** (verified by counting non-localhost hosts during a page load). Font, MSAL and icons are all local — keep it that way.
 
+## Companies (multi-company Official data)
+
+- Official data is per company; Personal data, `myProfile`, `taskLabels`, `locationsList` and day `locations` are shared. Per-company tables are `CO_TABLES` (official rows of `tasks` — anything with `scope!=='personal'` — plus people, customers, contacts, meetings, deals, plans, journals, savedviews…) and the lists `depts/products/regions/acctGroups/workWeek`.
+- In memory the globals always hold the **active** company (`activeCo`, device-local in `localStorage.cx_company`); inactive companies sit in `_coStore`. Switch only via `coActivate`/`switchCompany` — never assign the globals directly.
+- Saved/synced shape: the first company has the fixed id `home` and its data stays at the **top level** of the state (where it always lived), so an older app version keeps working and its pushes merge into `home` only. Other companies live under `state.co[id]`. `mergeRemote` must route rows by company — top-level official rows always go to `home`, whatever company is active. `tests/w13-companies.js` guards this; don't loosen it.
+- `home` can be renamed, not removed. Removal is a tombstone on the `companies` record (`deleted:true`), synced.
+
 ## Workflow used throughout this project's history
 
 - Syntax-check the inline script before testing: extract the largest `<script>` block and run it through `new Function(...)`.
