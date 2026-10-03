@@ -1472,26 +1472,75 @@ async function encJson(json){const iv=crypto.getRandomValues(new Uint8Array(12))
 /* One unlock per launch, shared by every caller. Previously each of saveToFile, gSave (twice on
    a conflict retry), snapMaybe and snapNow prompted independently, so a single edit could raise
    several passphrase dialogs. Concurrent callers now await the same promise. */
+/* ── Remembering the passphrase on this device ──
+   The derived AES key (never the passphrase) is kept in IndexedDB as a NON-EXTRACTABLE CryptoKey:
+   this origin's code can use it to encrypt/decrypt, but nothing can read the key bytes back out.
+   It expires a fixed number of days after the passphrase was last typed -- daily use does not
+   extend it, so the passphrase is still asked at least that often. This does not weaken the
+   device itself: the local cache (localStorage) is already plain text; encryption protects the
+   synced copy in OneDrive/the folder, and that file stays encrypted exactly as before. */
+const ENC_REM_KEY='cx_enc_remember';
+const encRememberDays=()=>{try{const v=localStorage.getItem(ENC_REM_KEY);return v==null?7:Math.max(0,+v||0);}catch(e){return 7;}};
+let _encRemUntil=0,_encTyped=false,_encRemP=null;
+async function encRemLoad(salt){try{const db=await fsIDB();
+    const r=await new Promise(res=>{const q=db.transaction('h').objectStore('h').get('enc');q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);});
+    if(!r||!r.key)return null;
+    if(r.salt!==salt||!(r.until>Date.now())||!encRememberDays()){await encRemClear();return null;}
+    _encRemUntil=r.until;return r.key;}catch(e){return null;}}
+async function encRemSave(force){const d=encRememberDays();if(!d||!_encKey||!_encMeta)return;
+  if(!force&&!_encTyped)return;                      // only a freshly typed passphrase starts a new window
+  const until=Date.now()+d*864e5;
+  try{const db=await fsIDB();await new Promise(res=>{const t=db.transaction('h','readwrite');t.objectStore('h').put({key:_encKey,salt:_encMeta.salt,until},'enc');t.oncomplete=res;t.onerror=res;});
+    _encRemUntil=until;_encTyped=false;}catch(e){}}
+async function encRemClear(){_encRemUntil=0;_encRemP=null;
+  try{const db=await fsIDB();await new Promise(res=>{const t=db.transaction('h','readwrite');t.objectStore('h').delete('enc');t.oncomplete=res;t.onerror=res;});}catch(e){}}
+/* A small known value encrypted with the key, kept with this device's settings, so a typed
+   passphrase can be checked BEFORE it is used. Without it a typo was only caught on the next
+   decrypt -- and a save in between would have written the file with the wrong key. */
+async function encMakeCheck(){if(!_encKey||!_encMeta)return;const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},_encKey,new TextEncoder().encode('clario-ok'));
+  _encMeta.chk={iv:b64(iv),ct:b64(ct),salt:_encMeta.salt};try{localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}catch(e){}}
+async function encVerify(key,salt){const c=_encMeta&&_encMeta.chk;if(!c||c.salt!==salt)return null;   // null: nothing to check against
+  try{await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(c.iv)},key,ub64(c.ct));return true;}catch(e){return false;}}
 let _encAsk=null;
 async function ensureEncKey(salt,interactive){
   if(_encKey)return _encKey;
+  if(!_encRemP)_encRemP=encRemLoad(salt);             // a remembered key needs no prompt, even for background work
+  const rk=await _encRemP;if(_encKey)return _encKey;
+  if(rk){_encKey=rk;return _encKey;}
   if(!interactive)return null;                       // background work never prompts
   if(_encAsk)return _encAsk;                          // a prompt is already open — reuse it
-  _encAsk=(async()=>{const pass=await askText('Enter the passphrase for your encrypted db.json:',{title:'Unlock db.json',type:'password',ok:'Unlock'});
+  _encAsk=(async()=>{const d=encRememberDays();
+    const pass=await askText(`Enter the passphrase for your encrypted db.json${d?` — this device will remember it for ${d===1?'1 day':d+' days'}`:''}:`,{title:'Unlock db.json',type:'password',ok:'Unlock'});
     if(!pass)throw new Error('no pass');
-    _encKey=await deriveKey(pass,salt);return _encKey;})();
+    const k=await deriveKey(pass,salt),ok=await encVerify(k,salt);
+    if(ok===false){toast('Wrong passphrase — try again.');throw new Error('no pass');}
+    _encKey=k;_encTyped=true;
+    if(ok)await encRemSave();                         // verified now; otherwise remembered after the first good decrypt
+    return _encKey;})();
   try{return await _encAsk;}finally{_encAsk=null;}}
 async function decEnvelope(env){if(!_encKey){await ensureEncKey(env.salt,true);
     if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(env.iv)},_encKey,ub64(env.ct));return JSON.parse(new TextDecoder().decode(pt));}
-async function parseDb(text){const j=JSON.parse(text);if(j&&j.clarioEnc){try{return await decEnvelope(j);}catch(e){_encKey=null;toast('Wrong passphrase or corrupted file.');throw e;}}return j;}
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(env.iv)},_encKey,ub64(env.ct));
+  // a successful decrypt proves the key: keep a check value for next time, and remember a typed passphrase
+  if(_encMeta&&env.salt===_encMeta.salt&&!(_encMeta.chk&&_encMeta.chk.salt===_encMeta.salt))await encMakeCheck();
+  if(_encTyped)await encRemSave();
+  return JSON.parse(new TextDecoder().decode(pt));}
+async function parseDb(text){const j=JSON.parse(text);if(j&&j.clarioEnc){try{return await decEnvelope(j);}catch(e){_encKey=null;_encTyped=false;encRemClear();toast('Wrong passphrase or corrupted file.');throw e;}}return j;}
+async function setEncRemember(v){const d=Math.max(0,+v||0);try{localStorage.setItem(ENC_REM_KEY,String(d));}catch(e){}
+  if(!d){await encRemClear();toast('This device will ask for the passphrase every launch.');}
+  else if(_encKey){await encRemSave(true);toast(`Remembered on this device until ${encRemLabel()}.`);}
+  renderView();}
+async function encForget(){await encRemClear();toast('Forgotten on this device — the next launch asks for the passphrase.');renderView();}
+const encRemLabel=()=>_encRemUntil?new Date(_encRemUntil).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
 async function serializeDb(opts){const json=JSON.stringify(getState(),null,2);
   if(_encMeta&&_encMeta.on){const k=await ensureEncKey(_encMeta.salt,!(opts&&opts.silent));
     if(!k)throw new Error('no pass');return encJson(json);}
   return json;}
 async function enableEnc(){const p1=await askText('Choose an encryption passphrase (losing it means losing the synced file):',{title:'Encrypt db.json',type:'password',ok:'Next'});if(!p1)return;const p2=await askText('Repeat passphrase:',{title:'Confirm passphrase',type:'password',ok:'Encrypt'});if(p1!==p2){toast('Passphrases do not match.');return;}
-  _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(p1,_encMeta.salt);localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));persist();if(_fsDir)await saveToFile();toast('db.json is now AES-256 encrypted.');renderView();}
-async function disableEnc(){if(!await askConfirm('Turn off encryption? db.json will be written as plain text.',{title:'Disable encryption',ok:'Turn off',danger:true}))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
+  _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(p1,_encMeta.salt);localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));
+  await encRemClear();await encMakeCheck();await encRemSave(true);persist();if(_fsDir)await saveToFile();toast('db.json is now AES-256 encrypted.');renderView();}
+async function disableEnc(){if(!await askConfirm('Turn off encryption? db.json will be written as plain text.',{title:'Disable encryption',ok:'Turn off',danger:true}))return;_encMeta=null;_encKey=null;localStorage.removeItem(ENC_KEY);await encRemClear();persist();if(_fsDir)await saveToFile();toast('Encryption off.');renderView();}
 
 /* ═══ PERSONAL SECTION PIN LOCK (access gate; see security note in Settings) ═══ */
 let _pinCfg=null;try{_pinCfg=JSON.parse(localStorage.getItem(PIN_KEY)||'null');}catch(e){}
@@ -4423,7 +4472,7 @@ function vHelp(){
   ${faqItem('OneDrive account sync (all devices)','Settings → paste your Azure client ID → Sign in with Microsoft. Clario then reads/writes Apps/Clario/db.json in your OneDrive directly — works on iPhone, iPad, Android and desktop. It pulls before every save and checks for other-device changes every 20 seconds; edits merge record-by-record with the newer change winning.')}
   ${faqItem('OneDrive folder sync (desktop fallback)','Edge/Chrome on desktop can instead link a local OneDrive folder from Settings. Same file, same merging; the link persists across launches.')}
   ${faqItem('Excel import & export','Settings → Bulk data. Pick a data set from the dropdown, then Template, Export or Import — no long list of buttons. Importable sets: tasks, people, accounts, contacts, deals, decisions, meetings, improvement ideas, departments and products. Names do the linking — unknown people and accounts are created automatically. People, accounts, contacts, departments and products update existing records by name; tasks, deals, meetings, decisions and ideas always add new rows, so don’t import the same sheet twice. Logs — the activity history, 1:1 agenda items, planner goals, decision exercises and shutdown journal — are export-only: you can download them for reference, but they can’t be imported, since editing a record of what happened would fabricate it.')}
-  ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Every device asks for the passphrase once. Losing the passphrase means losing the synced file — there is no recovery.')}
+  ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Each device remembers the passphrase for 7 days after you type it (change this to every launch, 1 day or 30 days under Settings → Encryption), then asks again. Losing the passphrase means losing the synced file — there is no recovery.')}
   ${faqItem('Install as an app','Desktop Edge/Chrome: menu → Apps → Install. Android Chrome: menu → Install app. iPhone/iPad Safari: Share → Add to Home Screen. The installed app works offline; sync resumes when online.')}
   </div>`;}
 function faqSearch(q){window._faqQ=q;q=(q||'').trim().toLowerCase();
@@ -5002,8 +5051,11 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <p class="note">Keep this app anywhere — Desktop or installed as an app, never inside OneDrive. Link a OneDrive data folder; only db.json lives there. The link persists across launches, pulls before every push, and picks up changes from other devices every 20 seconds. In OneDrive, set that folder to "Always keep on this device".</p></div>
   <div class="setcard"><h4>Encryption</h4>
     <div class="srow"><span>Synced file</span><b>${enc?'AES-256 encrypted':'Plain text'}</b></div>
-    <div style="margin-top:10px">${enc?'<button class="btn gh2 sm" onclick="disableEnc()">Turn off</button>':'<button class="btn sm" onclick="enableEnc()">Encrypt db.json</button>'}</div>
-    <p class="note">${enc?'db.json in OneDrive is encrypted with your passphrase (PBKDF2 + AES-GCM). The local cache on each device is protected by your Windows/phone login.':'Anyone who can open db.json in OneDrive can read it. Turn encryption on if it carries customer or KAM material.'} Losing the passphrase means losing the synced file — there is no recovery.</p></div>
+    ${enc?(()=>{const d=encRememberDays(),o=(v,l)=>`<option value="${v}"${d===v?' selected':''}>${l}</option>`;
+      return `<div class="srow"><span>Remember passphrase on this device</span><select id="encRemSel" onchange="setEncRemember(this.value)" style="width:auto">${o(0,'Ask every launch')}${o(1,'1 day')}${o(7,'7 days')}${o(30,'30 days')}</select></div>
+      <div class="srow"><span>Status</span><b>${_encRemUntil>Date.now()?`Remembered until ${encRemLabel()}`:_encKey?'Unlocked for this session':'Locked'}</b></div>`;})():''}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${enc?`<button class="btn gh2 sm" onclick="disableEnc()">Turn off</button>${_encRemUntil>Date.now()?'<button class="btn gh2 sm" onclick="encForget()">Forget on this device</button>':''}`:'<button class="btn sm" onclick="enableEnc()">Encrypt db.json</button>'}</div>
+    <p class="note">${enc?'db.json in OneDrive is encrypted with your passphrase (PBKDF2 + AES-GCM). The local cache on each device is protected by your Windows/phone login. Remembering keeps a locked key in this browser (it can be used, never read out) until the date shown, counted from when you last typed the passphrase — then it asks again. Choose "Ask every launch" on a shared computer.':'Anyone who can open db.json in OneDrive can read it. Turn encryption on if it carries customer or KAM material.'} Losing the passphrase means losing the synced file — there is no recovery.</p></div>
   <div class="setcard"><h4>Personal section lock</h4>
     <div class="srow"><span>PIN lock</span><b>${pinIsSet()?'On':'Off'}</b></div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
