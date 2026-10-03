@@ -56,7 +56,22 @@ const seed = `(()=>{ tasks.length=0;meetings.length=0;locations.length=0;
             cont:document.querySelectorAll('.locband.cont').length};
   });
   chk('one band per cell', bands.bands===bands.cells, JSON.stringify(bands));
-  chk('three stretches produce three labels', bands.named===3, `${bands.named} labels, ${bands.cont} continuations`);
+  /* A run re-labels wherever it wraps to a new week, so the label count depends on where the
+     seeded days fall in the calendar -- it was 3 in August 2026 and 6 in October. Derive it
+     from the dates rather than hard-coding one month's alignment. */
+  const wantLabels = await page.evaluate(()=>{
+    const mk=monthKey(today()), D=d=>mk+'-'+String(d).padStart(2,'0');
+    const set=new Map();
+    [[3,7,'Mumbai'],[10,13,'Delhi'],[17,19,'Kochi plant']].forEach(([a,b,c])=>{
+      for(let d=a;d<=b;d++)set.set(D(d),c);});
+    let labels=0;
+    for(const [ds,city] of set){
+      const isMonday=new Date(ds+'T12:00').getDay()===1;
+      const prev=addDays(ds,-1);
+      if(isMonday||set.get(prev)!==city)labels++;}
+    return labels;});
+  chk(`each stretch labels once per week row (expect ${wantLabels} here)`,
+      bands.named===wantLabels, `${bands.named} labels, ${bands.cont} continuations`);
   chk('unset days show the affordance', bands.unset===bands.cells-(bands.named+bands.cont), `${bands.unset} unset`);
 
   console.log('\n═══ a city keeps the same colour everywhere');
