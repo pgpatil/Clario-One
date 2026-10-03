@@ -71,40 +71,62 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
   chk('a new holding\'s first value counts as money invested', near(att.bFirst,50000), `invested part=${att.bFirst}`);
   chk('two unscheduled loans use the recorded total once', near(att.pastLoans,60000), `got ${att.pastLoans}, want 60000`);
 
-  console.log('\n═══ month on month and year on year on the dashboard');
+  console.log('\n═══ summary card: this month and year on year');
   const view = await page.evaluate(()=>{
-    personalTab='invest';invView='analysis';renderView();
+    personalTab='invest';invView='analysis';nwTab='moved';renderView();
     const cur=monthKey(today());
-    const kpis=Object.fromEntries([...document.querySelectorAll('#main .kpi')].map(k=>[k.querySelector('.kl').textContent.trim(),k.querySelector('.kv').textContent.trim()]));
+    const st=Object.fromEntries([...document.querySelectorAll('#main .nwst')].map(k=>[k.querySelector('.kl').textContent.trim(),k.querySelector('b').textContent.trim()]));
     const yoy=nwAt(cur).net-nwAt(ymAdd(cur,-12)).net, mom=nwAt(cur).net-nwAt(ymAdd(cur,-1)).net;
-    const cards=[...document.querySelectorAll('#main .card')].map(c=>c.querySelector('.ch')?.textContent||'');
-    const momRows=[...document.querySelectorAll('#main table.t')][0].querySelectorAll('tr.click').length;
-    const pills=[...document.querySelectorAll('#main .pill')].map(p=>p.textContent);
     const tabOn=[...document.querySelectorAll('.vtog button.on')].map(b=>b.textContent);
-    return {kpis, yoy, mom, yoyTxt:sgnMoney(yoy), momTxt:sgnMoney(mom), cards, momRows, pills, tabOn,
-            net:fmtMoney(nwAt(cur).net)};
+    const tabs=[...document.querySelectorAll('#main .nwtabs .tab')].map(b=>b.textContent.trim());
+    return {st, yoyTxt:sgnMoney(yoy), momTxt:sgnMoney(mom), tabOn, tabs,
+            hero:document.querySelector('#main .nwh-v').textContent.trim(), net:fmtMoney(nwAt(cur).net)};
   });
   chk('Analysis tab is selected', view.tabOn.includes('Analysis'), JSON.stringify(view.tabOn));
-  chk('Net worth KPI matches nwAt(today)', view.kpis['Net worth']===view.net, `${view.kpis['Net worth']} vs ${view.net}`);
-  chk('This month KPI is today minus last month', view.kpis['This month']===view.momTxt, `${view.kpis['This month']} vs ${view.momTxt}`);
-  chk('Year on year KPI is today minus 12 months ago', view.kpis['Year on year']===view.yoyTxt, `${view.kpis['Year on year']} vs ${view.yoyTxt}`);
-  chk('every section renders', ['Net worth over time','What moved','Over this range','Month on month','Year on year','Holdings performance','Allocation']
-      .every(h=>view.cards.some(c=>c.includes(h))), JSON.stringify(view.cards.map(c=>c.slice(0,24))));
-  chk('12-month range lists 11 month-on-month rows', view.momRows===11, `rows=${view.momRows}`);
-  chk('months with no holding value are flagged "carried"', view.pills.includes('carried'));
-  chk('partial calendar years are flagged "part"', view.pills.includes('part'));
+  chk('headline net worth matches nwAt(today)', view.hero===view.net, `${view.hero} vs ${view.net}`);
+  chk('This month is today minus last month', view.st['This month']===view.momTxt, `${view.st['This month']} vs ${view.momTxt}`);
+  chk('Year on year is today minus 12 months ago', view.st['Year on year']===view.yoyTxt, `${view.st['Year on year']} vs ${view.yoyTxt}`);
+  chk('returns per year is shown for investments', /%/.test(view.st['Returns / yr']||''), view.st['Returns / yr']);
+  chk('details sit behind five tabs', JSON.stringify(view.tabs)===JSON.stringify(['What moved','Monthly','Yearly','Holdings','Allocation']), JSON.stringify(view.tabs));
 
-  console.log('\n═══ growth rate, drawdown, XIRR on known inputs');
+  console.log('\n═══ every tab renders its picture');
+  const tabs = await page.evaluate(()=>{const out={};
+    const painted=id=>{const c=document.getElementById(id);if(!c)return 0;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n;};
+    setNwTab('moved');out.moved=document.querySelectorAll('#main .dv').length;
+    setNwTab('monthly');out.bars=painted('nwBars');out.sum=(document.querySelector('#main .nwsum')||{}).textContent||'';
+    nwTbl=true;renderView();out.rows=document.querySelectorAll('#main table.nwt tr.click').length;
+    out.pills=[...document.querySelectorAll('#main .pill')].map(p=>p.textContent);nwTbl=false;
+    setNwTab('yearly');out.years=document.querySelectorAll('#main .yrow').length;
+    out.ypills=[...document.querySelectorAll('#main .pill')].map(p=>p.textContent);
+    out.ytext=document.querySelector('#main .yrow .note').textContent;
+    setNwTab('holdings');out.holds=document.querySelectorAll('#main .hrow').length;
+    setNwTab('alloc');out.donut=painted('nwDonut');out.legend=document.querySelectorAll('#main .al-row').length;
+    setNwTab('moved');return out;});
+  chk('What moved: six diverging bars', tabs.moved===6, `${tabs.moved}`);
+  chk('Monthly: bar chart is painted', tabs.bars>1500, `${tabs.bars} px`);
+  chk('Monthly: selected month spelled out', /put in/.test(tabs.sum) && /market/.test(tabs.sum), tabs.sum.slice(0,70));
+  chk('Monthly: "Show the numbers" gives 11 rows for 1Y', tabs.rows===11, `rows=${tabs.rows}`);
+  chk('months with no holding value are flagged "carried"', tabs.pills.includes('carried'));
+  chk('Yearly: one row per calendar year', tabs.years===2, `${tabs.years}`);
+  chk('partial calendar years are flagged "part"', tabs.ypills.includes('part'));
+  chk('Yearly % is the market\'s return, not net worth change', /market [+−]₹[\d,.]+( L)? \([+−][\d.]+%\)/.test(tabs.ytext), tabs.ytext);
+  chk('Holdings: one row per holding', tabs.holds===2, `${tabs.holds}`);
+  chk('Allocation: donut painted with a legend', tabs.donut>1500 && tabs.legend>=3, `${tabs.donut}px, ${tabs.legend} rows`);
+
+  console.log('\n═══ returns, drawdown, XIRR on known inputs');
   const math = await page.evaluate(()=>{
-    const ser=[];for(let i=0;i<=24;i++)ser.push({net:i===24?121:100});
     const dd=nwDrawdown([{ym:'a',net:100},{ym:'b',net:120},{ym:'c',net:90},{ym:'d',net:130}]);
+    const ddNeg=nwDrawdown([{ym:'a',net:-500},{ym:'b',net:-300},{ym:'c',net:-450}]);
     const x1=xirr([{t:0,v:-1000},{t:365,v:1100}]);
     const x2=xirr([{t:0,v:-1000},{t:365,v:-1000},{t:730,v:2310}]);   // 10% on both tranches
-    return {cagr:nwCagr(ser), negCagr:nwCagr([{net:-5},{net:10}]), dd, x1, x2, x0:xirr([{t:0,v:-1}])};
+    const px=portXirr([{ym:'2025-01',holdings:1000},{ym:'2026-01',holdings:1100}],[]);
+    const px2=portXirr([{ym:'2025-01',holdings:0},{ym:'2025-02',holdings:1000},{ym:'2026-02',holdings:1100}],[{ym:'2025-02',inv:1000}]);
+    return {px, px2, dd, ddNeg, x1, x2, x0:xirr([{t:0,v:-1}])};
   });
-  chk('CAGR: 100 → 121 over two years is 10%/yr', near(math.cagr,0.10,1e-6), String(math.cagr));
-  chk('CAGR is undefined from a negative start', math.negCagr===null);
+  chk('returns/yr: 1000 → 1100 in a year is 10%', near(math.px,0.10,2e-3), String(math.px));
+  chk('returns/yr ignores money put in: invest 1000, worth 1100 a year on is 10%', near(math.px2,0.10,2e-3), String(math.px2));
   chk('drawdown: 120 → 90 is −25%, peak to trough', near(math.dd.pct,-0.25,1e-9)&&math.dd.from==='b'&&math.dd.at==='c', JSON.stringify(math.dd));
+  chk('drawdown still measured in rupees while net worth is negative', math.ddNeg.amt===-150&&math.ddNeg.pct===null, JSON.stringify(math.ddNeg));
   chk('XIRR: −1000 then +1100 a year later is 10%', near(math.x1,0.10,1e-4), String(math.x1));
   chk('XIRR: two yearly tranches at 10%', near(math.x2,0.10,1e-4), String(math.x2));
   chk('XIRR needs two flows', math.x0===null);
@@ -116,8 +138,9 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
     const before=nwAt(past).assumed;
     const wrote=nwRecord(), again=nwRecord();
     const snap=nwsnap.find(x=>x.month===cur);
-    renderView();
+    nwTab='monthly';nwTbl=true;renderView();
     const estPills=[...document.querySelectorAll('#main .pill')].filter(p=>p.textContent==='est.').length;
+    nwTab='moved';nwTbl=false;renderView();
     return {before, wrote, again, snapPf:snap&&snap.pf, pf:pfCorpus(), snapFlat:snap&&snap.flat, estPills,
             nowAssumed:nwAt(cur).assumed};
   });
@@ -136,12 +159,15 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
     setNwRange('12m');
     toggleNwSeries('net');  const stillOne=nwShow.net;          // cannot hide the last series
     toggleNwSeries('assets');toggleNwSeries('net');
-    const legOn=[...document.querySelectorAll('.nwleg.on')].map(b=>b.textContent.trim());
+    const legOn=[...document.querySelectorAll('button.nwleg.on')].map(b=>b.textContent.trim());
     toggleNwSeries('assets');toggleNwSeries('net');
+    nwTab='holdings';delete _sort.invperf;renderView();
+    const byVal=[...document.querySelectorAll('#main .hrow .hr-top b:first-child')].map(b=>b.textContent);
     setSort('invperf','name');
-    const names=[...document.querySelectorAll('#main table.t')][2].querySelectorAll('tbody tr, tr');
-    const order=[...names].map(r=>r.cells[0]?.textContent||'').filter(t=>/Index fund|Gold/.test(t)).map(t=>t.slice(0,4));
-    return {r6,r12,r3y,rAll,span,stillOne,legOn,order};
+    const order=[...document.querySelectorAll('#main .hrow .hr-top b:first-child')].map(b=>b.textContent.slice(0,4));
+    const r0=document.querySelector('#main .hrow');r0.click();const opened=!!document.querySelector('#main .hr-more');
+    nwTab='moved';nwHoldOpen=null;renderView();
+    return {r6,r12,r3y,rAll,span,stillOne,legOn,order,byVal,opened};
   }).catch(e=>({err:e.message}));
   chk('6 months → 6 points', ui.r6===6, JSON.stringify(ui));
   chk('12 months → 12 points', ui.r12===12);
@@ -149,15 +175,17 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
   chk('All starts at the first month with data', ui.rAll===ui.span);
   chk('the last visible series cannot be hidden', ui.stillOne===true);
   chk('legend toggles reflect state', JSON.stringify(ui.legOn)===JSON.stringify(['Assets']), JSON.stringify(ui.legOn));
-  chk('holdings table sorts by name', ui.order&&ui.order.length===2, JSON.stringify(ui.order));
+  chk('holdings default to largest value first', JSON.stringify(ui.byVal)===JSON.stringify(['Index fund','Gold']), JSON.stringify(ui.byVal));
+  chk('holdings sort by name', JSON.stringify(ui.order)===JSON.stringify(['Gold','Inde']), JSON.stringify(ui.order));
+  chk('tapping a holding opens its details', ui.opened);
 
   const yr = await page.evaluate(()=>{
-    const cells=()=>{const t=[...document.querySelectorAll('#main table.t')][1];
-      return [...t.querySelectorAll('tr')].slice(1).map(r=>[...r.cells].map(c=>c.textContent.trim()));};
+    nwTab='yearly';
+    const cells=()=>[...document.querySelectorAll('#main .yrow')].map(r=>[r.textContent.replace(/\s+/g,' ').trim()]);
     const prevYr=String(+today().slice(0,4)-1);
     setNwRange('12m'); const short=cells().find(r=>r[0].startsWith(prevYr));
     setNwRange('all'); const full=cells().find(r=>r[0].startsWith(prevYr));
-    setNwRange('12m');
+    setNwRange('12m');nwTab='moved';renderView();
     return {short, full, prevYr};});
   chk('a year row does not change with the chart range', !!yr.short && JSON.stringify(yr.short)===JSON.stringify(yr.full),
       `${JSON.stringify(yr.short)} vs ${JSON.stringify(yr.full)}`);
@@ -166,7 +194,7 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
   await page.evaluate(()=>{nwSel=null;renderView();window.scrollTo(0,0);});
   await page.waitForTimeout(100);
   const box = await page.locator('#nwCv').boundingBox();
-  chk('canvas has real size', box && box.width>300 && box.height>200, JSON.stringify(box));
+  chk('canvas has real size', box && box.width>300 && box.height>=200, JSON.stringify(box));
   const painted = await page.evaluate(()=>{const c=document.getElementById('nwCv');
     const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n;});
   chk('canvas is painted', painted>2000, `${painted} px`);
@@ -179,24 +207,74 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
   chk('tooltip is for the hovered month', tip.text.startsWith(tip.want), `${tip.text.slice(0,40)} | want ${tip.want}`);
   await page.mouse.click(px,py); await page.waitForTimeout(120);
   const sel = await page.evaluate(()=>{const want=window._nwData[3].ym;
-    const head=[...document.querySelectorAll('#main .card .ch')].find(h=>/What moved/.test(h.textContent));
+    const head=document.querySelector('#main .nwstep b');
+    nwTab='monthly';nwTbl=true;renderView();
     const row=document.querySelector('#main tr.sel');
-    return {nwSel, want, head:head&&head.textContent, wantLbl:finMonthLabel(want), row:row&&row.cells[0].textContent};});
+    return {nwSel, want, head:head&&head.textContent, wantLbl:finMonthLabel(want), short:shortYm(want), row:row&&row.cells[0].textContent};});
   chk('click selects that month', sel.nwSel===sel.want, `${sel.nwSel} vs ${sel.want}`);
   chk('"What moved" follows the selection', sel.head && sel.head.includes(sel.wantLbl), sel.head);
-  chk('month-on-month row is highlighted', sel.row===sel.wantLbl, sel.row);
+  chk('month-on-month row is highlighted', sel.row===sel.short, sel.row);
   await page.mouse.move(box.x+box.width/2, box.y-40); await page.waitForTimeout(60);
   chk('tooltip hides on leave', await page.evaluate(()=>getComputedStyle(document.getElementById('nwTip')).display==='none'));
   const rowSel = await page.evaluate(()=>{const r=document.querySelectorAll('#main table.t')[0].querySelectorAll('tr.click')[0];
     r.click();return {nwSel, want:window._nwData[window._nwData.length-1].ym};});
   chk('clicking a table row selects the month', rowSel.nwSel===rowSel.want, JSON.stringify(rowSel));
 
+  console.log('\n═══ monthly bars and the month stepper');
+  await page.evaluate(()=>{nwTbl=false;nwTab='monthly';nwSel=null;renderView();window.scrollTo(0,0);});
+  await page.locator('#nwBars').scrollIntoViewIfNeeded(); await page.waitForTimeout(80);
+  const bb = await page.locator('#nwBars').boundingBox();
+  // 3rd of 11 bars: x = pad.l + 2.5/11 of the plot width
+  const bx = bb.x + 46 + (bb.width-54)*2.5/11, by = bb.y + bb.height/2;
+  await page.mouse.move(bx,by); await page.waitForTimeout(60);
+  const btip = await page.evaluate(()=>{const t=document.getElementById('nwBarTip');
+    return {shown:getComputedStyle(t).display!=='none', text:t.textContent, want:finMonthLabel(window._nwData[3].ym)};});
+  chk('hovering a bar shows that month', btip.shown && btip.text.startsWith(btip.want), btip.text.slice(0,40));
+  chk('bar tooltip splits put in / market / other', /Put in/.test(btip.text)&&/Market/.test(btip.text)&&/Other/.test(btip.text));
+  await page.mouse.click(bx,by); await page.waitForTimeout(120);
+  const bsel = await page.evaluate(()=>({nwSel, want:window._nwData[3].ym, tab:nwTab,
+    sum:(document.querySelector('#main .nwsum b')||{}).textContent}));
+  chk('clicking a bar selects the month and stays on Monthly', bsel.nwSel===bsel.want && bsel.tab==='monthly', JSON.stringify(bsel));
+  chk('the summary line follows it', bsel.sum===await page.evaluate(()=>finMonthLabel(window._nwData[3].ym)), bsel.sum);
+  const step = await page.evaluate(()=>{setNwTab('moved');const a=nwSel;nwStep(-1);const b1=nwSel;nwStep(1);nwStep(1);const c1=nwSel;
+    for(let i=0;i<40;i++)nwStep(-1);const lo=nwSel;return {a,b1,c1,lo,first:window._nwData[1].ym,
+      prevOf:ymAdd(a,-1),nextOf:ymAdd(a,1),tab:nwTab};});
+  chk('‹ steps one month back', step.b1===step.prevOf, `${step.a} -> ${step.b1}`);
+  chk('› steps forward', step.c1===step.nextOf, step.c1);
+  chk('stepping stops at the first month that has a change', step.lo===step.first, `${step.lo} vs ${step.first}`);
+
+  console.log('\n═══ Investments lens: value vs money put in');
+  const lens = await page.evaluate(()=>{setNwMode('inv');
+    const last=window._nwData[window._nwData.length-1];
+    const perf=IH().map(holdingPerf).filter(Boolean);
+    const inv=perf.reduce((a,x)=>a+x.invested,0), val=perf.reduce((a,x)=>a+x.value,0);
+    const legend=document.querySelector('#main .nwlegs').textContent;
+    return {lastInv:last.inv,inv,lastHold:last.hold,val,legend};});
+  chk('money put in matches the holdings table', near(lens.lastInv,lens.inv), `${lens.lastInv} vs ${lens.inv}`);
+  chk('holdings value matches', near(lens.lastHold,lens.val), `${lens.lastHold} vs ${lens.val}`);
+  chk('legend shows the gain', /Gain|Loss/.test(lens.legend), lens.legend.slice(0,80));
+  const cb = await page.locator('#nwCv').boundingBox();
+  await page.mouse.move(cb.x+cb.width-20, cb.y+cb.height/2); await page.waitForTimeout(60);
+  const ltip = await page.evaluate(()=>document.getElementById('nwTip').textContent);
+  chk('hover in this lens reads holdings, put in and gain', /Holdings/.test(ltip)&&/Put in/.test(ltip)&&/(Gain|Loss)/.test(ltip), ltip.slice(0,80));
+  chk('figures in the tooltip are in lakhs', /₹[\d.]+ L/.test(ltip), ltip.slice(0,80));
+  await page.evaluate(()=>setNwMode('net'));
+
+  console.log('\n═══ allocation donut responds');
+  await page.evaluate(()=>{setNwTab('alloc');});
+  await page.locator('#nwDonut').scrollIntoViewIfNeeded(); await page.waitForTimeout(60);
+  const db = await page.locator('#nwDonut').boundingBox();
+  await page.mouse.move(db.x+db.width/2+db.width*0.4, db.y+db.height/2); await page.waitForTimeout(60);
+  const dn = await page.evaluate(()=>[...document.querySelectorAll('#main .al-row')].findIndex(r=>r.classList.contains('on')));
+  chk('hovering a slice highlights its legend row', dn>=0, `row ${dn}`);
+  await page.evaluate(()=>setNwTab('moved'));
+
   console.log('\n═══ net worth tab and analysis agree');
   const agree = await page.evaluate(()=>{
     invMonth=monthKey(today());invView='overview';renderView();
     const o=document.querySelector('#main .kpi.blue .kv').textContent;
     invView='analysis';renderView();
-    const a=document.querySelector('#main .kpi.blue .kv').textContent;
+    const a=document.querySelector('#main .nwh-v').textContent;
     return {o,a};});
   chk('same net worth on both tabs', agree.o===agree.a, `${agree.o} vs ${agree.a}`);
 
@@ -212,10 +290,16 @@ const near=(a,b,eps=0.5)=>Math.abs(a-b)<=eps;
   console.log('\n═══ phone width');
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>{renderView();}); await page.waitForTimeout(150);
-  const phone = await page.evaluate(()=>({sw:document.documentElement.scrollWidth,
-    cw:document.getElementById('nwCv').clientWidth}));
-  chk('no horizontal page scroll at 390px', phone.sw<=390, `scrollWidth=${phone.sw}`);
+  const phone = await page.evaluate(()=>{const out={};
+    for(const t of ['moved','monthly','yearly','holdings','alloc']){setNwTab(t);
+      out[t]={sw:document.documentElement.scrollWidth,h:document.documentElement.scrollHeight};}
+    const tb=document.querySelector('#main .nwtabs');out.tabsFit=tb.scrollWidth<=tb.clientWidth+1;
+    out.cw=document.getElementById('nwCv').clientWidth;setNwTab('moved');return out;});
+  chk('no horizontal page scroll at 390px on any tab', Object.values(phone).every(v=>!v.sw||v.sw<=390), JSON.stringify(Object.fromEntries(Object.entries(phone).filter(([k,v])=>v.sw).map(([k,v])=>[k,v.sw]))));
+  chk('all five tabs fit without scrolling', phone.tabsFit);
   chk('chart fits the phone', phone.cw>250 && phone.cw<=390, `${phone.cw}px`);
+  chk('the page stays short: under 1,800px on every tab', ['moved','monthly','yearly','holdings','alloc'].every(t=>phone[t].h<1800),
+      JSON.stringify(Object.fromEntries(['moved','monthly','yearly','holdings','alloc'].map(t=>[t,phone[t].h]))));
 
   await clear(); await page.evaluate(()=>{setMode('official');persist();});
   console.log('\n---page errors---', JSON.stringify(errs.slice(0,4)));
