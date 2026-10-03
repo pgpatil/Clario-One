@@ -134,6 +134,19 @@ table.t td.r,table.t th.r{text-align:right}
 .pill.a{background:var(--amb-l);color:var(--amb-d)}
 .pill.p{background:var(--pur-l);color:var(--pur-d)}
 .pill.n{background:var(--bg);color:var(--t2)}
+/* investment analysis. Gain text uses --grn-d: --grn is 4.19:1 on the selected-row tint, --grn-d 5.88 */
+.neg{color:var(--red)}.pos{color:var(--grn-d)}
+.attr{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px}
+.attr .ak{flex:0 0 150px;color:var(--t2)}
+.attr .ab{flex:1;min-width:40px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.attr .ab i{display:block;height:100%;background:var(--blue)}.attr .ab i.pos{background:var(--grn)}.attr .ab i.neg{background:var(--red)}
+.attr>b{min-width:92px;text-align:right}
+@media(max-width:600px){.attr .ak{flex-basis:108px;font-size:12px}.attr>b{min-width:80px}}
+.nwtip{position:absolute;display:none;top:8px;width:170px;background:#fff;border:1px solid var(--bdr2);border-radius:var(--rs);box-shadow:var(--sh);padding:8px 10px;font-size:12px;line-height:1.45;pointer-events:none;z-index:2}
+.nwleg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.nwleg:not(.on){color:var(--t3)}.nwleg:not(.on) i{background:var(--bdr2)!important}
+table.t.nwt td.num{white-space:nowrap}
+table.t tr.sel{background:var(--blue-l);box-shadow:inset 3px 0 0 var(--blue)}
 
 /* ═══ rows ═══ */
 .row{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:1px solid var(--bdr)}
@@ -1061,7 +1074,7 @@ const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);re
 const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000);
 const fmtD=ds=>ds?new Date(ds+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
 const fmtDT=s=>s?new Date(s).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
-const fmtMoney=v=>{v=+v||0;if(v>=1e7)return'₹'+(v/1e7).toFixed(2).replace(/\.00$/,'')+' Cr';if(v>=1e5)return'₹'+(v/1e5).toFixed(2).replace(/\.00$/,'')+' L';return'₹'+v.toLocaleString('en-IN');};
+const fmtMoney=v=>{v=+v||0;if(v<0)return'−'+fmtMoney(-v);if(v>=1e7)return'₹'+(v/1e7).toFixed(2).replace(/\.00$/,'')+' Cr';if(v>=1e5)return'₹'+(v/1e5).toFixed(2).replace(/\.00$/,'')+' L';return'₹'+v.toLocaleString('en-IN');};
 /* ═══ recurrence calendar math (weekday-aware weekly, drift-free monthly) ═══ */
 const WEEKDAY_LBL=['S','M','T','W','T','F','S'],WEEKDAY_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],NTH_LBL=['1st','2nd','3rd','4th'];
 const dateWeekday=ds=>new Date(ds+'T12:00').getDay();
@@ -1172,7 +1185,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[],ious=[],ioutx=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[],ious=[],ioutx=[],nwsnap=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -1193,7 +1206,7 @@ var _finCollapse={};
 function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx','nwsnap'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,acctGroups,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.acctGroups))acctGroups=s.acctGroups;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -2499,15 +2512,306 @@ function invGainHtml(delta,added,base,first){
   const gain=delta-added;const denom=(base||0)+(added||0);
   if(!gain)return '<span class="num" style="color:var(--t4)">no gain</span>';const up=gain>0;
   return `<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(gain))}${denom?invPctStr(gain,denom):''}</span>`;}
-function invToggle(){const t=(v,l)=>`<button class="${invView===v?'on':''}" onclick="invView='${v}';renderView()">${l}</button>`;return `<div class="vtog">${t('overview','Net worth')}${t('holdings','Holdings')}${t('pf','PF accounts')}</div>`;}
+function invToggle(){const t=(v,l)=>`<button class="${invView===v?'on':''}" onclick="invView='${v}';renderView()">${l}</button>`;return `<div class="vtog">${t('overview','Net worth')}${t('holdings','Holdings')}${t('pf','PF accounts')}${t('analysis','Analysis')}</div>`;}
 function pfCorpus(){return PFA().reduce((a,r)=>a+pfRowTotal(r),0);}
 /* Lending is an asset, informal borrowing is a liability -- neither reaches loanTotalOutstanding(),
    which only knows EMI debt, so both are added here explicitly. */
 function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus()+iouTotal('lent')-loanTotalOutstanding()-iouTotal('borrowed');}
+/* ═══ NET WORTH AS OF ANY MONTH ═══
+   invNetWorth(ym) only honoured ym for holdings. PF, loans and IOUs were always today's figure,
+   so the month-on-month change silently ignored principal repaid -- measured on a home loan:
+   Rs 14,850 of principal repaid in a month, change reported as Rs 0. Each component now answers
+   for the month asked, and says how sure it is:
+     holdings  exact where a value was entered that month; otherwise the last value repeats
+     loans     exact from the schedule (EMI + end date); unscheduled ones have no history
+     IOUs      exact from their dated entries and repayments
+     PF        no history at all
+   The two with no history are recorded once a month from now on (nwsnap), and before the first
+   recording they are held flat and flagged -- never presented as if they were known. */
+function loanOutstandingAt(l,ym){
+  if(l.start_ym&&ym<l.start_ym)return 0;                 // the loan did not exist yet
+  if(loanHasSchedule(l))return loanOutstanding(l,ym);
+  return null;}                                           // no history: caller decides
+function nwSnapAt(ym){return nwsnap.filter(x=>!x.deleted&&x.month<=ym).sort((a,b)=>b.month.localeCompare(a.month))[0]||null;}
+function iouOutstandingAt(i,ym){
+  if(!i.date||_ym(i.date)>ym)return 0;
+  const repaid=IOUTX(i.id).filter(x=>_ym(x.date)<=ym).reduce((a,x)=>a+(+x.amount||0),0);
+  return Math.max(0,(+i.principal||0)-repaid);}
+function nwAt(ym){
+  const cur=monthKey(today());
+  const snap=ym>=cur?null:nwSnapAt(ym);
+  const holdings=invTotalAsOf(ym);
+  const entered=IH().some(h=>!!invExact(h.id,ym));
+  const pf=ym>=cur?pfCorpus():(snap?+snap.pf||0:pfCorpus());
+  let sched=0,flatNow=0;
+  LOAN().forEach(l=>{const v=loanOutstandingAt(l,ym);
+    if(v!==null)sched+=v;else flatNow+=+l.outstanding||0;});
+  // a recording is one total for all unscheduled loans, so it replaces the sum -- never adds per loan
+  const flat=ym<cur&&snap&&snap.flat!=null?+snap.flat||0:flatNow;
+  const lent=IOU().filter(i=>i.dir==='lent').reduce((a,i)=>a+iouOutstandingAt(i,ym),0);
+  const borrowed=IOU().filter(i=>i.dir==='borrowed').reduce((a,i)=>a+iouOutstandingAt(i,ym),0);
+  const assets=holdings+pf+lent, debt=sched+flat+borrowed;
+  return{ym,holdings,pf,lent,loans:sched+flat,borrowed,assets,debt,net:assets-debt,
+    entered, assumed:ym<cur&&!snap&&(pfCorpus()>0||flat>0)};}
+/* Record this month's PF and unscheduled-loan figures so next month has a past to compare to.
+   Writes only when something changed, so it never churns sync. */
+function nwRecord(){
+  const ym=monthKey(today());
+  const pf=pfCorpus(), flat=LOAN().filter(l=>!loanHasSchedule(l)).reduce((a,l)=>a+(+l.outstanding||0),0);
+  const ex=nwsnap.find(x=>!x.deleted&&x.month===ym);
+  if(ex&&+ex.pf===pf&&+ex.flat===flat)return false;
+  const n=now();
+  if(ex){ex.pf=pf;ex.flat=flat;ex.updated_at=n;}
+  else nwsnap.push({id:uid(),month:ym,pf,flat,created_at:n,updated_at:n});
+  return true;}
+/* Where a month's change came from. Holdings are split per holding so a newly added holding's
+   first value counts as money brought in, not as a gain -- the same rule invGainHtml applies. */
+function nwAttrib(ym){
+  const pm=invPrevMonth(ym), a=nwAt(pm), b=nwAt(ym);
+  let opening=0,added=0,market=0;
+  IH().forEach(h=>{
+    const prev=invValueAsOf(h.id,pm), now_=invValueAsOf(h.id,ym);
+    if(now_==null)return;
+    if(prev==null){opening+=now_;return;}
+    const ad=invAdded(h.id,ym);added+=ad;market+=(now_-prev)-ad;});
+  return{ym,prev:a,cur:b,change:b.net-a.net,
+    parts:[
+      {k:'Money invested',v:added+opening},
+      {k:'Market movement',v:market},
+      {k:'PF',v:b.pf-a.pf},
+      {k:'Loan principal repaid',v:a.loans-b.loans},
+      {k:'Lent out (net)',v:b.lent-a.lent},
+      {k:'Borrowed (net)',v:-(b.borrowed-a.borrowed)}]};}
+/* ═══ INVESTMENT ANALYSIS ═══ */
+var nwRange='12m', nwSel=null, nwShow={net:true,assets:false,debt:false};
+function ymAdd(ym,k){const d=new Date(ym+'-15T12:00');d.setMonth(d.getMonth()+k);return d.toISOString().slice(0,7);}
+function ymDiff(a,b){const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);return (by-ay)*12+(bm-am);}
+/* The first month anything worth counting exists -- a holding value, a loan start, an IOU, a recording. */
+function nwFirstMonth(){
+  const c=[...IV().map(v=>v.month),...LOAN().map(l=>l.start_ym).filter(Boolean),
+    ...IOU().map(i=>_ym(i.date)).filter(Boolean),...nwsnap.filter(x=>!x.deleted).map(x=>x.month)].filter(Boolean).sort();
+  return c[0]||monthKey(today());}
+function nwRangeStart(){const end=monthKey(today()),first=nwFirstMonth();
+  const back={'6m':5,'12m':11,'3y':35}[nwRange];
+  const st=back==null?first:ymAdd(end,-back);
+  return st<first?first:st;}
+function nwSeries(){const end=monthKey(today());const out=[];
+  for(let m=nwRangeStart();m<=end;m=ymAdd(m,1))out.push(nwAt(m));
+  return out;}
+/* Compound annual growth over the range. Undefined when either end is not positive -- a growth
+   rate from a negative net worth is not a number anyone should act on. */
+function nwCagr(ser){if(ser.length<2)return null;const a=ser[0].net,b=ser[ser.length-1].net;
+  const yrs=(ser.length-1)/12;if(a<=0||b<=0||yrs<=0)return null;return Math.pow(b/a,1/yrs)-1;}
+/* Largest fall from a running peak, measured in rupees so it still means something while net worth
+   is negative (a home loan early on). The % is given only when the peak was positive. */
+function nwDrawdown(ser){let peak=-Infinity,pk=null,amt=0,pct=0,at=null,from=null;
+  ser.forEach(p=>{if(p.net>peak){peak=p.net;pk=p.ym;}const fall=p.net-peak;
+    if(fall<amt){amt=fall;at=p.ym;from=pk;pct=peak>0?fall/peak:null;}});
+  return{amt,pct,at,from};}
+/* XIRR on monthly flows: the first recorded value is the opening investment, each later
+   "added" is new money in, and today's value is what you would get back. Bisection rather than
+   Newton because it cannot diverge on odd flow patterns. */
+function xirr(flows){
+  if(flows.length<2)return null;
+  const t0=flows[0].t;
+  const npv=r=>flows.reduce((a,f)=>a+f.v/Math.pow(1+r,(f.t-t0)/365),0);
+  let lo=-0.99,hi=10,flo=npv(lo),fhi=npv(hi);
+  if(!isFinite(flo)||!isFinite(fhi)||flo*fhi>0)return null;
+  for(let i=0;i<200;i++){const mid=(lo+hi)/2,fm=npv(mid);
+    if(Math.abs(fm)<0.01)return mid;
+    if(fm*flo<0){hi=mid;fhi=fm;}else{lo=mid;flo=fm;}}
+  return (lo+hi)/2;}
+const ymDay=ym=>new Date(ym+'-15T12:00').getTime()/86400000;
+function holdingPerf(h){
+  const rows=IV().filter(v=>v.hold_id===h.id).sort((a,b)=>a.month.localeCompare(b.month));
+  if(!rows.length)return null;
+  const first=rows[0], last=rows[rows.length-1], cur=invValueAsOf(h.id,monthKey(today()))||0;
+  let invested=+first.value||0;
+  const flows=[{t:ymDay(first.month),v:-(+first.value||0)}];
+  rows.slice(1).forEach(r=>{const ad=+r.added||0;if(ad){invested+=ad;flows.push({t:ymDay(r.month),v:-ad});}});
+  const span=ymDiff(first.month,monthKey(today()));
+  flows.push({t:ymDay(monthKey(today())),v:cur});
+  const gain=cur-invested;
+  return{h,value:cur,invested,gain,ret:invested?gain/invested:null,
+    xirr:span>=1?xirr(flows):null,since:first.month,months:span,entries:rows.length};}
+function allocAt(ym){const m={};
+  IH().forEach(h=>{const v=invValueAsOf(h.id,ym)||0;if(v){const k=h.kind||'Other';m[k]=(m[k]||0)+v;}});
+  const N=nwAt(ym);if(N.pf)m['Provident Fund']=N.pf;if(N.lent)m['Owed to you']=N.lent;
+  return m;}
+const pctTxt=(x,d=1)=>x==null?'—':(x>=0?'+':'−')+Math.abs(x*100).toFixed(d)+'%';
+const sgnMoney=v=>(v>=0?'+':'−')+fmtMoney(Math.abs(v));
+function setNwRange(r){nwRange=r;nwSel=null;reRender();}
+function toggleNwSeries(k){nwShow[k]=!nwShow[k];if(!nwShow.net&&!nwShow.assets&&!nwShow.debt)nwShow.net=true;reRender();}
+function selNwMonth(ym){nwSel=ym;reRender();}
+
+function vInvAnalysis(){
+  if(nwRecord())persist();
+  const ser=nwSeries(), end=ser[ser.length-1], cur=monthKey(today());
+  if(!IH().length&&!PFA().length&&!LOAN().length&&!IOU().length)
+    return pagehead('PERSONAL','Investments','Analysis',invToggle())+
+      '<div class="card"><div class="cb" style="text-align:center;padding:26px;color:var(--t3);font-size:13px">Add holdings, PF or loans and record values month by month — the analysis builds from that history.</div></div>';
+  const prev=nwAt(ymAdd(cur,-1)), yago=nwAt(ymAdd(cur,-12));
+  const mom=end.net-prev.net, yoy=end.net-yago.net;
+  const momP=prev.net>0?mom/prev.net:null, yoyP=yago.net>0?yoy/yago.net:null;
+  const cagr=nwCagr(ser), dd=nwDrawdown(ser);
+  const debtRatio=end.assets>0?end.debt/end.assets:null;
+  const hasYearAgo=nwFirstMonth()<=ymAdd(cur,-12);
+
+  // month-on-month rows with attribution
+  const rows=ser.slice(1).map(p=>{const a=nwAttrib(p.ym);
+    const inv=a.parts[0].v, mkt=a.parts[1].v;
+    return{ym:p.ym,net:p.net,change:a.change,pct:a.prev.net>0?a.change/a.prev.net:null,inv,mkt,
+      entered:p.entered,assumed:p.assumed};});
+  const ups=rows.filter(r=>r.change>0).length, downs=rows.filter(r=>r.change<0).length;
+  const best=rows.slice().sort((a,b)=>b.change-a.change)[0], worst=rows.slice().sort((a,b)=>a.change-b.change)[0];
+  const carried=rows.filter(r=>!r.entered).length, assumed=ser.filter(p=>p.assumed).length;
+
+  // calendar years
+  const years=[...new Set(ser.map(p=>p.ym.slice(0,4)))];
+  /* Each year is measured on its own calendar span (Dec before -> Dec, or today), never on the chart
+     range, so picking "6 months" cannot change what last year's row says. */
+  const first=nwFirstMonth();
+  const yrows=years.map(y=>{
+    const openWant=ymAdd(y+'-01',-1), openYm=openWant>=first?openWant:first, closeYm=y+'-12'<cur?y+'-12':cur;
+    const open=nwAt(openYm), close=nwAt(closeYm);
+    let inv=0,mkt=0;   // from the month after the opening, so the parts cover the same span as the change
+    for(let m=ymAdd(openYm,1);m<=closeYm;m=ymAdd(m,1)){const p=nwAttrib(m).parts;inv+=p[0].v;mkt+=p[1].v;}
+    const change=close.net-open.net;
+    return{y,open:open.net,close:close.net,change,pct:open.net>0?change/open.net:null,inv,mkt,
+      partial:closeYm!==y+'-12'||openYm!==openWant};});
+
+  // selected month (default: latest)
+  const sel=nwSel&&ser.find(p=>p.ym===nwSel)?nwSel:end.ym;
+  const att=sel===ser[0].ym&&ser.length>1?null:nwAttrib(sel);
+
+  // holdings
+  _sort.invperf=_sort.invperf||{key:'value',dir:-1};
+  let perf=IH().map(holdingPerf).filter(Boolean);
+  perf=applySort('invperf',perf,{name:x=>x.h.name.toLowerCase(),value:x=>x.value,invested:x=>x.invested,
+    gain:x=>x.gain,ret:x=>x.ret==null?-1e9:x.ret,xirr:x=>x.xirr==null?-1e9:x.xirr});
+  const totInv=perf.reduce((a,x)=>a+x.invested,0), totVal=perf.reduce((a,x)=>a+x.value,0);
+
+  // allocation drift
+  const aNow=allocAt(cur), aThen=allocAt(ymAdd(cur,-12));
+  const tNow=Object.values(aNow).reduce((a,v)=>a+v,0), tThen=Object.values(aThen).reduce((a,v)=>a+v,0);
+  const kinds=[...new Set([...Object.keys(aNow),...Object.keys(aThen)])].sort((a,b)=>(aNow[b]||0)-(aNow[a]||0));
+
+  window._nwData=ser.map(p=>({ym:p.ym,net:p.net,assets:p.assets,debt:p.debt,entered:p.entered,assumed:p.assumed}));
+  const chip=(r,l)=>`<button class="btn xs ${nwRange===r?'':'gh2'}" onclick="setNwRange('${r}')">${l}</button>`;
+  const leg=(k,l,c)=>`<button class="btn xs gh2 nwleg ${nwShow[k]?'on':''}" aria-pressed="${!!nwShow[k]}" onclick="toggleNwSeries('${k}')"><i style="background:var(${c})"></i>${l}</button>`;
+  const kpi=(l,v,sub,cls)=>`<div class="kpi ${cls||''}"><div class="kl">${l}</div><div class="kv num" style="font-size:19px">${v}</div>${sub?`<div class="num" style="font-size:11px;color:var(--t3)">${sub}</div>`:''}</div>`;
+  const bar=(k,v,max)=>{const w=max?Math.round(Math.abs(v)/max*100):0;
+    return `<div class="attr"><span class="ak">${k}</span><span class="ab"><i class="${v<0?'neg':'pos'}" style="width:${w}%"></i></span><b class="num ${v<0?'neg':''}">${v?sgnMoney(v):'—'}</b></div>`;};
+
+  return pagehead('PERSONAL','Investments','How your net worth is moving',invToggle())+
+  `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+    <span class="note" style="margin-right:4px">Range</span>${chip('6m','6 months')}${chip('12m','12 months')}${chip('3y','3 years')}${chip('all','All')}</div>
+  <div class="kpis">
+    ${kpi('Net worth',fmtMoney(end.net),fmtMoney(end.assets)+' assets − '+fmtMoney(end.debt)+' owed','blue')}
+    ${kpi('This month',sgnMoney(mom),(momP==null?'':pctTxt(momP)+' ')+'vs '+finMonthLabel(prev.ym),mom<0?'bad':'good')}
+    ${kpi('Year on year',hasYearAgo?sgnMoney(yoy):'—',hasYearAgo?(yoyP==null?'':pctTxt(yoyP)+' ')+'vs '+finMonthLabel(yago.ym):'needs 12 months of history',hasYearAgo?(yoy<0?'bad':'good'):'')}
+    ${kpi('Growth rate',cagr==null?'—':pctTxt(cagr)+' /yr',cagr==null?'needs a positive start and end':'compounded over the range','')}
+    ${kpi('Debt to assets',debtRatio==null?'—':Math.round(debtRatio*100)+'%',debtRatio==null?'':(debtRatio>0.5?'over half your assets are owed':'of your assets are owed'),debtRatio>0.5?'bad':'')}
+  </div>
+  <div class="card"><div class="ch"><span>Net worth over time</span><span style="display:flex;gap:4px;flex-wrap:wrap">${leg('net','Net worth','--blue')}${leg('assets','Assets','--grn')}${leg('debt','Owed','--red')}</span></div>
+    <div class="cb" style="position:relative"><canvas id="nwCv" style="width:100%;height:260px;display:block;cursor:crosshair;touch-action:pan-y"></canvas><div id="nwTip" class="nwtip"></div>
+    <p class="note" style="margin-top:6px">Hover or touch for a month's figures; click a month to see what moved it.${carried?` ${carried} of ${rows.length} months have no holding value entered — those repeat the last value, so their change reads low.`:''}${assumed?` PF and unscheduled loans have no history before ${finMonthLabel(nwsnap.filter(x=>!x.deleted).map(x=>x.month).sort()[0]||cur)}, so they are held flat there.`:''}</p></div></div>
+  <div class="grid2">
+    <div class="card"><div class="ch"><span>What moved ${finMonthLabel(sel)}</span>${att?`<b class="num ${att.change<0?'neg':''}">${sgnMoney(att.change)}</b>`:''}</div>
+      <div class="cb">${att?(()=>{const mx=Math.max(1,...att.parts.map(p=>Math.abs(p.v)));
+        return att.parts.map(p=>bar(p.k,p.v,mx)).join('')+`<p class="note" style="margin-top:8px">Market movement is the change in holding values after taking out money you put in. A new holding's first value counts as money invested, not as a gain.</p>`;})()
+        :'<div class="empty">The first month in the range has nothing before it to compare against.</div>'}</div></div>
+    <div class="card"><div class="ch"><span>Over this range</span></div><div class="cb">
+      <div class="rit-stat"><span>Months up / down</span><b>${ups} / ${downs}</b></div>
+      ${best&&best.change>0?`<div class="rit-stat"><span>Best month</span><b class="lnk" onclick="selNwMonth('${best.ym}')">${finMonthLabel(best.ym)} · ${sgnMoney(best.change)}</b></div>`:''}
+      ${worst&&worst.change<0?`<div class="rit-stat"><span>Worst month</span><b class="lnk neg" onclick="selNwMonth('${worst.ym}')">${finMonthLabel(worst.ym)} · ${sgnMoney(worst.change)}</b></div>`:''}
+      <div class="rit-stat"><span>Largest fall from a peak</span><b class="${dd.amt<0?'neg':''}">${dd.amt<0?`${sgnMoney(dd.amt)}${dd.pct!=null?` (${pctTxt(dd.pct)})`:''} · ${finMonthLabel(dd.from)} → ${finMonthLabel(dd.at)}`:'none'}</b></div>
+      <div class="rit-stat"><span>Money invested</span><b>${fmtMoney(rows.reduce((a,r)=>a+r.inv,0))}</b></div>
+      <div class="rit-stat"><span>Market movement</span><b class="${rows.reduce((a,r)=>a+r.mkt,0)<0?'neg':''}">${sgnMoney(rows.reduce((a,r)=>a+r.mkt,0))}</b></div>
+    </div></div>
+  </div>
+  ${seccard('Month on month',rows.length,`<div style="overflow-x:auto"><table class="t nwt"><tr><th>Month</th><th class="r">Net worth</th><th class="r">Change</th><th class="r">%</th><th class="r">Invested</th><th class="r">Market</th><th></th></tr>
+    ${rows.slice().reverse().map(r=>`<tr class="click ${r.ym===sel?'sel':''}" onclick="selNwMonth('${r.ym}')"><td>${finMonthLabel(r.ym)}</td><td class="r num">${fmtMoney(r.net)}</td>
+      <td class="r num ${r.change<0?'neg':'pos'}">${sgnMoney(r.change)}</td><td class="r num">${pctTxt(r.pct)}</td>
+      <td class="r num">${r.inv?fmtMoney(r.inv):''}</td><td class="r num ${r.mkt<0?'neg':''}">${r.mkt?sgnMoney(r.mkt):''}</td>
+      <td>${!r.entered?'<span class="pill n" title="No holding value entered this month; the last value repeats">carried</span>':''}${r.assumed?' <span class="pill n" title="PF / unscheduled loans held flat — no history for this month">est.</span>':''}</td></tr>`).join('')}</table></div>`,'Needs at least two months of history.')}
+  ${seccard('Year on year',yrows.length,`<div style="overflow-x:auto"><table class="t nwt"><tr><th>Year</th><th class="r">Opening</th><th class="r">Closing</th><th class="r">Change</th><th class="r">%</th><th class="r">Invested</th><th class="r">Market</th></tr>
+    ${yrows.slice().reverse().map(y=>`<tr><td>${y.y}${y.partial?' <span class="pill n" title="Not a full calendar year of data">part</span>':''}</td><td class="r num">${fmtMoney(y.open)}</td><td class="r num">${fmtMoney(y.close)}</td>
+      <td class="r num ${y.change<0?'neg':'pos'}">${sgnMoney(y.change)}</td><td class="r num">${pctTxt(y.pct)}</td><td class="r num">${fmtMoney(y.inv)}</td><td class="r num ${y.mkt<0?'neg':''}">${sgnMoney(y.mkt)}</td></tr>`).join('')}</table></div>`,'')}
+  ${seccard('Holdings performance',perf.length,`<div style="overflow-x:auto"><table class="t nwt"><tr>${sortHead('invperf','name','Holding')}${sortHead('invperf','value','Value','r')}${sortHead('invperf','invested','Invested','r')}${sortHead('invperf','gain','Gain','r')}${sortHead('invperf','ret','Return','r')}${sortHead('invperf','xirr','Annualised','r')}</tr>
+    ${perf.map(x=>`<tr><td><b>${esc(x.h.name)}</b><div class="note">${esc(x.h.kind||'')} · since ${finMonthLabel(x.since)}</div></td><td class="r num">${fmtMoney(x.value)}</td><td class="r num">${fmtMoney(x.invested)}</td>
+      <td class="r num ${x.gain<0?'neg':'pos'}">${sgnMoney(x.gain)}</td><td class="r num">${pctTxt(x.ret)}</td>
+      <td class="r num" title="${x.xirr==null?'Needs at least a month between the first value and today':'XIRR: the yearly rate that turns your dated contributions into today’s value'}">${x.xirr==null?'—':pctTxt(x.xirr)}</td></tr>`).join('')}
+    <tr style="font-weight:700"><td>Total</td><td class="r num">${fmtMoney(totVal)}</td><td class="r num">${fmtMoney(totInv)}</td><td class="r num ${totVal-totInv<0?'neg':'pos'}">${sgnMoney(totVal-totInv)}</td><td class="r num">${pctTxt(totInv?(totVal-totInv)/totInv:null)}</td><td></td></tr></table></div>
+    <p class="note" style="padding:8px 14px">Return is gain over money put in. Annualised (XIRR) accounts for when each rupee went in, so two holdings with the same return over different spans compare fairly.</p>`,'No holding values recorded yet.')}
+  ${seccard('Allocation — now vs a year ago',kinds.length,'<div class="cb">'+kinds.map(k=>{const n=tNow?(aNow[k]||0)/tNow:0,t=tThen?(aThen[k]||0)/tThen:0,dr=(n-t)*100;
+    return `<div class="attr"><span class="ak">${esc(k)}</span><span class="ab"><i style="width:${Math.round(n*100)}%"></i></span><b class="num">${Math.round(n*100)}%</b><span class="num note" style="min-width:74px;text-align:right">${tThen?`${dr>=0?'+':'−'}${Math.abs(dr).toFixed(1)} pts`:'—'}</span></div>`;}).join('')+'</div>','')}`;}
+
+/* Interactive line chart. Canvas so it stays dependency-free (the app makes no third-party
+   requests); pointer events so hover on desktop and touch on a phone use one path. */
+const axisMoney=v=>{const a=Math.abs(v),s=v<0?'−':'';
+  if(a>=1e7)return s+(a/1e7).toFixed(2).replace(/\.?0+$/,'')+'Cr';
+  if(a>=1e5)return s+(a/1e5).toFixed(1).replace(/\.0$/,'')+'L';
+  if(a>=1e3)return s+Math.round(a/1e3)+'k';return s+Math.round(a);};
+function drawNwChart(cv){
+  const data=window._nwData||[];if(!cv||!data.length)return;
+  const css=getComputedStyle(document.documentElement);
+  const col={net:css.getPropertyValue('--blue').trim()||'#4a5a6a',assets:css.getPropertyValue('--grn').trim()||'#2e7d4f',
+    debt:css.getPropertyValue('--red').trim()||'#c0392b',grid:css.getPropertyValue('--bdr').trim()||'#e5e5e5',
+    txt:css.getPropertyValue('--t3').trim()||'#666'};
+  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+  const keys=['net','assets','debt'].filter(k=>nwShow[k]);
+  const vals=data.flatMap(d=>keys.map(k=>d[k]));
+  // fit the data, not zero: a 3% month on a large net worth has to be visible to be analysed
+  let lo=Math.min(...vals),hi=Math.max(...vals);if(hi===lo){const p=Math.abs(hi)*0.05||1;lo-=p;hi+=p;}
+  // round the axis out to an even 1/2/2.5/5 step so gridline labels read as round numbers
+  const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw);
+  lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;const ticks=Math.round((hi-lo)/st);
+  const pad={l:46,r:12,t:12,b:26}, iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
+  const x=i=>pad.l+(data.length===1?iw/2:i*iw/(data.length-1)), y=v=>pad.t+ih-(v-lo)/(hi-lo)*ih;
+  const draw=hov=>{
+    c.clearRect(0,0,W,H);c.font='11px Inter, system-ui, sans-serif';
+    for(let g=0;g<=ticks;g++){const v=lo+st*g,yy=y(v);
+      c.strokeStyle=col.grid;c.lineWidth=1;c.beginPath();c.moveTo(pad.l,yy);c.lineTo(W-pad.r,yy);c.stroke();
+      c.fillStyle=col.txt;c.textAlign='right';c.fillText(axisMoney(v),pad.l-6,yy+4);}
+    if(lo<0&&hi>0){c.strokeStyle=col.txt;c.setLineDash([3,3]);c.beginPath();c.moveTo(pad.l,y(0));c.lineTo(W-pad.r,y(0));c.stroke();c.setLineDash([]);}
+    const step=Math.max(1,Math.ceil(data.length/Math.max(2,Math.floor(iw/72))));
+    c.textAlign='center';c.fillStyle=col.txt;
+    const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const n1=data.length-1, shortLbl=ym=>{const[yy,mm]=ym.split('-');return MON3[+mm-1]+' ’'+yy.slice(2);};
+    data.forEach((d,i)=>{const last=i===n1;
+      if(!last&&(i%step||n1-i<step))return;            // keep the last label, drop one that would collide with it
+      c.textAlign=data.length===1?'center':i===0?'left':last?'right':'center';
+      c.fillText(shortLbl(d.ym),x(i),H-8);});
+    keys.forEach(k=>{c.strokeStyle=col[k];c.lineWidth=k==='net'?2.5:1.75;c.beginPath();
+      data.forEach((d,i)=>i?c.lineTo(x(i),y(d[k])):c.moveTo(x(i),y(d[k])));c.stroke();
+      data.forEach((d,i)=>{c.fillStyle=col[k];c.beginPath();c.arc(x(i),y(d[k]),(d.ym===nwSel||i===hov)?4:2.2,0,7);c.fill();
+        if(k==='net'&&!d.entered){c.strokeStyle='#fff';c.lineWidth=1;c.stroke();}});});
+    if(hov!=null){c.strokeStyle=col.txt;c.lineWidth=1;c.setLineDash([2,3]);c.beginPath();c.moveTo(x(hov),pad.t);c.lineTo(x(hov),pad.t+ih);c.stroke();c.setLineDash([]);}};
+  draw(null);
+  const tip=g('nwTip');
+  const idxAt=ev=>{const r=cv.getBoundingClientRect(),px=ev.clientX-r.left;
+    if(data.length===1)return 0;return Math.max(0,Math.min(data.length-1,Math.round((px-pad.l)/iw*(data.length-1))));};
+  const show=ev=>{const i=idxAt(ev),d=data[i];draw(i);
+    if(tip){const prev=i?data[i-1].net:null;
+      tip.innerHTML=`<b>${finMonthLabel(d.ym)}</b><div>Net worth <b>${fmtMoney(d.net)}</b></div>`+
+        (prev!=null?`<div class="${d.net-prev<0?'neg':'pos'}">${sgnMoney(d.net-prev)} on the month</div>`:'')+
+        `<div class="note">${fmtMoney(d.assets)} assets · ${fmtMoney(d.debt)} owed</div>`+
+        (!d.entered?'<div class="note">no holding value entered</div>':'');
+      tip.style.display='block';const cw=cv.clientWidth,tx=x(i);
+      tip.style.left=Math.min(cw-170,Math.max(0,tx+12))+'px';tip.style.top='8px';}
+    cv._hov=i;};
+  cv.onpointermove=show;cv.onpointerdown=show;
+  cv.onpointerleave=()=>{draw(null);if(tip)tip.style.display='none';};
+  cv.onclick=ev=>{const i=idxAt(ev);selNwMonth(data[i].ym);};}
 function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,pm=invPrevMonth(ym),td=today(),isCur=ym===monthKey(td);
-  const holds=IH();const pf=pfCorpus();const debt=loanTotalOutstanding();const holdTot=invTotalAsOf(ym);
-  const assets=holdTot+pf;const net=assets-debt;
-  const prevAssets=invTotalAsOf(pm)+pf,prevNet=prevAssets-debt,delta=net-prevNet;
+  /* Both this month and last come from nwAt(), so the change compares like with like --
+     including borrowed & lent, which this screen used to leave out of net worth entirely. */
+  const N=nwAt(ym);const holds=IH();const pf=N.pf;const debt=N.debt;const holdTot=N.holdings;
+  const assets=N.assets;const net=N.net;
+  /* prev used to reuse today's PF and today's debt, so principal repaid never showed as a gain */
+  const prevNet=nwAt(pm).net,delta=net-prevNet;
   const nav=`<div class="pl-nav" style="margin-bottom:12px"><button class="btn gh2 sm" onclick="invMonthShift(-1)">‹</button><span class="pl-title">${finMonthLabel(ym)}</span><button class="btn gh2 sm" onclick="invMonthShift(1)">›</button>${!isCur?`<button class="btn gh2 xs" onclick="invMonth=monthKey(today());renderView()">This month</button>`:''}</div>`;
   if(!holds.length&&!PFA().length&&!LOAN().length)return pagehead('PERSONAL','Investments','Net worth across all investments',invToggle())+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:48ch;margin-left:auto;margin-right:auto">Add holdings (funds, stocks, gold/silver by weight, property, FDs…), your PF accounts and any loans — your total net worth and asset allocation appear here.</div><button class="btn" onclick="invView='holdings';renderView();openInvHold()">+ Add investment</button></div></div>`;
@@ -2515,6 +2819,7 @@ function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMont
   holds.forEach(h=>{const k=h.kind||'Other';const v=invValueAsOf(h.id,ym)||0;byKind[k]=(byKind[k]||0)+v;if(invIsWeight(h)){qtyKind[k]=qtyKind[k]||{};qtyKind[k][h.unit]=(qtyKind[k][h.unit]||0)+(+h.qty||0);}});
   const alloc=Object.entries(byKind).filter(([k,v])=>v).sort((a,b)=>b[1]-a[1]);
   if(pf>0)alloc.push(['Provident Fund',pf]);
+  if(N.lent>0)alloc.push(['Owed to you',N.lent]);   // part of assets, so it has to be part of the split
   const qlbl=k=>{const q=qtyKind[k];return q?' · '+Object.entries(q).map(([u,n])=>n+' '+u).join(' + '):'';};
   const rows=alloc.map(([k,v])=>{const pct=assets?Math.round(v/assets*100):0;return `<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(k)}${(k==='Gold'||k==='Silver')?`<span class="num" style="color:var(--t3);font-weight:500">${qlbl(k)}</span>`:''}</div>
       <div class="capbar" style="margin-top:6px"><div style="width:${pct}%"></div></div></div>
@@ -2523,10 +2828,11 @@ function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMont
     `<div class="kpis"><div class="kpi blue"><div class="kl">Net worth</div><div class="kv num" style="font-size:22px">${fmtMoney(net)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(assets)} assets${debt>0?` − ${fmtMoney(debt)} debt`:''}</div></div>
       <div class="kpi ${delta<0?'bad':'good'}"><div class="kl">Change vs ${finMonthLabel(pm)}</div><div class="kv num" style="font-size:19px">${delta>=0?'+':'−'}${fmtMoney(Math.abs(delta))}</div><div class="num" style="font-size:10px;color:var(--t3)">${prevNet>0?((delta>=0?'+':'−')+(Math.abs(delta)/prevNet*100).toFixed(1)+'%'):'—'}${invAddedTotal(ym)?' · incl. '+fmtMoney(invAddedTotal(ym))+' added':''}</div></div>${debt>0?`<div class="kpi bad"><div class="kl">Total debt</div><div class="kv num" style="font-size:19px">${fmtMoney(debt)}</div><div class="num" style="font-size:10px;color:var(--t3)">${fmtMoney(loanTotalEmi())}/mo EMI</div></div>`:''}</div>`+
     `<div class="card"><div class="ch"><span>Asset allocation</span><span class="n num">${alloc.length}</span></div>${rows}</div>
-    <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your PF corpus, minus total outstanding debt. Update figures on the Holdings, PF accounts and Loans tabs.</p>`;}
+    <p class="note" style="padding:0 4px">Net worth = all holdings (funds, stocks, gold/silver, property…) valued for ${finMonthLabel(ym)} plus your PF corpus and money owed to you, minus loans and money you owe. Update figures on the Holdings, PF accounts and Loans tabs, and under Money \u2192 Borrowed &amp; lent.</p>`;}
 function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,td=today(),pm=invPrevMonth(ym);
   if(invView==='overview')return vInvOverview();
   if(invView==='pf')return vInvPf();
+  if(invView==='analysis')return vInvAnalysis();
   const holds=IH().sort((a,b)=>a.name.localeCompare(b.name));
   if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month',invToggle())+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">Add your holdings (mutual funds, stocks, gold/silver by weight, property, FDs…), then update their value each month. Clario saves each month's figure and shows the movement.</div><button class="btn" onclick="openInvHold()">+ Add investment</button></div></div>`;
@@ -5210,7 +5516,7 @@ async function quickNew(kind,sel){const n=now();
     if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}
   if(kind==='region'){const v=((await askText('New region:',{title:'New region'}))||'').trim();if(!v)return;
     if(!regions.includes(v))regions.push(v);persist();fillRegion(sel||'cRegion',v);return;}}
-function wire(){setGhHeight();wireDragScheduling();const pinI=g('pinInput');if(pinI)setTimeout(()=>{try{pinI.focus();}catch(e){}},40);
+function wire(){setGhHeight();wireDragScheduling();const nc=g('nwCv');if(nc)drawNwChart(nc);const pinI=g('pinInput');if(pinI)setTimeout(()=>{try{pinI.focus();}catch(e){}},40);
   const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   if(g('csvPick'))csvPickUI();
   if(g('faqQ')&&window._faqQ)faqSearch(window._faqQ);

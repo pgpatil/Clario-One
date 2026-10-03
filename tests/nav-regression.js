@@ -57,7 +57,7 @@ const BASE = process.env.CLARIO_URL || 'http://localhost:8934/index.html';
   for (const fv of ['month','commit','loans','cast']) {
     await page.evaluate(fv=>{personalTab='money';finView=fv;renderView();}, fv); await page.waitForTimeout(150);
   }
-  for (const iv of ['overview','holdings','pf']) {
+  for (const iv of ['overview','holdings','pf','analysis']) {
     await page.evaluate(iv=>{personalTab='invest';invView=iv;renderView();}, iv); await page.waitForTimeout(150);
   }
   await page.evaluate(()=>{finView='month';setMode('official');nav('home');}); await page.waitForTimeout(200);
