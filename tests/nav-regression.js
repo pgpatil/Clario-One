@@ -67,6 +67,15 @@ const BASE = process.env.CLARIO_URL || 'http://localhost:8934/index.html';
   await page.goBack(); await page.waitForTimeout(200);
   await page.goForward(); await page.waitForTimeout(200);
 
+  /* A JS escape like \u2014 written into static HTML renders literally. Scan every modal's
+     markup too, since modals are not visible text until opened. */
+  const rawEsc = await page.evaluate(()=>{
+    const hits=[];
+    const scan=(txt,where)=>{const m=txt.match(/\\u[0-9a-fA-F]{4}/);if(m)hits.push(where+': '+m[0]);};
+    scan(document.body.innerText,'page');
+    document.querySelectorAll('.ovl').forEach(o=>scan(o.textContent,'#'+o.id));
+    return hits;});
+  rawEsc.forEach(h=>errs.push('RAW ESCAPE '+h));
   console.log('ERRORS:', JSON.stringify(errs, null, errs.length?1:0));
   console.log('DONE, error count:', errs.length);
   await b.close();

@@ -963,7 +963,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <div class="ovl" id="mIou"><div class="modal" style="max-width:460px">
   <h3 id="mIouTitle">Borrowing<button class="mx" type="button" onclick="closeM()">&#10005;</button></h3>
   <div class="mbody">
-    <div class="fld"><label>Direction</label><select id="iouDir"><option value="borrowed">I borrowed \u2014 I owe them</option><option value="lent">I lent \u2014 they owe me</option></select></div>
+    <div class="fld"><label>Direction</label><select id="iouDir"><option value="borrowed">I borrowed</option><option value="lent">I lent</option></select></div>
     <div class="fld"><label>With whom <span class="req">*</span></label><input id="iouParty" list="iouPartyDL" placeholder="Name"><datalist id="iouPartyDL"></datalist></div>
     <div class="g2">
       <div class="fld"><label>Amount <span class="req">*</span></label><input type="number" id="iouPrincipal" placeholder="0"></div>
@@ -972,7 +972,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
       <div class="fld"><label>Interest % p.a.</label><input type="number" id="iouRate" step="0.1" placeholder="0"></div>
     </div>
     <div class="fld"><label>Note</label><input id="iouNote" placeholder="What it was for"></div>
-    <p class="note">Interest is optional and shown as accrued to date only \u2014 it is never compounded and never turned into a schedule. Something with a fixed EMI and end date belongs in Loans.</p>
+    <p class="note">Interest is optional and shown as accrued to date only &mdash; it is never compounded and never turned into a schedule. Something with a fixed EMI and end date belongs in Loans.</p>
   </div>
   <div class="macts"><button class="btn dg" id="iouDel" onclick="delIouModal()">Delete</button>
   <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveIou()">Save</button></div></div>
