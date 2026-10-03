@@ -141,16 +141,54 @@ table.t td.r,table.t th.r{text-align:right}
 .gh-co{font-size:12px;font-weight:700;color:var(--blue-d);background:var(--blue-l);border:1px solid var(--blue-b);border-radius:12px;padding:3px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
 .gh-co:hover{border-color:var(--blue)}
 @media(max-width:600px){.gh-co{max-width:96px;font-size:11px;padding:2px 8px}}
-.attr{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:12.5px}
-.attr .ak{flex:0 0 150px;color:var(--t2)}
-.attr .ab{flex:1;min-width:40px;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
-.attr .ab i{display:block;height:100%;background:var(--blue)}.attr .ab i.pos{background:var(--grn)}.attr .ab i.neg{background:var(--red)}
-.attr>b{min-width:92px;text-align:right}
-@media(max-width:600px){.attr .ak{flex-basis:108px;font-size:12px}.attr>b{min-width:80px}}
 .nwtip{position:absolute;display:none;top:8px;width:170px;background:#fff;border:1px solid var(--bdr2);border-radius:var(--rs);box-shadow:var(--sh);padding:8px 10px;font-size:12px;line-height:1.45;pointer-events:none;z-index:2}
-.nwleg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
-.nwleg:not(.on){color:var(--t3)}.nwleg:not(.on) i{background:var(--bdr2)!important}
 table.t.nwt td.num{white-space:nowrap}
+/* analysis dashboard */
+.nwhero .cb{display:grid;grid-template-columns:minmax(190px,1fr) 3fr;gap:16px;align-items:center}
+.nwhero .kl,.nwst .kl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);font-weight:700}
+.nwh-v{font-size:22px;font-weight:800;letter-spacing:-.4px;color:var(--blue-d);margin:2px 0}
+.nwh-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.nwst{background:var(--sub);border:1px solid var(--bdr);border-radius:var(--rs);padding:7px 10px;min-width:0}
+.nwst b{display:block;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.nwst span{display:block;font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nwst.pos b{color:var(--grn-d)}.nwst.neg b{color:var(--red)}
+.nwch{flex-wrap:wrap;gap:8px}
+.nwcv{width:100%;display:block;cursor:crosshair;touch-action:pan-y}
+.nwlegs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:11.5px}
+.nwleg{display:inline-flex;align-items:center;font-size:11.5px;color:var(--t2);background:none;border:0;padding:2px 0}
+.nwleg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px}
+button.nwleg:not(.on){color:var(--t3);text-decoration:line-through}button.nwleg:not(.on) i{background:var(--bdr2)!important}
+.nwchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.nwchip{font-size:11.5px;padding:3px 9px;border:1px solid var(--bdr);border-radius:12px;background:var(--sub);color:var(--t2);white-space:nowrap}
+.nwchip.lnk:hover{border-color:var(--blue-b);text-decoration:none;filter:none}
+.nwnote{margin-top:8px;font-size:11.5px;color:var(--t3)}.nwnote summary{cursor:pointer}.nwnote p{margin:4px 0 0}
+.nwtabs{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:2px solid var(--bdr);margin:0 0 12px}
+.nwtabs::-webkit-scrollbar{display:none}.nwtabs .tab{flex:0 0 auto;padding:8px 12px;font-size:12.5px;background:none}
+@media(max-width:420px){.nwtabs .tab{padding:8px 6px;font-size:12px}}
+.nwstep{display:flex;align-items:center;justify-content:space-between;text-align:center;margin-bottom:10px}
+.dv{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px}
+.dv .ak{flex:0 0 140px;color:var(--t2)}.dv>b{flex:0 0 86px;text-align:right;white-space:nowrap}
+.dv .dt{flex:1;display:flex;height:10px;min-width:60px}
+.dv .dt>span{flex:1;position:relative;background:var(--bg)}.dv .dt .l{border-right:1px solid var(--t4)}
+.dv .dt i{position:absolute;top:0;bottom:0}.dv .dt .l i{right:0;border-radius:3px 0 0 3px}.dv .dt .r i{left:0;border-radius:0 3px 3px 0}
+.dv i.inv,.ybar i.inv{background:var(--blue)}.dv i.pos,.ybar i.pos{background:var(--grn)}.dv i.neg,.ybar i.neg{background:var(--red)}.ybar i.oth{background:var(--t4)}
+.nwsum{margin-top:8px;padding:8px 10px;background:var(--sub);border:1px solid var(--bdr);border-radius:var(--rs);font-size:12.5px}
+.nwsum.lnk:hover{text-decoration:none;border-color:var(--blue-b);filter:none}
+.yrow{padding:9px 0;border-bottom:1px solid var(--bdr)}.yr-top{display:flex;justify-content:space-between;font-size:13px}
+.ybar{display:flex;height:10px;margin:6px 0 4px;background:var(--bg);border-radius:3px;overflow:hidden}.ybar i{display:block;height:100%}
+.hrow{padding:9px 0;border-bottom:1px solid var(--bdr)}.hrow.lnk:hover{text-decoration:none;filter:none;background:var(--sub)}
+.hr-top,.hr-sub{display:flex;justify-content:space-between;gap:8px;font-size:13px;align-items:center}
+.hr-bar{height:6px;background:var(--bg);border-radius:3px;margin:5px 0;overflow:hidden}.hr-bar i{display:block;height:100%;background:var(--blue)}
+.hr-more{margin-top:5px}
+.nwalloc{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center}
+.al-row{display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:12.5px;border-radius:var(--rs);cursor:default}
+.al-row.on{background:var(--blue-l)}.al-row i{width:10px;height:10px;border-radius:2px;flex:0 0 auto}
+.al-row .ak{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.al-row b{min-width:36px;text-align:right}
+.al-row .num.note{min-width:62px;text-align:right}.al-row .al-dr{min-width:70px}
+@media(max-width:700px){
+  .nwhero .cb{grid-template-columns:1fr;gap:10px}.nwh-stats{grid-template-columns:1fr 1fr;gap:6px}
+  .dv .ak{flex-basis:96px;font-size:12px}.dv>b{flex-basis:74px}
+  .nwalloc{grid-template-columns:1fr}.al-row .num.note{min-width:0}.al-row .al-dr{min-width:58px}}
 table.t tr.sel{background:var(--blue-l);box-shadow:inset 3px 0 0 var(--blue)}
 
 /* ═══ rows ═══ */
@@ -2690,10 +2728,6 @@ function nwRangeStart(){const end=monthKey(today()),first=nwFirstMonth();
 function nwSeries(){const end=monthKey(today());const out=[];
   for(let m=nwRangeStart();m<=end;m=ymAdd(m,1))out.push(nwAt(m));
   return out;}
-/* Compound annual growth over the range. Undefined when either end is not positive -- a growth
-   rate from a negative net worth is not a number anyone should act on. */
-function nwCagr(ser){if(ser.length<2)return null;const a=ser[0].net,b=ser[ser.length-1].net;
-  const yrs=(ser.length-1)/12;if(a<=0||b<=0||yrs<=0)return null;return Math.pow(b/a,1/yrs)-1;}
 /* Largest fall from a running peak, measured in rupees so it still means something while net worth
    is negative (a home loan early on). The % is given only when the peak was positive. */
 function nwDrawdown(ser){let peak=-Infinity,pk=null,amt=0,pct=0,at=null,from=null;
@@ -2714,6 +2748,14 @@ function xirr(flows){
     if(fm*flo<0){hi=mid;fhi=fm;}else{lo=mid;flo=fm;}}
   return (lo+hi)/2;}
 const ymDay=ym=>new Date(ym+'-15T12:00').getTime()/86400000;
+/* Annual return of all holdings together over a range: what they were worth at the start and every
+   rupee put in since are outflows, what they are worth now is the inflow. Unlike the growth of net
+   worth this leaves out savings and loan repayments, so it answers "how are my investments doing". */
+function portXirr(ser,rows){if(ser.length<2)return null;const last=ser[ser.length-1];
+  const f=[{t:ymDay(ser[0].ym),v:-ser[0].holdings}];
+  rows.forEach(r=>{if(r.inv)f.push({t:ymDay(r.ym),v:-r.inv});});
+  f.push({t:ymDay(last.ym),v:last.holdings});
+  return f.some(x=>x.v<0)&&last.holdings>0?xirr(f):null;}
 function holdingPerf(h){
   const rows=IV().filter(v=>v.hold_id===h.id).sort((a,b)=>a.month.localeCompare(b.month));
   if(!rows.length)return null;
@@ -2732,171 +2774,265 @@ function allocAt(ym){const m={};
   return m;}
 const pctTxt=(x,d=1)=>x==null?'—':(x>=0?'+':'−')+Math.abs(x*100).toFixed(d)+'%';
 const sgnMoney=v=>(v>=0?'+':'−')+fmtMoney(Math.abs(v));
+var nwTab='moved', nwMode='net', nwTbl=false, nwHoldOpen=null;
+/* Money put into holdings as of a month: each holding's first value plus every "added" since. */
+function investedAsOf(ym){return IH().reduce((a,h)=>{
+  const rows=IV().filter(v=>v.hold_id===h.id&&v.month<=ym).sort((x,y)=>x.month.localeCompare(y.month));
+  return rows.length?a+(+rows[0].value||0)+rows.slice(1).reduce((t,r)=>t+(+r.added||0),0):a;},0);}
 function setNwRange(r){nwRange=r;nwSel=null;reRender();}
+function setNwMode(m){nwMode=m;reRender();}
+function setNwTab(t){nwTab=t;reRender();}
 function toggleNwSeries(k){nwShow[k]=!nwShow[k];if(!nwShow.net&&!nwShow.assets&&!nwShow.debt)nwShow.net=true;reRender();}
-function selNwMonth(ym){nwSel=ym;reRender();}
-
-function vInvAnalysis(){
-  if(nwRecord())persist();
-  const ser=nwSeries(), end=ser[ser.length-1], cur=monthKey(today());
-  if(!IH().length&&!PFA().length&&!LOAN().length&&!IOU().length)
-    return pagehead('PERSONAL','Investments','Analysis',invToggle())+
-      '<div class="card"><div class="cb" style="text-align:center;padding:26px;color:var(--t3);font-size:13px">Add holdings, PF or loans and record values month by month — the analysis builds from that history.</div></div>';
-  const prev=nwAt(ymAdd(cur,-1)), yago=nwAt(ymAdd(cur,-12));
-  const mom=end.net-prev.net, yoy=end.net-yago.net;
-  const momP=prev.net>0?mom/prev.net:null, yoyP=yago.net>0?yoy/yago.net:null;
-  const cagr=nwCagr(ser), dd=nwDrawdown(ser);
-  const debtRatio=end.assets>0?end.debt/end.assets:null;
-  const hasYearAgo=nwFirstMonth()<=ymAdd(cur,-12);
-
-  // month-on-month rows with attribution
-  const rows=ser.slice(1).map(p=>{const a=nwAttrib(p.ym);
-    const inv=a.parts[0].v, mkt=a.parts[1].v;
-    return{ym:p.ym,net:p.net,change:a.change,pct:a.prev.net>0?a.change/a.prev.net:null,inv,mkt,
-      entered:p.entered,assumed:p.assumed};});
-  const ups=rows.filter(r=>r.change>0).length, downs=rows.filter(r=>r.change<0).length;
-  const best=rows.slice().sort((a,b)=>b.change-a.change)[0], worst=rows.slice().sort((a,b)=>a.change-b.change)[0];
-  const carried=rows.filter(r=>!r.entered).length, assumed=ser.filter(p=>p.assumed).length;
-
-  // calendar years
-  const years=[...new Set(ser.map(p=>p.ym.slice(0,4)))];
-  /* Each year is measured on its own calendar span (Dec before -> Dec, or today), never on the chart
-     range, so picking "6 months" cannot change what last year's row says. */
-  const first=nwFirstMonth();
-  const yrows=years.map(y=>{
-    const openWant=ymAdd(y+'-01',-1), openYm=openWant>=first?openWant:first, closeYm=y+'-12'<cur?y+'-12':cur;
-    const open=nwAt(openYm), close=nwAt(closeYm);
-    let inv=0,mkt=0;   // from the month after the opening, so the parts cover the same span as the change
-    for(let m=ymAdd(openYm,1);m<=closeYm;m=ymAdd(m,1)){const p=nwAttrib(m).parts;inv+=p[0].v;mkt+=p[1].v;}
-    const change=close.net-open.net;
-    return{y,open:open.net,close:close.net,change,pct:open.net>0?change/open.net:null,inv,mkt,
-      partial:closeYm!==y+'-12'||openYm!==openWant};});
-
-  // selected month (default: latest)
-  const sel=nwSel&&ser.find(p=>p.ym===nwSel)?nwSel:end.ym;
-  const att=sel===ser[0].ym&&ser.length>1?null:nwAttrib(sel);
-
-  // holdings
-  _sort.invperf=_sort.invperf||{key:'value',dir:-1};
-  let perf=IH().map(holdingPerf).filter(Boolean);
-  perf=applySort('invperf',perf,{name:x=>x.h.name.toLowerCase(),value:x=>x.value,invested:x=>x.invested,
-    gain:x=>x.gain,ret:x=>x.ret==null?-1e9:x.ret,xirr:x=>x.xirr==null?-1e9:x.xirr});
-  const totInv=perf.reduce((a,x)=>a+x.invested,0), totVal=perf.reduce((a,x)=>a+x.value,0);
-
-  // allocation drift
-  const aNow=allocAt(cur), aThen=allocAt(ymAdd(cur,-12));
-  const tNow=Object.values(aNow).reduce((a,v)=>a+v,0), tThen=Object.values(aThen).reduce((a,v)=>a+v,0);
-  const kinds=[...new Set([...Object.keys(aNow),...Object.keys(aThen)])].sort((a,b)=>(aNow[b]||0)-(aNow[a]||0));
-
-  window._nwData=ser.map(p=>({ym:p.ym,net:p.net,assets:p.assets,debt:p.debt,entered:p.entered,assumed:p.assumed}));
-  const chip=(r,l)=>`<button class="btn xs ${nwRange===r?'':'gh2'}" onclick="setNwRange('${r}')">${l}</button>`;
-  const leg=(k,l,c)=>`<button class="btn xs gh2 nwleg ${nwShow[k]?'on':''}" aria-pressed="${!!nwShow[k]}" onclick="toggleNwSeries('${k}')"><i style="background:var(${c})"></i>${l}</button>`;
-  const kpi=(l,v,sub,cls)=>`<div class="kpi ${cls||''}"><div class="kl">${l}</div><div class="kv num" style="font-size:19px">${v}</div>${sub?`<div class="num" style="font-size:11px;color:var(--t3)">${sub}</div>`:''}</div>`;
-  const bar=(k,v,max)=>{const w=max?Math.round(Math.abs(v)/max*100):0;
-    return `<div class="attr"><span class="ak">${k}</span><span class="ab"><i class="${v<0?'neg':'pos'}" style="width:${w}%"></i></span><b class="num ${v<0?'neg':''}">${v?sgnMoney(v):'—'}</b></div>`;};
-
-  return pagehead('PERSONAL','Investments','How your net worth is moving',invToggle())+
-  `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-    <span class="note" style="margin-right:4px">Range</span>${chip('6m','6 months')}${chip('12m','12 months')}${chip('3y','3 years')}${chip('all','All')}</div>
-  <div class="kpis">
-    ${kpi('Net worth',fmtMoney(end.net),fmtMoney(end.assets)+' assets − '+fmtMoney(end.debt)+' owed','blue')}
-    ${kpi('This month',sgnMoney(mom),(momP==null?'':pctTxt(momP)+' ')+'vs '+finMonthLabel(prev.ym),mom<0?'bad':'good')}
-    ${kpi('Year on year',hasYearAgo?sgnMoney(yoy):'—',hasYearAgo?(yoyP==null?'':pctTxt(yoyP)+' ')+'vs '+finMonthLabel(yago.ym):'needs 12 months of history',hasYearAgo?(yoy<0?'bad':'good'):'')}
-    ${kpi('Growth rate',cagr==null?'—':pctTxt(cagr)+' /yr',cagr==null?'needs a positive start and end':'compounded over the range','')}
-    ${kpi('Debt to assets',debtRatio==null?'—':Math.round(debtRatio*100)+'%',debtRatio==null?'':(debtRatio>0.5?'over half your assets are owed':'of your assets are owed'),debtRatio>0.5?'bad':'')}
-  </div>
-  <div class="card"><div class="ch"><span>Net worth over time</span><span style="display:flex;gap:4px;flex-wrap:wrap">${leg('net','Net worth','--blue')}${leg('assets','Assets','--grn')}${leg('debt','Owed','--red')}</span></div>
-    <div class="cb" style="position:relative"><canvas id="nwCv" style="width:100%;height:260px;display:block;cursor:crosshair;touch-action:pan-y"></canvas><div id="nwTip" class="nwtip"></div>
-    <p class="note" style="margin-top:6px">Hover or touch for a month's figures; click a month to see what moved it.${carried?` ${carried} of ${rows.length} months have no holding value entered — those repeat the last value, so their change reads low.`:''}${assumed?` PF and unscheduled loans have no history before ${finMonthLabel(nwsnap.filter(x=>!x.deleted).map(x=>x.month).sort()[0]||cur)}, so they are held flat there.`:''}</p></div></div>
-  <div class="grid2">
-    <div class="card"><div class="ch"><span>What moved ${finMonthLabel(sel)}</span>${att?`<b class="num ${att.change<0?'neg':''}">${sgnMoney(att.change)}</b>`:''}</div>
-      <div class="cb">${att?(()=>{const mx=Math.max(1,...att.parts.map(p=>Math.abs(p.v)));
-        return att.parts.map(p=>bar(p.k,p.v,mx)).join('')+`<p class="note" style="margin-top:8px">Market movement is the change in holding values after taking out money you put in. A new holding's first value counts as money invested, not as a gain.</p>`;})()
-        :'<div class="empty">The first month in the range has nothing before it to compare against.</div>'}</div></div>
-    <div class="card"><div class="ch"><span>Over this range</span></div><div class="cb">
-      <div class="rit-stat"><span>Months up / down</span><b>${ups} / ${downs}</b></div>
-      ${best&&best.change>0?`<div class="rit-stat"><span>Best month</span><b class="lnk" onclick="selNwMonth('${best.ym}')">${finMonthLabel(best.ym)} · ${sgnMoney(best.change)}</b></div>`:''}
-      ${worst&&worst.change<0?`<div class="rit-stat"><span>Worst month</span><b class="lnk neg" onclick="selNwMonth('${worst.ym}')">${finMonthLabel(worst.ym)} · ${sgnMoney(worst.change)}</b></div>`:''}
-      <div class="rit-stat"><span>Largest fall from a peak</span><b class="${dd.amt<0?'neg':''}">${dd.amt<0?`${sgnMoney(dd.amt)}${dd.pct!=null?` (${pctTxt(dd.pct)})`:''} · ${finMonthLabel(dd.from)} → ${finMonthLabel(dd.at)}`:'none'}</b></div>
-      <div class="rit-stat"><span>Money invested</span><b>${fmtMoney(rows.reduce((a,r)=>a+r.inv,0))}</b></div>
-      <div class="rit-stat"><span>Market movement</span><b class="${rows.reduce((a,r)=>a+r.mkt,0)<0?'neg':''}">${sgnMoney(rows.reduce((a,r)=>a+r.mkt,0))}</b></div>
-    </div></div>
-  </div>
-  ${seccard('Month on month',rows.length,`<div style="overflow-x:auto"><table class="t nwt"><tr><th>Month</th><th class="r">Net worth</th><th class="r">Change</th><th class="r">%</th><th class="r">Invested</th><th class="r">Market</th><th></th></tr>
-    ${rows.slice().reverse().map(r=>`<tr class="click ${r.ym===sel?'sel':''}" onclick="selNwMonth('${r.ym}')"><td>${finMonthLabel(r.ym)}</td><td class="r num">${fmtMoney(r.net)}</td>
-      <td class="r num ${r.change<0?'neg':'pos'}">${sgnMoney(r.change)}</td><td class="r num">${pctTxt(r.pct)}</td>
-      <td class="r num">${r.inv?fmtMoney(r.inv):''}</td><td class="r num ${r.mkt<0?'neg':''}">${r.mkt?sgnMoney(r.mkt):''}</td>
-      <td>${!r.entered?'<span class="pill n" title="No holding value entered this month; the last value repeats">carried</span>':''}${r.assumed?' <span class="pill n" title="PF / unscheduled loans held flat — no history for this month">est.</span>':''}</td></tr>`).join('')}</table></div>`,'Needs at least two months of history.')}
-  ${seccard('Year on year',yrows.length,`<div style="overflow-x:auto"><table class="t nwt"><tr><th>Year</th><th class="r">Opening</th><th class="r">Closing</th><th class="r">Change</th><th class="r">%</th><th class="r">Invested</th><th class="r">Market</th></tr>
-    ${yrows.slice().reverse().map(y=>`<tr><td>${y.y}${y.partial?' <span class="pill n" title="Not a full calendar year of data">part</span>':''}</td><td class="r num">${fmtMoney(y.open)}</td><td class="r num">${fmtMoney(y.close)}</td>
-      <td class="r num ${y.change<0?'neg':'pos'}">${sgnMoney(y.change)}</td><td class="r num">${pctTxt(y.pct)}</td><td class="r num">${fmtMoney(y.inv)}</td><td class="r num ${y.mkt<0?'neg':''}">${sgnMoney(y.mkt)}</td></tr>`).join('')}</table></div>`,'')}
-  ${seccard('Holdings performance',perf.length,`<div style="overflow-x:auto"><table class="t nwt"><tr>${sortHead('invperf','name','Holding')}${sortHead('invperf','value','Value','r')}${sortHead('invperf','invested','Invested','r')}${sortHead('invperf','gain','Gain','r')}${sortHead('invperf','ret','Return','r')}${sortHead('invperf','xirr','Annualised','r')}</tr>
-    ${perf.map(x=>`<tr><td><b>${esc(x.h.name)}</b><div class="note">${esc(x.h.kind||'')} · since ${finMonthLabel(x.since)}</div></td><td class="r num">${fmtMoney(x.value)}</td><td class="r num">${fmtMoney(x.invested)}</td>
-      <td class="r num ${x.gain<0?'neg':'pos'}">${sgnMoney(x.gain)}</td><td class="r num">${pctTxt(x.ret)}</td>
-      <td class="r num" title="${x.xirr==null?'Needs at least a month between the first value and today':'XIRR: the yearly rate that turns your dated contributions into today’s value'}">${x.xirr==null?'—':pctTxt(x.xirr)}</td></tr>`).join('')}
-    <tr style="font-weight:700"><td>Total</td><td class="r num">${fmtMoney(totVal)}</td><td class="r num">${fmtMoney(totInv)}</td><td class="r num ${totVal-totInv<0?'neg':'pos'}">${sgnMoney(totVal-totInv)}</td><td class="r num">${pctTxt(totInv?(totVal-totInv)/totInv:null)}</td><td></td></tr></table></div>
-    <p class="note" style="padding:8px 14px">Return is gain over money put in. Annualised (XIRR) accounts for when each rupee went in, so two holdings with the same return over different spans compare fairly.</p>`,'No holding values recorded yet.')}
-  ${seccard('Allocation — now vs a year ago',kinds.length,'<div class="cb">'+kinds.map(k=>{const n=tNow?(aNow[k]||0)/tNow:0,t=tThen?(aThen[k]||0)/tThen:0,dr=(n-t)*100;
-    return `<div class="attr"><span class="ak">${esc(k)}</span><span class="ab"><i style="width:${Math.round(n*100)}%"></i></span><b class="num">${Math.round(n*100)}%</b><span class="num note" style="min-width:74px;text-align:right">${tThen?`${dr>=0?'+':'−'}${Math.abs(dr).toFixed(1)} pts`:'—'}</span></div>`;}).join('')+'</div>','')}`;}
-
-/* Interactive line chart. Canvas so it stays dependency-free (the app makes no third-party
-   requests); pointer events so hover on desktop and touch on a phone use one path. */
+/* A month picked anywhere (line, bar, chip, row) opens its breakdown unless a month view is already showing. */
+function selNwMonth(ym){nwSel=ym;if(nwTab!=='moved'&&nwTab!=='monthly')nwTab='moved';reRender();}
+function nwStep(k){const d=window._nwData||[];const i=d.findIndex(p=>p.ym===nwSel);const j=Math.max(1,Math.min(d.length-1,(i<0?d.length-1:i)+k));if(d[j])selNwMonth(d[j].ym);}
+const shortYm=ym=>{const[yy,mm]=ym.split('-');return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mm-1]+' ’'+yy.slice(2);};
+/* chart colours come from the tokens, so a theme change follows */
+function nwCol(){const css=getComputedStyle(document.documentElement),v=(n,f)=>css.getPropertyValue(n).trim()||f;
+  return{net:v('--blue','#0f72c2'),assets:v('--grn','#2e844a'),debt:v('--red','#ba0517'),hold:v('--blue','#0f72c2'),inv:v('--t4','#6b6b6b'),
+    grn:v('--grn','#2e844a'),red:v('--red','#ba0517'),blue:v('--blue','#0f72c2'),oth:v('--t4','#6b6b6b'),grid:v('--bdr','#e5e5e5'),
+    txt:v('--t3','#706e6b'),t1:v('--t1','#181818'),amb:v('--amb','#dd7a01'),pur:v('--pur','#9050e9'),ind:v('--ind','#5867e8'),steel:v('--steel','#332f2e')};}
+const hexA=(h,a)=>{const m=/^#?([0-9a-f]{6})$/i.exec(h||'');if(!m)return `rgba(0,0,0,${a})`;const n=parseInt(m[1],16);return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;};
+function nwFrame(cv){const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);return{c,W,H};}
+/* round an axis out to an even 1/2/2.5/5 step so the gridline labels are round numbers */
+function nwScale(lo,hi){if(hi===lo){const p=Math.abs(hi)*0.05||1;lo-=p;hi+=p;}
+  const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw);
+  lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;return{lo,hi,st,n:Math.round((hi-lo)/st)};}
 const axisMoney=v=>{const a=Math.abs(v),s=v<0?'−':'';
   if(a>=1e7)return s+(a/1e7).toFixed(2).replace(/\.?0+$/,'')+'Cr';
   if(a>=1e5)return s+(a/1e5).toFixed(1).replace(/\.0$/,'')+'L';
   if(a>=1e3)return s+Math.round(a/1e3)+'k';return s+Math.round(a);};
+function nwAxes(c,W,H,pad,sc,col,labels,xAt){const ih=H-pad.t-pad.b,y=v=>pad.t+ih-(v-sc.lo)/(sc.hi-sc.lo)*ih;
+  c.font='11px Inter, system-ui, sans-serif';c.lineWidth=1;
+  for(let g=0;g<=sc.n;g++){const v=sc.lo+sc.st*g,yy=y(v);c.strokeStyle=Math.abs(v)<1e-9?col.txt:col.grid;
+    c.beginPath();c.moveTo(pad.l,yy);c.lineTo(W-pad.r,yy);c.stroke();c.fillStyle=col.txt;c.textAlign='right';c.fillText(axisMoney(v),pad.l-6,yy+4);}
+  const n1=labels.length-1,step=Math.max(1,Math.ceil(labels.length/Math.max(2,Math.floor((W-pad.l-pad.r)/72))));
+  labels.forEach((l,i)=>{const last=i===n1;if(!last&&(i%step||n1-i<step))return;
+    c.textAlign=labels.length===1?'center':i===0?'left':last?'right':'center';c.fillStyle=col.txt;c.fillText(l,xAt(i),H-8);});
+  return y;}
+function nwTipAt(tip,cv,x,html){if(!tip)return;tip.innerHTML=html;tip.style.display='block';
+  const cw=cv.clientWidth,tw=tip.offsetWidth||170;tip.style.left=(cv.offsetLeft+Math.min(cw-tw,Math.max(0,x+12>cw-tw?x-tw-12:x+12)))+'px';tip.style.top=(cv.offsetTop+6)+'px';}
+
+function vInvAnalysis(){
+  if(nwRecord())persist();
+  const cur=monthKey(today());
+  if(!IH().length&&!PFA().length&&!LOAN().length&&!IOU().length)
+    return pagehead('PERSONAL','Investments','Analysis',invToggle())+
+      '<div class="card"><div class="cb" style="text-align:center;padding:26px;color:var(--t3);font-size:13px">Add holdings, PF or loans and record values month by month — the analysis builds from that history.</div></div>';
+  const ser=nwSeries(), end=ser[ser.length-1];
+  const prev=nwAt(ymAdd(cur,-1)), yago=nwAt(ymAdd(cur,-12));
+  const mom=end.net-prev.net, yoy=end.net-yago.net;
+  const momP=prev.net>0?mom/prev.net:null, yoyP=yago.net>0?yoy/yago.net:null;
+  const dd=nwDrawdown(ser), debtRatio=end.assets>0?end.debt/end.assets:null;
+  const hasYearAgo=nwFirstMonth()<=ymAdd(cur,-12);
+  const rows=ser.slice(1).map(p=>{const a=nwAttrib(p.ym),inv=a.parts[0].v,mkt=a.parts[1].v;
+    return{ym:p.ym,net:p.net,change:a.change,pct:a.prev.net>0?a.change/a.prev.net:null,inv,mkt,oth:a.change-inv-mkt,
+      entered:p.entered,assumed:p.assumed};});
+  const ret=portXirr(ser,rows);
+  const ups=rows.filter(r=>r.change>0).length, downs=rows.filter(r=>r.change<0).length;
+  const best=rows.slice().sort((a,b)=>b.change-a.change)[0], worst=rows.slice().sort((a,b)=>a.change-b.change)[0];
+  const carried=rows.filter(r=>!r.entered).length, assumed=ser.filter(p=>p.assumed).length;
+  const sel=nwSel&&rows.find(r=>r.ym===nwSel)?nwSel:(rows.length?end.ym:null);
+  window._nwData=ser.map(p=>{const r=rows.find(x=>x.ym===p.ym);
+    return{ym:p.ym,net:p.net,assets:p.assets,debt:p.debt,hold:p.holdings,inv:investedAsOf(p.ym),entered:p.entered,assumed:p.assumed,
+      ch:r?r.change:null,pi:r?r.inv:0,pm:r?r.mkt:0,po:r?r.oth:0};});
+  window._nwSelYm=sel;
+
+  // ── summary: one card, everything visible without scrolling
+  const stat=(l,v,sub,cls)=>`<div class="nwst ${cls||''}"><div class="kl">${l}</div><b class="num">${v}</b><span class="num">${sub||'&nbsp;'}</span></div>`;
+  const hero=`<div class="card nwhero"><div class="cb">
+    <div><div class="kl">Net worth · ${finMonthLabel(cur)}</div><div class="nwh-v num ${end.net<0?'neg':''}">${fmtMoney(end.net)}</div>
+      <div class="note num">${fmtMoney(end.assets)} assets − ${fmtMoney(end.debt)} owed</div></div>
+    <div class="nwh-stats">
+      ${stat('This month',sgnMoney(mom),momP==null?'vs '+shortYm(prev.ym):pctTxt(momP),mom<0?'neg':'pos')}
+      ${stat('Year on year',hasYearAgo?sgnMoney(yoy):'—',hasYearAgo?(yoyP==null?'vs '+shortYm(yago.ym):pctTxt(yoyP)):'needs 12 months',hasYearAgo?(yoy<0?'neg':'pos'):'')}
+      ${stat('Returns / yr',ret==null?'—':pctTxt(ret),ret==null?'needs holding values':'investments, '+{'6m':'6M','12m':'1Y','3y':'3Y','all':'all time'}[nwRange],ret==null?'':ret<0?'neg':'pos')}
+      ${stat('Debt / assets',debtRatio==null?'—':Math.round(debtRatio*100)+'%',debtRatio==null?'':debtRatio>0.5?'over half owed':'owed',debtRatio>0.5?'neg':'')}
+    </div></div></div>`;
+
+  // ── main chart: two lenses on the same months
+  const rng=(r,l)=>`<button class="${nwRange===r?'on':''}" onclick="setNwRange('${r}')">${l}</button>`;
+  const mode=(m,l)=>`<button class="${nwMode===m?'on':''}" onclick="setNwMode('${m}')">${l}</button>`;
+  const leg=(k,l,c,dash)=>`<button class="nwleg ${nwShow[k]?'on':''}" aria-pressed="${!!nwShow[k]}" onclick="toggleNwSeries('${k}')"><i style="background:var(${c})${dash?';height:0;border-top:2px dashed var('+c+')':''}"></i>${l}</button>`;
+  const lastD=window._nwData[window._nwData.length-1], gain=lastD.hold-lastD.inv;
+  const legend=nwMode==='net'?`${leg('net','Net worth','--blue')}${leg('assets','Assets','--grn')}${leg('debt','Owed','--red')}`
+    :`<span class="nwleg on"><i style="background:var(--blue)"></i>Holdings value</span><span class="nwleg on"><i style="height:0;border-top:2px dashed var(--t4)"></i>Money put in</span><span class="note num" style="margin-left:auto">${gain>=0?'Gain':'Loss'} <b class="${gain<0?'neg':'pos'}">${sgnMoney(gain)}</b>${lastD.inv?` (${pctTxt(gain/lastD.inv)})`:''}</span>`;
+  const chip=(html,on)=>`<span class="nwchip${on?' lnk':''}" ${on?`onclick="${on}"`:''}>${html}</span>`;
+  const chips=[
+    chip(`<b class="pos">▲${ups}</b> <b class="neg">▼${downs}</b> months`),
+    best&&best.change>0?chip(`Best ${shortYm(best.ym)} <b class="pos">${sgnMoney(best.change)}</b>`,`selNwMonth('${best.ym}')`):'',
+    worst&&worst.change<0?chip(`Worst ${shortYm(worst.ym)} <b class="neg">${sgnMoney(worst.change)}</b>`,`selNwMonth('${worst.ym}')`):'',
+    dd.amt<0?chip(`Largest fall <b class="neg">${sgnMoney(dd.amt)}</b> ${shortYm(dd.from)}→${shortYm(dd.at)}`,`selNwMonth('${dd.at}')`):''].join('');
+  const caveat=(carried||assumed)?`<details class="nwnote"><summary>${[carried?carried+' month'+(carried===1?'':'s')+' carried':'',assumed?assumed+' estimated':''].filter(Boolean).join(' · ')} — why?</summary>
+    ${carried?`<p>No holding value was entered for ${carried} month${carried===1?'':'s'}; the last value repeats, so the change there reads low. Hollow dots on the chart.</p>`:''}
+    ${assumed?`<p>PF and loans without an EMI schedule have no history before ${finMonthLabel(nwsnap.filter(x=>!x.deleted).map(x=>x.month).sort()[0]||cur)}, so they are held at today's figure there.</p>`:''}</details>`:'';
+  const chart=`<div class="card"><div class="ch nwch"><div class="vtog" style="margin-left:0">${mode('net','Net worth')}${mode('inv','Investments')}</div>
+      <div class="vtog">${rng('6m','6M')}${rng('12m','1Y')}${rng('3y','3Y')}${rng('all','All')}</div></div>
+    <div class="cb" style="position:relative;padding-top:8px"><div class="nwlegs">${legend}</div>
+      <canvas id="nwCv" class="nwcv" style="height:230px"></canvas><div id="nwTip" class="nwtip"></div>
+      <div class="nwchips">${chips}</div>${caveat}</div></div>`;
+
+  // ── detail tabs: one at a time, each a picture first
+  const tab=(k,l)=>`<button class="tab ${nwTab===k?'on':''}" onclick="setNwTab('${k}')">${l}</button>`;
+  const tabs=`<div class="nwtabs" role="tablist">${tab('moved','What moved')}${tab('monthly','Monthly')}${tab('yearly','Yearly')}${tab('holdings','Holdings')}${tab('alloc','Allocation')}</div>`;
+  let body='';
+  if(nwTab==='moved'){
+    const att=sel?nwAttrib(sel):null;
+    if(!att)body='<div class="empty">Needs at least two months of history.</div>';
+    else{const mx=Math.max(1,...att.parts.map(p=>Math.abs(p.v)));
+      const i=window._nwData.findIndex(p=>p.ym===sel);
+      body=`<div class="nwstep"><button class="btn gh2 sm" onclick="nwStep(-1)" ${i<=1?'disabled':''} aria-label="Previous month">‹</button>
+        <div><b>${finMonthLabel(sel)}</b><div class="num ${att.change<0?'neg':'pos'}" style="font-weight:800;font-size:18px">${sgnMoney(att.change)}</div></div>
+        <button class="btn gh2 sm" onclick="nwStep(1)" ${i>=window._nwData.length-1?'disabled':''} aria-label="Next month">›</button></div>
+        ${att.parts.map((p,k)=>{const w=Math.round(Math.abs(p.v)/mx*100),c=k===0?'inv':p.v<0?'neg':'pos';
+          return `<div class="dv"><span class="ak">${p.k}</span><span class="dt"><span class="l">${p.v<0?`<i class="${c}" style="width:${w}%"></i>`:''}</span><span class="r">${p.v>0?`<i class="${c}" style="width:${w}%"></i>`:''}</span></span><b class="num ${p.v<0?'neg':''}">${p.v?sgnMoney(p.v):'—'}</b></div>`;}).join('')}
+        <p class="note" style="margin-top:8px">Blue is money you put in; green and red are what changed by itself. A new holding's first value counts as money put in, not a gain.</p>`;}}
+  else if(nwTab==='monthly'){
+    const r=rows.find(x=>x.ym===sel);
+    body=rows.length?`<div class="nwlegs"><span class="nwleg on"><i style="background:var(--blue)"></i>Put in</span><span class="nwleg on"><i style="background:var(--grn)"></i>Market up</span><span class="nwleg on"><i style="background:var(--red)"></i>Market down</span><span class="nwleg on"><i style="background:var(--t4)"></i>PF, loans, lent</span><span class="nwleg on"><i style="background:var(--t1);height:2px"></i>Net change</span></div>
+      <div style="position:relative"><canvas id="nwBars" class="nwcv" style="height:190px"></canvas><div id="nwBarTip" class="nwtip"></div></div>
+      ${r?`<div class="nwsum lnk" onclick="setNwTab('moved')"><b>${finMonthLabel(r.ym)}</b> <b class="num ${r.change<0?'neg':'pos'}">${sgnMoney(r.change)}</b><span class="note num"> = ${fmtMoney(r.inv)} put in ${r.mkt<0?'−':'+'} ${fmtMoney(Math.abs(r.mkt))} market ${r.oth<0?'−':'+'} ${fmtMoney(Math.abs(r.oth))} other</span> <span class="note">· details ›</span></div>`:''}
+      <button class="btn gh2 xs" style="margin-top:8px" onclick="nwTbl=!nwTbl;reRender()">${nwTbl?'Hide':'Show'} the numbers</button>
+      ${nwTbl?`<div style="overflow-x:auto;margin-top:8px"><table class="t nwt"><tr><th>Month</th><th class="r">Net worth</th><th class="r">Change</th><th class="r">Put in</th><th class="r">Market</th><th></th></tr>
+        ${rows.slice().reverse().map(r=>`<tr class="click ${r.ym===sel?'sel':''}" onclick="selNwMonth('${r.ym}')"><td>${shortYm(r.ym)}</td><td class="r num">${fmtMoney(r.net)}</td><td class="r num ${r.change<0?'neg':'pos'}">${sgnMoney(r.change)}</td><td class="r num">${r.inv?fmtMoney(r.inv):''}</td><td class="r num ${r.mkt<0?'neg':''}">${r.mkt?sgnMoney(r.mkt):''}</td>
+          <td>${!r.entered?'<span class="pill n" title="No holding value entered this month; the last value repeats">carried</span>':''}${r.assumed?' <span class="pill n" title="PF / unscheduled loans held flat — no history for this month">est.</span>':''}</td></tr>`).join('')}</table></div>`:''}`
+      :'<div class="empty">Needs at least two months of history.</div>';}
+  else if(nwTab==='yearly'){
+    const first=nwFirstMonth(), years=[...new Set(ser.map(p=>p.ym.slice(0,4)))];
+    const yrows=years.map(y=>{const openWant=ymAdd(y+'-01',-1),openYm=openWant>=first?openWant:first,closeYm=y+'-12'<cur?y+'-12':cur;
+      const open=nwAt(openYm),close=nwAt(closeYm);let inv=0,mkt=0;
+      for(let m=ymAdd(openYm,1);m<=closeYm;m=ymAdd(m,1)){const p=nwAttrib(m).parts;inv+=p[0].v;mkt+=p[1].v;}
+      const change=close.net-open.net, base=open.holdings+inv;
+      // % is the market's return on money at work, not the change over net worth: a year you saved
+      // heavily from a small start would otherwise read as +400%
+      return{y,open:open.net,close:close.net,change,mret:base>0?mkt/base:null,inv,mkt,oth:change-inv-mkt,partial:closeYm!==y+'-12'||openYm!==openWant};});
+    const mx=Math.max(1,...yrows.map(y=>Math.abs(y.inv)+Math.abs(y.mkt)+Math.abs(y.oth)));
+    const seg=(v,c)=>v?`<i class="${c}" style="width:${Math.abs(v)/mx*100}%" title="${sgnMoney(v)}"></i>`:'';
+    body=yrows.slice().reverse().map(y=>`<div class="yrow"><div class="yr-top"><b>${y.y}${y.partial?' <span class="pill n" title="Not a full calendar year of data">part</span>':''}</b>
+        <b class="num ${y.change<0?'neg':'pos'}">${sgnMoney(y.change)}</b></div>
+      <div class="ybar">${seg(y.inv,'inv')}${seg(y.mkt,y.mkt<0?'neg':'pos')}${seg(y.oth,'oth')}</div>
+      <div class="note num">${fmtMoney(y.open)} → ${fmtMoney(y.close)} · put in ${fmtMoney(y.inv)} · market ${sgnMoney(y.mkt)}${y.mret!=null?` (${pctTxt(y.mret)})`:''}${y.oth?` · other ${sgnMoney(y.oth)}`:''}</div></div>`).join('')+
+      '<p class="note" style="margin-top:6px">Each year runs from the December before to December (or today), whatever range the chart shows.</p>';}
+  else if(nwTab==='holdings'){
+    _sort.invperf=_sort.invperf||{key:'value',dir:-1};
+    let perf=IH().map(holdingPerf).filter(Boolean);
+    perf=applySort('invperf',perf,{name:x=>x.h.name.toLowerCase(),value:x=>x.value,gain:x=>x.gain,ret:x=>x.ret==null?-1e9:x.ret,xirr:x=>x.xirr==null?-1e9:x.xirr});
+    const tot=perf.reduce((a,x)=>a+x.value,0), totInv=perf.reduce((a,x)=>a+x.invested,0);
+    const sk=_sort.invperf.key, sb=(k,l)=>`<button class="${sk===k?'on':''}" onclick="setSort('invperf','${k}')">${l}${sk===k?(_sort.invperf.dir===1?' ▲':' ▼'):''}</button>`;
+    const pill=x=>x==null?'':`<span class="pill ${x<0?'r':'g'} num">${pctTxt(x)}</span>`;
+    body=perf.length?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"><span class="note">Sort</span><div class="vtog" style="margin-left:0">${sb('value','Value')}${sb('ret','Return')}${sb('xirr','Yearly')}${sb('name','Name')}</div>
+        <span class="note num" style="margin-left:auto">${fmtMoney(tot)} · <b class="${tot-totInv<0?'neg':'pos'}">${sgnMoney(tot-totInv)}</b> ${pctTxt(totInv?(tot-totInv)/totInv:null)}</span></div>`+
+      perf.map(x=>{const open=nwHoldOpen===x.h.id;return `<div class="hrow lnk" onclick="nwHoldOpen=${open?'null':`'${x.h.id}'`};reRender()">
+        <div class="hr-top"><b>${esc(x.h.name)}</b><b class="num">${fmtMoney(x.value)}</b></div>
+        <div class="hr-bar"><i style="width:${tot?x.value/tot*100:0}%"></i></div>
+        <div class="hr-sub"><span class="note">${esc(x.h.kind||'')} · ${tot?Math.round(x.value/tot*100):0}%</span><span>${pill(x.ret)} ${x.xirr!=null?`<span class="note num">${pctTxt(x.xirr)}/yr</span>`:''}</span></div>
+        ${open?`<div class="hr-more note num">Put in ${fmtMoney(x.invested)} · ${x.gain<0?'loss':'gain'} <b class="${x.gain<0?'neg':'pos'}">${sgnMoney(x.gain)}</b> · since ${finMonthLabel(x.since)} · ${x.entries} value${x.entries===1?'':'s'} recorded${x.xirr==null?' · yearly rate needs a month of history':''}</div>`:''}</div>`;}).join('')+
+      '<p class="note" style="margin-top:8px">The pill is return on money put in. "/yr" is the annualised rate (XIRR), which allows for when each rupee went in. Tap a holding for details.</p>'
+      :'<div class="empty">No holding values recorded yet.</div>';}
+  else if(nwTab==='alloc'){
+    const aNow=allocAt(cur),aThen=allocAt(ymAdd(cur,-12));
+    const tNow=Object.values(aNow).reduce((a,v)=>a+v,0),tThen=Object.values(aThen).reduce((a,v)=>a+v,0);
+    const kinds=Object.keys(aNow).filter(k=>aNow[k]>0).sort((a,b)=>aNow[b]-aNow[a]);
+    const pal=['--blue','--grn','--amb','--pur','--ind','--steel','--t4','--red'];
+    window._nwAlloc=kinds.map((k,i)=>({k,v:aNow[k],c:pal[i%pal.length]}));
+    body=kinds.length?`<div class="nwalloc"><div style="position:relative"><canvas id="nwDonut" style="width:180px;height:180px;display:block;margin:0 auto"></canvas></div>
+      <div class="nwal-leg">${kinds.map((k,i)=>{const n=aNow[k]/tNow,t=tThen?(aThen[k]||0)/tThen:null,dr=t==null?null:(n-t)*100;
+        return `<div class="al-row" data-i="${i}"><i style="background:var(${pal[i%pal.length]})"></i><span class="ak">${esc(k)}</span><b class="num">${Math.round(n*100)}%</b><span class="num note">${fmtMoney(aNow[k])}</span><span class="num note al-dr">${dr==null?'':(Math.abs(dr)<0.05?'±0':(dr>0?'▲':'▼')+Math.abs(dr).toFixed(1))+' pts'}</span></div>`;}).join('')}
+      <p class="note" style="margin-top:6px">Points are the change in share since ${finMonthLabel(ymAdd(cur,-12))}.</p></div></div>`
+      :'<div class="empty">No assets recorded yet.</div>';}
+  return pagehead('PERSONAL','Investments','How your net worth is moving',invToggle())+hero+chart+
+    `<div class="card"><div class="cb" style="padding-top:4px">${tabs}${body}</div></div>`;}
+
+/* Line chart. Canvas so it stays dependency-free (the app makes no third-party requests);
+   pointer events so mouse hover and a finger dragging across the chart use one path. */
 function drawNwChart(cv){
   const data=window._nwData||[];if(!cv||!data.length)return;
-  const css=getComputedStyle(document.documentElement);
-  const col={net:css.getPropertyValue('--blue').trim()||'#4a5a6a',assets:css.getPropertyValue('--grn').trim()||'#2e7d4f',
-    debt:css.getPropertyValue('--red').trim()||'#c0392b',grid:css.getPropertyValue('--bdr').trim()||'#e5e5e5',
-    txt:css.getPropertyValue('--t3').trim()||'#666'};
-  const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
-  cv.width=W*dpr;cv.height=H*dpr;const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
-  const keys=['net','assets','debt'].filter(k=>nwShow[k]);
-  const vals=data.flatMap(d=>keys.map(k=>d[k]));
-  // fit the data, not zero: a 3% month on a large net worth has to be visible to be analysed
-  let lo=Math.min(...vals),hi=Math.max(...vals);if(hi===lo){const p=Math.abs(hi)*0.05||1;lo-=p;hi+=p;}
-  // round the axis out to an even 1/2/2.5/5 step so gridline labels read as round numbers
-  const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw);
-  lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;const ticks=Math.round((hi-lo)/st);
-  const pad={l:46,r:12,t:12,b:26}, iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
-  const x=i=>pad.l+(data.length===1?iw/2:i*iw/(data.length-1)), y=v=>pad.t+ih-(v-lo)/(hi-lo)*ih;
-  const draw=hov=>{
-    c.clearRect(0,0,W,H);c.font='11px Inter, system-ui, sans-serif';
-    for(let g=0;g<=ticks;g++){const v=lo+st*g,yy=y(v);
-      c.strokeStyle=col.grid;c.lineWidth=1;c.beginPath();c.moveTo(pad.l,yy);c.lineTo(W-pad.r,yy);c.stroke();
-      c.fillStyle=col.txt;c.textAlign='right';c.fillText(axisMoney(v),pad.l-6,yy+4);}
-    if(lo<0&&hi>0){c.strokeStyle=col.txt;c.setLineDash([3,3]);c.beginPath();c.moveTo(pad.l,y(0));c.lineTo(W-pad.r,y(0));c.stroke();c.setLineDash([]);}
-    const step=Math.max(1,Math.ceil(data.length/Math.max(2,Math.floor(iw/72))));
-    c.textAlign='center';c.fillStyle=col.txt;
-    const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const n1=data.length-1, shortLbl=ym=>{const[yy,mm]=ym.split('-');return MON3[+mm-1]+' ’'+yy.slice(2);};
-    data.forEach((d,i)=>{const last=i===n1;
-      if(!last&&(i%step||n1-i<step))return;            // keep the last label, drop one that would collide with it
-      c.textAlign=data.length===1?'center':i===0?'left':last?'right':'center';
-      c.fillText(shortLbl(d.ym),x(i),H-8);});
-    keys.forEach(k=>{c.strokeStyle=col[k];c.lineWidth=k==='net'?2.5:1.75;c.beginPath();
-      data.forEach((d,i)=>i?c.lineTo(x(i),y(d[k])):c.moveTo(x(i),y(d[k])));c.stroke();
-      data.forEach((d,i)=>{c.fillStyle=col[k];c.beginPath();c.arc(x(i),y(d[k]),(d.ym===nwSel||i===hov)?4:2.2,0,7);c.fill();
-        if(k==='net'&&!d.entered){c.strokeStyle='#fff';c.lineWidth=1;c.stroke();}});});
-    if(hov!=null){c.strokeStyle=col.txt;c.lineWidth=1;c.setLineDash([2,3]);c.beginPath();c.moveTo(x(hov),pad.t);c.lineTo(x(hov),pad.t+ih);c.stroke();c.setLineDash([]);}};
+  const col=nwCol(),{c,W,H}=nwFrame(cv),inv=nwMode==='inv';
+  const keys=inv?['hold','inv']:['net','assets','debt'].filter(k=>nwShow[k]);
+  const sc=nwScale(Math.min(...data.flatMap(d=>keys.map(k=>d[k]))),Math.max(...data.flatMap(d=>keys.map(k=>d[k]))));
+  const pad={l:46,r:12,t:10,b:24},iw=W-pad.l-pad.r;
+  const x=i=>pad.l+(data.length===1?iw/2:i*iw/(data.length-1));
+  const draw=hov=>{c.clearRect(0,0,W,H);
+    const y=nwAxes(c,W,H,pad,sc,col,data.map(d=>shortYm(d.ym)),x);
+    if(inv&&data.length>1){   // the gap between value and money put in IS the gain: shade it
+      for(let i=1;i<data.length;i++){const a=data[i-1],b=data[i];
+        c.fillStyle=hexA((a.hold+b.hold)/2>=(a.inv+b.inv)/2?col.grn:col.red,.16);
+        c.beginPath();c.moveTo(x(i-1),y(a.hold));c.lineTo(x(i),y(b.hold));c.lineTo(x(i),y(b.inv));c.lineTo(x(i-1),y(a.inv));c.closePath();c.fill();}}
+    else if(!inv&&keys.length===1&&keys[0]==='net'&&data.length>1){   // soft area under a lone net worth line
+      const base=y(Math.max(sc.lo,Math.min(sc.hi,0)));c.fillStyle=hexA(col.net,.08);c.beginPath();c.moveTo(x(0),base);
+      data.forEach((d,i)=>c.lineTo(x(i),y(d.net)));c.lineTo(x(data.length-1),base);c.closePath();c.fill();}
+    keys.forEach(k=>{c.strokeStyle=col[k];c.lineWidth=k==='net'||k==='hold'?2.5:1.75;c.setLineDash(k==='inv'?[5,4]:[]);c.beginPath();
+      data.forEach((d,i)=>i?c.lineTo(x(i),y(d[k])):c.moveTo(x(i),y(d[k])));c.stroke();c.setLineDash([]);
+      if(k==='inv')return;
+      data.forEach((d,i)=>{const big=d.ym===window._nwSelYm||i===hov;c.beginPath();c.arc(x(i),y(d[k]),big?4.5:2.6,0,7);
+        if((k==='net'||k==='hold')&&!d.entered){c.fillStyle='#fff';c.fill();c.strokeStyle=col[k];c.lineWidth=1.5;c.stroke();}
+        else{c.fillStyle=col[k];c.fill();}});});
+    if(hov!=null){c.strokeStyle=col.txt;c.lineWidth=1;c.setLineDash([2,3]);c.beginPath();c.moveTo(x(hov),pad.t);c.lineTo(x(hov),H-pad.b);c.stroke();c.setLineDash([]);}};
   draw(null);
   const tip=g('nwTip');
-  const idxAt=ev=>{const r=cv.getBoundingClientRect(),px=ev.clientX-r.left;
-    if(data.length===1)return 0;return Math.max(0,Math.min(data.length-1,Math.round((px-pad.l)/iw*(data.length-1))));};
+  const idxAt=ev=>{const r=cv.getBoundingClientRect();if(data.length===1)return 0;
+    return Math.max(0,Math.min(data.length-1,Math.round((ev.clientX-r.left-pad.l)/iw*(data.length-1))));};
   const show=ev=>{const i=idxAt(ev),d=data[i];draw(i);
-    if(tip){const prev=i?data[i-1].net:null;
-      tip.innerHTML=`<b>${finMonthLabel(d.ym)}</b><div>Net worth <b>${fmtMoney(d.net)}</b></div>`+
-        (prev!=null?`<div class="${d.net-prev<0?'neg':'pos'}">${sgnMoney(d.net-prev)} on the month</div>`:'')+
-        `<div class="note">${fmtMoney(d.assets)} assets · ${fmtMoney(d.debt)} owed</div>`+
-        (!d.entered?'<div class="note">no holding value entered</div>':'');
-      tip.style.display='block';const cw=cv.clientWidth,tx=x(i);
-      tip.style.left=Math.min(cw-170,Math.max(0,tx+12))+'px';tip.style.top='8px';}
+    const ch=i?d.net-data[i-1].net:null;
+    nwTipAt(tip,cv,x(i),`<b>${finMonthLabel(d.ym)}</b>`+(inv
+      ?`<div>Holdings <b class="num">${fmtMoney(d.hold)}</b></div><div>Put in <b class="num">${fmtMoney(d.inv)}</b></div><div class="num ${d.hold-d.inv<0?'neg':'pos'}">${d.hold-d.inv<0?'Loss':'Gain'} ${sgnMoney(d.hold-d.inv)}${d.inv?' ('+pctTxt((d.hold-d.inv)/d.inv)+')':''}</div>`
+      :`<div>Net worth <b class="num">${fmtMoney(d.net)}</b></div>${ch!=null?`<div class="num ${ch<0?'neg':'pos'}">${sgnMoney(ch)} on the month</div>`:''}<div class="note num">${fmtMoney(d.assets)} assets · ${fmtMoney(d.debt)} owed</div>`)+
+      (!d.entered?'<div class="note">no holding value entered</div>':'')+(i?'<div class="note">tap for what moved</div>':''));
     cv._hov=i;};
   cv.onpointermove=show;cv.onpointerdown=show;
   cv.onpointerleave=()=>{draw(null);if(tip)tip.style.display='none';};
-  cv.onclick=ev=>{const i=idxAt(ev);selNwMonth(data[i].ym);};}
+  cv.onclick=ev=>{const i=idxAt(ev);if(i>0)selNwMonth(data[i].ym);};}
+
+/* Monthly change as stacked columns: what you put in, what the market did, everything else.
+   The dark tick is the net change, so a month where markets fell but you invested still reads right. */
+function drawNwBars(cv){
+  const data=(window._nwData||[]).slice(1);if(!cv||!data.length)return;
+  const col=nwCol(),{c,W,H}=nwFrame(cv);
+  const parts=d=>[[d.pi,col.blue],[d.pm,d.pm<0?col.red:col.grn],[d.po,col.oth]];
+  let lo=0,hi=0;data.forEach(d=>{let p=0,n=0;parts(d).forEach(([v])=>{if(v>0)p+=v;else n+=v;});hi=Math.max(hi,p,d.ch);lo=Math.min(lo,n,d.ch);});
+  const sc=nwScale(lo,hi),pad={l:46,r:8,t:8,b:24},iw=W-pad.l-pad.r,bw=Math.max(4,Math.min(28,iw/data.length*0.62));
+  const x=i=>pad.l+(i+0.5)*iw/data.length;
+  const draw=hov=>{c.clearRect(0,0,W,H);
+    const y=nwAxes(c,W,H,pad,sc,col,data.map(d=>shortYm(d.ym)),x);
+    data.forEach((d,i)=>{const dim=window._nwSelYm&&d.ym!==window._nwSelYm&&i!==hov;let up=0,dn=0;
+      c.globalAlpha=dim?0.45:1;
+      parts(d).forEach(([v,cl])=>{if(!v)return;c.fillStyle=cl;
+        if(v>0){c.fillRect(x(i)-bw/2,y(up+v),bw,y(up)-y(up+v));up+=v;}else{c.fillRect(x(i)-bw/2,y(dn),bw,y(dn+v)-y(dn));dn+=v;}});
+      c.globalAlpha=1;c.fillStyle=col.t1;c.fillRect(x(i)-bw/2-3,y(d.ch)-1,bw+6,2.5);});};
+  draw(null);
+  const tip=g('nwBarTip');
+  const idxAt=ev=>{const r=cv.getBoundingClientRect();return Math.max(0,Math.min(data.length-1,Math.floor((ev.clientX-r.left-pad.l)/iw*data.length)));};
+  const show=ev=>{const i=idxAt(ev),d=data[i];draw(i);
+    nwTipAt(tip,cv,x(i),`<b>${finMonthLabel(d.ym)}</b><div class="num ${d.ch<0?'neg':'pos'}" style="font-weight:700">${sgnMoney(d.ch)}</div><div class="num">Put in ${fmtMoney(d.pi)}</div><div class="num ${d.pm<0?'neg':''}">Market ${sgnMoney(d.pm)}</div><div class="num note">Other ${sgnMoney(d.po)}</div>`);};
+  cv.onpointermove=show;cv.onpointerdown=show;
+  cv.onpointerleave=()=>{draw(null);if(tip)tip.style.display='none';};
+  cv.onclick=ev=>{selNwMonth(data[idxAt(ev)].ym);};}
+
+/* Allocation donut. Slices are hard to compare by eye, so the legend beside it carries the exact
+   share and the drift; the donut is there for the shape. Hover or tap a slice to read it. */
+function drawNwDonut(cv){
+  const data=window._nwAlloc||[];if(!cv||!data.length)return;
+  const css=getComputedStyle(document.documentElement),col=nwCol(),{c,W,H}=nwFrame(cv);
+  const tot=data.reduce((a,d)=>a+d.v,0),cx=W/2,cy=H/2,R=Math.min(W,H)/2-4,r0=R*0.62;
+  const ang=[];let a0=-Math.PI/2;data.forEach(d=>{const a1=a0+d.v/tot*Math.PI*2;ang.push([a0,a1]);a0=a1;});
+  const legRows=[...document.querySelectorAll('.al-row')];
+  const draw=hov=>{c.clearRect(0,0,W,H);
+    data.forEach((d,i)=>{const[s,e]=ang[i],rr=i===hov?R+3:R;c.fillStyle=css.getPropertyValue(d.c).trim()||'#888';
+      c.beginPath();c.arc(cx,cy,rr,s,e);c.arc(cx,cy,r0,e,s,true);c.closePath();c.fill();
+      c.strokeStyle='#fff';c.lineWidth=2;c.stroke();});
+    const d=hov!=null?data[hov]:null;c.textAlign='center';c.fillStyle=col.txt;c.font='11px Inter, system-ui, sans-serif';
+    c.fillText(d?d.k:'Total assets',cx,cy-8);c.fillStyle=col.t1;c.font='700 15px Inter, system-ui, sans-serif';
+    c.fillText(d?Math.round(d.v/tot*100)+'%':fmtMoney(tot),cx,cy+10);
+    if(d){c.font='11px Inter, system-ui, sans-serif';c.fillStyle=col.txt;c.fillText(fmtMoney(d.v),cx,cy+26);}
+    legRows.forEach((el,i)=>el.classList.toggle('on',i===hov));};
+  draw(null);
+  const hit=ev=>{const r=cv.getBoundingClientRect(),dx=ev.clientX-r.left-cx,dy=ev.clientY-r.top-cy,dist=Math.hypot(dx,dy);
+    if(dist<r0||dist>R+4)return null;let t=Math.atan2(dy,dx);if(t<-Math.PI/2)t+=Math.PI*2;
+    return ang.findIndex(([s,e])=>t>=s&&t<e);};
+  cv.onpointermove=ev=>{const i=hit(ev);draw(i<0?null:i);};cv.onpointerdown=cv.onpointermove;
+  cv.onpointerleave=()=>draw(null);
+  legRows.forEach((el,i)=>{el.onpointerenter=()=>draw(i);el.onpointerleave=()=>draw(null);el.onclick=()=>draw(i);});}
 function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,pm=invPrevMonth(ym),td=today(),isCur=ym===monthKey(td);
   /* Both this month and last come from nwAt(), so the change compares like with like --
      including borrowed & lent, which this screen used to leave out of net worth entirely. */
@@ -5649,7 +5785,7 @@ async function quickNew(kind,sel){const n=now();
     if(!products.includes(v))products.push(v);persist();fillProd(sel||'dlProd',v);return;}
   if(kind==='region'){const v=((await askText('New region:',{title:'New region'}))||'').trim();if(!v)return;
     if(!regions.includes(v))regions.push(v);persist();fillRegion(sel||'cRegion',v);return;}}
-function wire(){setGhHeight();wireDragScheduling();const nc=g('nwCv');if(nc)drawNwChart(nc);const pinI=g('pinInput');if(pinI)setTimeout(()=>{try{pinI.focus();}catch(e){}},40);
+function wire(){setGhHeight();wireDragScheduling();const nc=g('nwCv');if(nc)drawNwChart(nc);const nb=g('nwBars');if(nb)drawNwBars(nb);const nd=g('nwDonut');if(nd)drawNwDonut(nd);const pinI=g('pinInput');if(pinI)setTimeout(()=>{try{pinI.focus();}catch(e){}},40);
   const q=g('qaInput');if(q)q.onkeydown=e=>{if(e.key==='Enter')quickAdd();};
   if(g('csvPick'))csvPickUI();
   if(g('faqQ')&&window._faqQ)faqSearch(window._faqQ);
