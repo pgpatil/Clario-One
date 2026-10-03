@@ -959,6 +959,25 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
 </div></div>
 
+<!-- Borrowed / lent -->
+<div class="ovl" id="mIou"><div class="modal" style="max-width:460px">
+  <h3 id="mIouTitle">Borrowing<button class="mx" type="button" onclick="closeM()">&#10005;</button></h3>
+  <div class="mbody">
+    <div class="fld"><label>Direction</label><select id="iouDir"><option value="borrowed">I borrowed \u2014 I owe them</option><option value="lent">I lent \u2014 they owe me</option></select></div>
+    <div class="fld"><label>With whom <span class="req">*</span></label><input id="iouParty" list="iouPartyDL" placeholder="Name"><datalist id="iouPartyDL"></datalist></div>
+    <div class="g2">
+      <div class="fld"><label>Amount <span class="req">*</span></label><input type="number" id="iouPrincipal" placeholder="0"></div>
+      <div class="fld"><label>On</label><input type="date" id="iouDate"></div>
+      <div class="fld"><label>Expected back by</label><input type="date" id="iouDue"></div>
+      <div class="fld"><label>Interest % p.a.</label><input type="number" id="iouRate" step="0.1" placeholder="0"></div>
+    </div>
+    <div class="fld"><label>Note</label><input id="iouNote" placeholder="What it was for"></div>
+    <p class="note">Interest is optional and shown as accrued to date only \u2014 it is never compounded and never turned into a schedule. Something with a fixed EMI and end date belongs in Loans.</p>
+  </div>
+  <div class="macts"><button class="btn dg" id="iouDel" onclick="delIouModal()">Delete</button>
+  <div class="rr"><button class="btn gh2" onclick="closeM()">Cancel</button><button class="btn" onclick="saveIou()">Save</button></div></div>
+</div></div>
+
 <!-- Set a location across a span of days -->
 <div class="ovl" id="mTrip"><div class="modal" style="max-width:430px">
   <h3>Set a trip<button class="mx" type="button" onclick="closeM()">&#10005;</button></h3>
@@ -1153,7 +1172,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[],ious=[],ioutx=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -1174,7 +1193,7 @@ var _finCollapse={};
 function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx'];
 function getState(){const s={version:APP_VER,updatedAt:stateUpdatedAt,depts,products,regions,locationsList,taskLabels,acctGroups,myProfile,companyName,workWeek};TABLES.forEach(t=>s[t]=window[t]);return s;}
 function applyState(s){if(!s||typeof s!=='object')return;TABLES.forEach(t=>{window[t]=Array.isArray(s[t])?s[t]:[];});if(Array.isArray(s.depts)&&s.depts.length)depts=s.depts;if(Array.isArray(s.products)&&s.products.length)products=s.products;if(Array.isArray(s.regions))regions=s.regions;if(Array.isArray(s.taskLabels))taskLabels=s.taskLabels;if(Array.isArray(s.acctGroups))acctGroups=s.acctGroups;if(Array.isArray(s.locationsList))locationsList=s.locationsList;if(s.myProfile&&typeof s.myProfile==='object')myProfile=s.myProfile;if(typeof s.companyName==='string')companyName=s.companyName;if(s.workWeek&&typeof s.workWeek==='object')workWeek={off:Array.isArray(s.workWeek.off)?s.workWeek.off:[0],satRule:s.workWeek.satRule||'none'};stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
@@ -2152,12 +2171,12 @@ function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:
   persist();renderView();toast('Starter categories added.');}
 function ymAdd(ym,n){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);}
 function finBalRow(ym){return finbal.find(b=>!b.deleted&&b.month===ym);}
-function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
+function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+iouCashIn(ym);}
 /* Total spending in the month, whatever funded it — bank or card. */
 function finSpendActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0);}
 /* Cash that actually left the bank: bank-funded categories + card bill payments + bank EMIs.
    Card-funded categories are deliberately excluded — their cash leaves via the card payment. */
-function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&!finIsCardFunded(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym);}
+function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&!finIsCardFunded(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym)+iouCashOut(ym);}
 function finOpening(ym){const r=finBalRow(ym);if(r)return +r.opening||0;
   const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>a.month.localeCompare(b.month));
   if(!priors.length)return 0;
@@ -2244,17 +2263,18 @@ function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((
     `<div class="card"><div class="ch"><span>Recurring commitments</span><button class="btn sm" onclick="openFinCat(null,'fixed')">+ Add commitment</button></div>${rows}</div>
     <p class="note" style="padding:0 4px">Each commitment appears automatically in the months it's due on the monthly plan, at the amount set here. To make one occurrence differ (e.g. a higher school-fee term), open that month and edit its planned amount there.</p>`;}
 function finMoneyToggle(){const t=(v,l)=>`<button class="${finView===v?'on':''}" onclick="finView='${v}';renderView()">${l}</button>`;
-  return `<div class="vtog">${t('month','Monthly plan')}${t('commit','Fixed commitments')}${t('loans','Loans')}${t('cast','Forecast')}</div>`;}
+  const od=iouOverdueCount();
+  return `<div class="vtog">${t('month','Monthly plan')}${t('commit','Fixed commitments')}${t('loans','Loans')}${t('iou','Borrowed &amp; lent')}${od?`<span class="bdg hot" style="align-self:center;margin-left:7px">${od}</span>`:''}${t('cast','Forecast')}</div>`;}
 /* ═══ CASHFLOW FORECAST ═══
    Projects the bank balance forward on planned income minus planned outflow. The point is
    the lumpy months: quarterly/annual commitments and loan EMIs know their own schedule
    (and their end dates), so the dip when school fees + insurance + advance tax collide —
    and the relief when a loan finishes — both show up before they happen. */
-function finPlannedIncome(ym){return FCAT().filter(c=>c.group==='income').reduce((a,c)=>a+finPlanned(c,ym),0);}
+function finPlannedIncome(ym){return FCAT().filter(c=>c.group==='income').reduce((a,c)=>a+finPlanned(c,ym),0)+iouExpectedIn(ym);}
 function finPlannedOutflow(ym){
   const cats=FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finPlanned(c,ym),0);
   const emis=LOAN().filter(l=>(+l.emi>0)&&loanDueIn(l,ym)).reduce((a,l)=>a+(+l.emi||0),0);
-  return cats+emis;}
+  return cats+emis+iouExpectedOut(ym);}
 function finForecast(n){n=n||12;const cur=monthKey(today());const rows=[];
   // Start from where this month actually stands, then apply what's still outstanding
   // and any income not yet received — so month one isn't double-counted.
@@ -2302,7 +2322,7 @@ function finDueItems(ym){const td=today(),out=[];
         act:`<button class="btn xs" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`});});
   out.forEach(i=>{i.overdue=!!(i.due&&i.due<td);});
   return out.sort((a,b)=>(b.overdue-a.overdue)||((a.due||'9999-99')).localeCompare(b.due||'9999-99'));}
-function finOverdueCount(){return finDueItems(monthKey(today())).filter(i=>i.overdue).length;}
+function finOverdueCount(){return finDueItems(monthKey(today())).filter(i=>i.overdue).length+iouOverdueCount();}
 /* ═══ AUTO-DEBIT ═══
    Items flagged auto-debit are recorded once their day has passed, so standing instructions
    don't need a monthly tap. Runs on open and catches up the last few months (idempotent —
@@ -2339,6 +2359,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   const cats=FCAT();
   if(finView==='cast')return vFinForecast();
   if(finView==='loans')return vInvLoans();
+  if(finView==='iou')return vFinIous();
   if(cats.length&&finView==='commit')return vFinCommitments();
   if(!cats.length)return pagehead('PERSONAL','Money','Plan the month, track actuals','')+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
@@ -2480,7 +2501,9 @@ function invGainHtml(delta,added,base,first){
   return `<span class="num" style="color:${up?'var(--grn)':'var(--red)'};font-weight:700">${up?'▲':'▼'} ${fmtMoney(Math.abs(gain))}${denom?invPctStr(gain,denom):''}</span>`;}
 function invToggle(){const t=(v,l)=>`<button class="${invView===v?'on':''}" onclick="invView='${v}';renderView()">${l}</button>`;return `<div class="vtog">${t('overview','Net worth')}${t('holdings','Holdings')}${t('pf','PF accounts')}</div>`;}
 function pfCorpus(){return PFA().reduce((a,r)=>a+pfRowTotal(r),0);}
-function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus()-loanTotalOutstanding();}
+/* Lending is an asset, informal borrowing is a liability -- neither reaches loanTotalOutstanding(),
+   which only knows EMI debt, so both are added here explicitly. */
+function invNetWorth(ym){return invTotalAsOf(ym)+pfCorpus()+iouTotal('lent')-loanTotalOutstanding()-iouTotal('borrowed');}
 function vInvOverview(){if(!invMonth)invMonth=monthKey(today());const ym=invMonth,pm=invPrevMonth(ym),td=today(),isCur=ym===monthKey(td);
   const holds=IH();const pf=pfCorpus();const debt=loanTotalOutstanding();const holdTot=invTotalAsOf(ym);
   const assets=holdTot+pf;const net=assets-debt;
@@ -2604,6 +2627,132 @@ function loanOutstanding(l,ym){if(!loanHasSchedule(l))return +l.outstanding||0;
 function loanNextSplit(l,ym){const out=loanOutstanding(l,ym);const interest=Math.round(out*loanMonRate(l));const principal=Math.max(0,Math.min(out,(+l.emi||0)-interest));return {interest,principal,out};}
 function loanDueIn(l,ym){if(!loanHasSchedule(l))return loanOutstanding(l)>0;if(l.start_ym&&ym<l.start_ym)return false;return l.end_ym>=ym&&l.last_paid_ym!==ym;}
 function loanPaidThisMonth(l,ym){return l.last_paid_ym===ym;}
+/* ═══ BORROWED & LENT ═══
+   Informal debt in both directions: money taken from someone, money given to someone. Kept
+   apart from Loans on purpose. A loan's balance is derived from EMI x months remaining, which
+   is exactly what a borrowing from a relative does not have -- no EMI, no end date, repayments
+   whenever. And a loan is one-directional: loanTotalOutstanding() is subtracted from net worth
+   and every EMI is added to the forecast, so money LENT would come out with the wrong sign in
+   both. Different shape, different table.
+   Outstanding is derived, never stored: principal minus repayments logged against it. */
+const IOU=()=>ious.filter(x=>!x.deleted);
+const IOUTX=id=>ioutx.filter(x=>!x.deleted&&x.iou_id===id).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+const iouRepaid=id=>IOUTX(id).reduce((a,x)=>a+(+x.amount||0),0);
+const iouOutstanding=i=>Math.max(0,(+i.principal||0)-iouRepaid(i.id));
+const iouSettled=i=>iouOutstanding(i)<=0;
+const iouOpen=dir=>IOU().filter(i=>i.dir===dir&&!iouSettled(i));
+const iouTotal=dir=>iouOpen(dir).reduce((a,i)=>a+iouOutstanding(i),0);
+/* Simple interest accrued to date on what is still outstanding. Shown, never compounded and
+   never amortised -- a schedule belongs in Loans. */
+function iouAccrued(i){
+  const r=+i.rate||0; if(!r||!i.date)return 0;
+  const days=Math.max(0,Math.round((new Date(today()+'T12:00')-new Date(i.date+'T12:00'))/86400000));
+  return Math.round(iouOutstanding(i)*(r/100)*(days/365));}
+const iouOverdue=i=>!iouSettled(i)&&!!i.due&&i.due<today();
+const iouOverdueCount=()=>IOU().filter(iouOverdue).length;
+const iouParties=()=>[...new Set(IOU().map(i=>i.party).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+/* Cash actually moves four ways, and the bank balance is wrong unless all four are counted:
+   borrowing money is cash in, repaying it is cash out; lending is cash out, being repaid is
+   cash in. The principal lands in the month of its date, each repayment in the month of its own. */
+const _ym=d=>(d||'').slice(0,7);
+function iouCashIn(ym){
+  return IOU().filter(i=>i.dir==='borrowed'&&_ym(i.date)===ym).reduce((a,i)=>a+(+i.principal||0),0)
+       + IOU().filter(i=>i.dir==='lent').reduce((a,i)=>a+IOUTX(i.id).filter(x=>_ym(x.date)===ym).reduce((b,x)=>b+(+x.amount||0),0),0);}
+function iouCashOut(ym){
+  return IOU().filter(i=>i.dir==='lent'&&_ym(i.date)===ym).reduce((a,i)=>a+(+i.principal||0),0)
+       + IOU().filter(i=>i.dir==='borrowed').reduce((a,i)=>a+IOUTX(i.id).filter(x=>_ym(x.date)===ym).reduce((b,x)=>b+(+x.amount||0),0),0);}
+/* Expected settlements dated in a future month, for the forecast. */
+function iouExpectedIn(ym){return IOU().filter(i=>i.dir==='lent'&&!iouSettled(i)&&_ym(i.due)===ym).reduce((a,i)=>a+iouOutstanding(i),0);}
+function iouExpectedOut(ym){return IOU().filter(i=>i.dir==='borrowed'&&!iouSettled(i)&&_ym(i.due)===ym).reduce((a,i)=>a+iouOutstanding(i),0);}
+function iouRow(i){
+  const out=iouOutstanding(i), repaid=iouRepaid(i.id), pct=(+i.principal)?Math.round(repaid/(+i.principal)*100):0;
+  const done=iouSettled(i), over=iouOverdue(i), acc=iouAccrued(i);
+  const txs=IOUTX(i.id);
+  return `<div class="row ${done?'done':''}" style="align-items:flex-start">
+    <div class="bd">
+      <div class="tt">${esc(i.party||'Someone')}${done?' <span class="pill g">Settled</span>':''}${over?` <span class="pill r">Overdue ${fmtD(i.due)}</span>`:''}</div>
+      <div class="meta">
+        <span class="num"><b>${fmtMoney(out)}</b> of ${fmtMoney(i.principal)}</span>
+        ${repaid?`<span class="pill n num">${pct}% back</span>`:''}
+        ${i.date?`<span>since ${fmtD(i.date)}</span>`:''}
+        ${i.due&&!over&&!done?`<span>due ${fmtD(i.due)}</span>`:''}
+        ${acc?`<span class="pill a num" title="Simple interest accrued to date at ${i.rate}% — shown only, never compounded">+${fmtMoney(acc)} int</span>`:''}
+        ${i.note?`<span>· ${esc(i.note)}</span>`:''}
+      </div>
+      ${repaid?`<div class="subbar" style="margin-top:6px"><i style="width:${Math.min(100,pct)}%"></i></div>`:''}
+      ${txs.length?`<div class="meta" style="margin-top:4px">${txs.map(x=>`<span class="pill n num" title="${esc(x.note||'')}">${fmtD(x.date)} ${fmtMoney(x.amount)} <a class="lnk" onclick="event.stopPropagation();iouTxDel('${x.id}')" title="Remove this repayment">✕</a></span>`).join('')}</div>`:''}
+      ${done?'':`<div class="addline" style="margin-top:6px">
+        <input type="number" id="iouAmt_${i.id}" placeholder="Amount" style="max-width:120px" value="${out}">
+        <input type="date" id="iouDate_${i.id}" value="${today()}" style="max-width:150px">
+        <button class="btn sm" onclick="iouAddTx('${i.id}')">${i.dir==='lent'?'Received':'Repaid'}</button></div>`}
+    </div>
+    <div class="rowacts"><button class="iconb" title="Edit" onclick="openIou('${i.id}')">✎</button>
+      <button class="iconb" title="Delete" onclick="iouDel('${i.id}')">✕</button></div></div>`;}
+
+function vFinIous(){
+  const borrowed=IOU().filter(i=>i.dir==='borrowed'), lent=IOU().filter(i=>i.dir==='lent');
+  const oB=iouTotal('borrowed'), oL=iouTotal('lent'), net=oL-oB;
+  const sort=a=>a.slice().sort((x,y)=>(iouSettled(x)-iouSettled(y))||((x.due||'9999').localeCompare(y.due||'9999')));
+  const empty=d=>`<div class="empty">${d==='borrowed'
+    ? 'Nothing borrowed. Add money you have taken from someone — informally, without an EMI. A loan with a fixed EMI and end date belongs in <a class="lnk" onclick="finView=\'loans\';renderView()">Loans</a> instead.'
+    : 'Nothing lent. Add money you have given someone and expect back.'}</div>`;
+  return pagehead('PERSONAL','Borrowed &amp; lent','Informal money in both directions',
+    finMoneyToggle()+`<button class="btn sm" onclick="openIou(null,'lent')">+ Lent</button><button class="btn gh2 sm" onclick="openIou(null,'borrowed')">+ Borrowed</button>`)+
+  `<div class="kpis">
+    <div class="kpi ${oB?'bad':''}"><div class="kv num">${fmtMoney(oB)}</div><div class="kl">You owe</div></div>
+    <div class="kpi"><div class="kv num">${fmtMoney(oL)}</div><div class="kl">Owed to you</div></div>
+    <div class="kpi ${net<0?'bad':'good'}"><div class="kv num">${fmtMoney(Math.abs(net))}</div><div class="kl">${net<0?'Net you owe':'Net owed to you'}</div></div>
+  </div>
+  ${seccard('You owe',iouOpen('borrowed').length,sort(borrowed.filter(i=>!iouSettled(i))).map(iouRow).join(''),empty('borrowed'))}
+  ${seccard('Owed to you',iouOpen('lent').length,sort(lent.filter(i=>!iouSettled(i))).map(iouRow).join(''),empty('lent'))}
+  ${(()=>{const done=IOU().filter(iouSettled).sort((a,b)=>(b.updated_at||'').localeCompare(a.updated_at||''));
+    /* Settled entries live in their own section rather than padding the two live counts --
+       "You owe (3)" has to mean three things you still owe. They stay on the page because a
+       cleared debt is history worth keeping, not a record to hide. */
+    return done.length?seccard('Settled',done.length,done.map(iouRow).join(''),''):'';})()}
+  <p class="note">Both sides count toward net worth, and every movement reaches the monthly plan — borrowing is cash in, repaying is cash out, lending is cash out, being repaid is cash in, each in the month it is dated. An expected settlement with a due date also shows in the forecast.</p>`;}
+
+let editIou=null;
+function openIou(id,dir){
+  editIou=id?ious.find(x=>x.id===id):null; const i=editIou;
+  g('mIouTitle').firstChild.textContent=(i?'Edit':'New')+' '+((i?i.dir:dir)==='lent'?'lending':'borrowing')+' ';
+  g('iouDir').value=i?i.dir:(dir||'borrowed');
+  g('iouParty').value=i?.party||''; g('iouPrincipal').value=i?i.principal:'';
+  g('iouDate').value=i?.date||today(); g('iouDue').value=i?.due||'';
+  g('iouRate').value=(i&&i.rate)?i.rate:''; g('iouNote').value=i?.note||'';
+  g('iouPartyDL').innerHTML=iouParties().map(x=>`<option value="${esc(x)}">`).join('');
+  g('iouDel').style.display=i?'':'none';
+  g('mIou').classList.add('open'); setTimeout(()=>g('iouParty').focus(),50);}
+function saveIou(){
+  const party=g('iouParty').value.trim(), amt=+g('iouPrincipal').value||0;
+  if(!party){toast('Who is it with?');return;}
+  if(amt<=0){toast('Enter an amount.');return;}
+  const n=now();
+  const d={dir:g('iouDir').value,party,principal:amt,date:g('iouDate').value||today(),
+    due:g('iouDue').value||null,rate:+g('iouRate').value||0,note:g('iouNote').value.trim(),updated_at:n};
+  if(editIou)Object.assign(editIou,d); else ious.push(Object.assign({id:uid(),created_at:n},d));
+  closeM();persist();reRender();toast('Saved.');}
+async function iouDel(id){
+  const i=ious.find(x=>x.id===id); if(!i)return;
+  const txs=IOUTX(id).length;
+  if(!await askConfirm(`Delete this entry with ${i.party}?`+(txs?` Its ${txs} logged repayment${txs>1?'s':''} go too.`:''),{ok:'Delete',danger:true}))return;
+  const n=now(); IOUTX(id).forEach(x=>{x.deleted=true;x.updated_at=n;});
+  i.deleted=true;i.updated_at=n; closeM();persist();reRender();toast('Deleted.');}
+async function delIouModal(){if(editIou)await iouDel(editIou.id);}
+function iouAddTx(id){
+  const i=ious.find(x=>x.id===id); if(!i)return;
+  const amt=+g('iouAmt_'+id).value||0, date=g('iouDate_'+id).value||today();
+  if(amt<=0){toast('Enter an amount.');return;}
+  const out=iouOutstanding(i);
+  if(amt>out&&!confirmOver(amt,out))return;
+  const n=now();
+  ioutx.push({id:uid(),iou_id:id,date,amount:amt,note:'',created_at:n,updated_at:n});
+  persist();reRender();
+  toast(iouSettled(i)?'Settled with '+i.party+'.':fmtMoney(iouOutstanding(i))+' still outstanding.');}
+/* Overpaying is almost always a typo, but occasionally real (interest paid on top). Warn, allow. */
+function confirmOver(amt,out){return amt<=out||window.confirm('That is more than the '+fmtMoney(out)+' outstanding. Record it anyway?');}
+function iouTxDel(txid){const x=ioutx.find(t=>t.id===txid);if(!x)return;
+  x.deleted=true;x.updated_at=now();persist();reRender();}
 function loanTotalOutstanding(){return LOAN().reduce((a,l)=>a+loanOutstanding(l),0);}
 function loanTotalEmi(){return LOAN().reduce((a,l)=>a+(+l.emi||0),0);}
 function loanBankPaidTotal(ym){return LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&l.last_paid_ym===ym).reduce((a,l)=>a+(+l.emi||0),0);}
