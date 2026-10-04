@@ -1009,9 +1009,10 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <!-- Generic ask/confirm dialog -->
 <div class="ovl" id="mAsk"><div class="modal" style="max-width:420px">
   <h3 id="askTitle">Confirm</h3>
-  <div class="mbody"><div id="askMsg" style="font-size:13px;color:var(--t2);line-height:1.55;margin-bottom:10px"></div>
+  <div class="mbody"><div id="askMsg" style="font-size:13px;color:var(--t2);line-height:1.55;margin-bottom:10px;white-space:pre-line"></div>
   <div class="fld" id="askField" style="display:none"><input id="askInput" list="askInputDL"><datalist id="askInputDL"></datalist></div>
-  <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div></div>
+  <div id="askChoices" style="display:none;flex-direction:column;gap:6px"></div>
+  <div id="askAlt" style="display:none;margin-top:10px"></div></div>
   <div class="macts"><button class="btn gh2" id="askCancel" onclick="askResolve(null)">Cancel</button>
   <div class="rr"><button class="btn" id="askOk" onclick="askOk()">OK</button></div></div>
 </div></div>
@@ -1511,7 +1512,8 @@ async function ensureEncKey(salt,interactive){
   if(!interactive)return null;                       // background work never prompts
   if(_encAsk)return _encAsk;                          // a prompt is already open — reuse it
   _encAsk=(async()=>{const d=encRememberDays();
-    const pass=await askText(`Enter the passphrase for your encrypted db.json${d?` — this device will remember it for ${d===1?'1 day':d+' days'}`:''}:`,{title:'Unlock db.json',type:'password',ok:'Unlock'});
+    const moved=_encMeta&&_encMeta.salt&&salt!==_encMeta.salt;
+    const pass=await askText(`${moved?'db.json was re-encrypted with a new passphrase on another device. ':''}Enter the passphrase for your encrypted db.json${d?` — this device will remember it for ${d===1?'1 day':d+' days'}`:''}:`,{title:'Unlock db.json',type:'password',ok:'Unlock',alt:{label:'Forgot passphrase?',fn:forgotPassphrase}});
     if(!pass)throw new Error('no pass');
     const k=await deriveKey(pass,salt),ok=await encVerify(k,salt);
     if(ok===false){toast('Wrong passphrase — try again.');throw new Error('no pass');}
@@ -1522,6 +1524,7 @@ async function ensureEncKey(salt,interactive){
 async function decEnvelope(env){if(!_encKey){await ensureEncKey(env.salt,true);
     if(!_encMeta){_encMeta={on:true,salt:env.salt};localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}}
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(env.iv)},_encKey,ub64(env.ct));
+  if(_encMeta&&env.salt&&env.salt!==_encMeta.salt){_encMeta.salt=env.salt;delete _encMeta.chk;try{localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));}catch(e){}}
   // a successful decrypt proves the key: keep a check value for next time, and remember a typed passphrase
   if(_encMeta&&env.salt===_encMeta.salt&&!(_encMeta.chk&&_encMeta.chk.salt===_encMeta.salt))await encMakeCheck();
   if(_encTyped)await encRemSave();
@@ -1531,6 +1534,52 @@ async function setEncRemember(v){const d=Math.max(0,+v||0);try{localStorage.setI
   if(!d){await encRemClear();toast('This device will ask for the passphrase every launch.');}
   else if(_encKey){await encRemSave(true);toast(`Remembered on this device until ${encRemLabel()}.`);}
   renderView();}
+/* ── Change or replace the passphrase ──
+   Both end the same way: a new salt and key, the file re-encrypted from this device's copy and
+   written over db.json. They differ in what comes first. Change knows the old passphrase, so it
+   pulls and merges the latest file before re-keying -- nothing is lost. Forgot cannot read the old
+   file, so it saves that file aside first (db-before-reset-….json) and warns that changes made on
+   other devices since this one last synced are not included. */
+const _hasLocalData=()=>['tasks','customers','people','meetings','fintx','invhold','loans','family','ious'].some(t=>(window[t]||[]).some(x=>!x.deleted));
+async function encBackupOld(){const stamp=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-'),name=`db-before-reset-${stamp}.json`;let ok=false;
+  if(_fsDir){try{const fh=await _fsDir.getFileHandle(DB_FILE);const txt=await(await fh.getFile()).text();
+      const bh=await _fsDir.getFileHandle(name,{create:true});const w=await bh.createWritable();await w.write(txt);await w.close();ok=true;}catch(e){}}
+  if(gActive()&&!_gNeedsReauth){try{const t=await gToken();const r=await fetch(GRAPH_FILE+':/content',{headers:{Authorization:'Bearer '+t}});
+      if(r.ok){const txt=await r.text();const p=await fetch(GRAPH_DIR+'/'+name+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:txt});ok=ok||p.ok;}
+      else if(r.status===404)ok=true;}catch(e){}}                      // nothing there yet: nothing to keep
+  return ok?name:null;}
+async function encAskNew(title){const p1=await askText('New passphrase (losing it means losing the synced file):',{title,type:'password',ok:'Next'});if(!p1)return null;
+  if(p1.length<6){toast('Use at least 6 characters.');return null;}
+  const p2=await askText('Repeat the new passphrase:',{title,type:'password',ok:'Save'});if(p2==null)return null;
+  if(p1!==p2){toast('Passphrases do not match.');return null;}return p1;}
+async function encRekey(pass){
+  _encMeta={on:true,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};_encKey=await deriveKey(pass,_encMeta.salt);
+  localStorage.setItem(ENC_KEY,JSON.stringify(_encMeta));await encRemClear();await encMakeCheck();await encRemSave(true);
+  // the remote copy is now unreadable with the new key: mark it as already seen so the save overwrites it instead of pulling
+  if(gActive()&&!_gNeedsReauth){try{const mt=await gMeta();if(mt){_gLastM=mt.m;if(mt.etag)_gEtag=mt.etag;}}catch(e){}}
+  if(_fsDir){try{_fsLastM=await fMtime();}catch(e){}}
+  persist();
+  if(_fsDir)await saveToFile();
+  if(gActive()&&!_gNeedsReauth)await gSave();}
+async function changePassphrase(){if(!(_encMeta&&_encMeta.on))return;
+  const cur=await askText('Current passphrase:',{title:'Change passphrase',type:'password',ok:'Next',alt:{label:'Forgot passphrase?',fn:forgotPassphrase}});if(cur==null)return;
+  const k=await deriveKey(cur,_encMeta.salt),ok=await encVerify(k,_encMeta.salt);
+  if(ok===false){toast('Wrong passphrase.');return;}
+  if(ok===null){toast('Sync once on this device first, then change the passphrase.');return;}
+  _encKey=k;
+  try{if(gActive()&&!_gNeedsReauth)await gPull(true);if(_fsDir)await pullDisk(true);}catch(e){toast('Could not fetch the latest db.json — try again when online.');return;}
+  const p=await encAskNew('Change passphrase');if(!p)return;
+  await encRekey(p);toast('Passphrase changed. Other devices will ask for the new one.');renderView();}
+async function forgotPassphrase(){
+  if(!(_encMeta&&_encMeta.on)){toast('Encryption is not on.');return;}
+  if(!_hasLocalData()){await askConfirm('A passphrase cannot be recovered — it is the key that encrypts db.json. This device holds no copy of your data, so replacing the passphrase from here would replace db.json with an empty file.\n\nOpen Clario on a device that has your data and choose "Forgot passphrase?" there, or keep trying passphrases you may have used.',{title:'Forgot passphrase',ok:'OK'});return;}
+  if(!await askConfirm(`A passphrase cannot be recovered — it is the key that encrypts db.json. What you can do is set a new passphrase and re-encrypt db.json from the copy on this device.\n\n• Changes made on other devices since this one last synced are not in this copy and will not carry over.\n• The current db.json is saved aside first as db-before-reset-….json, so it can still be opened if the old passphrase comes back to you.\n• Every other device will ask for the new passphrase.`,{title:'Forgot passphrase',ok:'Set a new passphrase'}))return;
+  const ok=await proveOwner('pass');if(!ok)return;
+  if(ok==='none'&&!await askConfirm('Nothing else is set up on this device to prove it is you (no OneDrive sign-in, PIN or recovery code). Continue anyway?',{title:'Forgot passphrase',ok:'Continue',danger:true}))return;
+  const p=await encAskNew('New passphrase');if(!p)return;
+  const bak=await encBackupOld();
+  if(!bak&&(_fsDir||gActive())&&!await askConfirm('The current db.json could not be saved aside. Replace it anyway?',{title:'Forgot passphrase',ok:'Replace it',danger:true}))return;
+  await encRekey(p);toast(bak?`New passphrase set. The old file was kept as ${bak}.`:'New passphrase set.');renderView();}
 async function encForget(){await encRemClear();toast('Forgotten on this device — the next launch asks for the passphrase.');renderView();}
 const encRemLabel=()=>_encRemUntil?new Date(_encRemUntil).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
 async function serializeDb(opts){const json=JSON.stringify(getState(),null,2);
@@ -1551,10 +1600,63 @@ async function pinVerify(pin){if(!pinIsSet())return false;try{return (await pinH
 async function _pinCapture(keepUnlocked){const p1=await askText('Enter a PIN (4–12 digits):',{title:'Personal PIN',type:'password',ok:'Next'});if(p1===null)return false;const pin=(p1||'').trim();
   if(!/^\d{4,12}$/.test(pin)){toast('PIN must be 4–12 digits.');return false;}
   const p2=await askText('Re-enter the PIN:',{title:'Confirm PIN',type:'password',ok:'Save'});if(p2===null)return false;if((p2||'').trim()!==pin){toast('PINs do not match.');return false;}
-  const salt=b64(crypto.getRandomValues(new Uint8Array(16)));const hash=await pinHash(pin,salt);_pinCfg={salt,hash};localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));_personalUnlocked=!!keepUnlocked;_pinAttempts=0;_pinLockUntil=0;return true;}
+  const salt=b64(crypto.getRandomValues(new Uint8Array(16)));const hash=await pinHash(pin,salt);_pinCfg={salt,hash};
+  localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));_personalUnlocked=!!keepUnlocked;_pinAttempts=0;_pinLockUntil=0;
+  await pinNewRecovery();              // every new PIN gets a fresh recovery code; an old code stops working
+  return true;}
+/* Recovery code: shown once, stored only as a slow hash, works once. It is the one way back that
+   needs neither OneDrive nor encryption to be set up. No 0/O/1/I/L so it survives being written down. */
+const RC_ABC='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const rcNorm=c=>(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+async function pinNewRecovery(){const r=crypto.getRandomValues(new Uint8Array(12));
+  const code=[...r].map(x=>RC_ABC[x%RC_ABC.length]).join('');const salt=b64(crypto.getRandomValues(new Uint8Array(16)));
+  _pinCfg.rc={salt,hash:await pinHash(code,salt)};localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));   // saved before it is shown
+  const shown=code.match(/.{4}/g).join('-');window._lastRc=shown;
+  if(await askConfirm(`Your PIN recovery code:\n\n${shown}\n\nKeep it somewhere safe (not on this device). If you forget your PIN it lets you set a new one. It works once and is replaced when you change the PIN.`,{title:'Save your recovery code',ok:'Copy and close'}))
+    {try{await navigator.clipboard.writeText(shown);toast('Recovery code copied.');}catch(e){}}
+  return shown;}
+async function rcVerify(code){const rc=_pinCfg&&_pinCfg.rc;if(!rc)return false;try{return (await pinHash(rcNorm(code),rc.salt))===rc.hash;}catch(e){return false;}}
+async function newRecoveryCode(){const cur=await askText('Enter your current PIN to make a new recovery code:',{title:'New recovery code',type:'password',ok:'Next',alt:{label:'Forgot PIN?',fn:forgotPin}});
+  if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}await pinNewRecovery();renderView();}
+
+/* ── Prove you own this data, for a reset. Offers only what is set up on this device. ── */
+async function proveOwner(purpose){const ch=[];
+  if(gActive())ch.push({value:'ms',label:`Sign in again with Microsoft (${_gAcct.username||'your account'})`});
+  if(purpose==='pin'&&_encMeta&&_encMeta.on&&_encMeta.chk)ch.push({value:'pass',label:'Enter your db.json encryption passphrase'});
+  if(purpose==='pass'&&pinIsSet())ch.push({value:'pin',label:'Enter your Personal PIN'});
+  if(pinIsSet()&&_pinCfg.rc)ch.push({value:'rc',label:'Enter your PIN recovery code'});
+  if(purpose==='pin')ch.push({value:'reset',label:'None of these — reset this device'});
+  if(!ch.length)return'none';
+  const how=await askChoice(purpose==='pin'?'Prove it is you, then choose a new PIN:':'Prove it is you before replacing the passphrase:',ch,{title:'Verify it is you'});
+  if(!how)return false;
+  if(how==='reset')return'reset';
+  if(how==='ms'){try{const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite'],account:_gAcct,prompt:'login'});
+      if(r&&r.account&&r.account.homeAccountId===_gAcct.homeAccountId)return'ms';toast('That is a different Microsoft account.');return false;}
+    catch(e){toast(/popup/i.test(e&&e.message||'')?'The sign-in window was blocked — allow pop-ups for this app and try again.':'Microsoft sign-in was not completed.');return false;}}
+  if(how==='pass'){const v=await askText('db.json passphrase:',{title:'Verify it is you',type:'password',ok:'Verify'});if(!v)return false;
+    if(await encVerify(await deriveKey(v,_encMeta.salt),_encMeta.salt))return'pass';toast('Wrong passphrase.');return false;}
+  if(how==='pin'){const v=await askText('Personal PIN:',{title:'Verify it is you',type:'password',ok:'Verify'});if(!v)return false;
+    if(await pinVerify(v.trim()))return'pin';toast('Wrong PIN.');return false;}
+  if(how==='rc'){const v=await askText('Recovery code (the dashes are optional):',{title:'Verify it is you',ok:'Verify',placeholder:'XXXX-XXXX-XXXX'});if(!v)return false;
+    if(await rcVerify(v)){delete _pinCfg.rc;localStorage.setItem(PIN_KEY,JSON.stringify(_pinCfg));return'rc';}   // single use
+    toast('That recovery code does not match.');return false;}
+  return false;}
+async function forgotPin(){if(!pinIsSet()){toast('No PIN is set on this device.');return;}
+  const ok=await proveOwner('pin');if(!ok)return;
+  if(ok==='reset')return resetDevice();
+  if(await _pinCapture(true)){toast('New PIN set.');reRender();}}
+/* Last resort: forget everything on this device. The data is not lost if it was synced -- signing
+   in to OneDrive again (which needs the Microsoft password) or relinking the folder brings it back. */
+async function resetDevice(){
+  const synced=gActive()?'OneDrive':_fsDir?'the linked folder':'';
+  const v=await askText(`This erases everything stored in this browser: all data, the PIN, the OneDrive sign-in, the folder link and the remembered passphrase. ${synced?`Your data stays in ${synced}; sign in or relink afterwards to get it back${_encMeta&&_encMeta.on?' (you will need the db.json passphrase)':''}. Changes not yet synced are lost.`:'Nothing is synced, so the data on this device will be gone for good — export a backup first if you can.'}\n\nType RESET to continue:`,{title:'Reset this device',ok:'Erase this device',placeholder:'RESET'});
+  if((v||'').trim().toUpperCase()!=='RESET'){if(v!=null)toast('Nothing was erased.');return;}
+  try{localStorage.clear();sessionStorage.clear();}catch(e){}
+  try{await new Promise(res=>{const r=indexedDB.deleteDatabase('cx_fs');r.onsuccess=r.onerror=r.onblocked=()=>res();});}catch(e){}
+  location.reload();}
 async function setPin(){if(pinIsSet())return changePin();if(await _pinCapture(false)){toast('Personal PIN set — it will ask for the PIN next time you open Personal.');renderView();}}
-async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture(true)){toast('PIN updated.');renderView();}}
-async function removePin(){if(!pinIsSet())return;const cur=await askText('Enter your current PIN to remove the lock:',{title:'Remove lock',type:'password',ok:'Remove'});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}_pinCfg=null;localStorage.removeItem(PIN_KEY);_personalUnlocked=false;toast('Personal lock removed.');renderView();}
+async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next',alt:{label:'Forgot PIN?',fn:forgotPin}});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture(true)){toast('PIN updated.');renderView();}}
+async function removePin(){if(!pinIsSet())return;const cur=await askText('Enter your current PIN to remove the lock:',{title:'Remove lock',type:'password',ok:'Remove',alt:{label:'Forgot PIN?',fn:forgotPin}});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}_pinCfg=null;localStorage.removeItem(PIN_KEY);_personalUnlocked=false;toast('Personal lock removed.');renderView();}
 function lockPersonal(){_personalUnlocked=false;renderView();}
 async function pinTry(){if(_pinLockUntil>Date.now())return;const el=g('pinInput');const pin=(el?el.value:'').trim();if(!pin)return;
   if(await pinVerify(pin)){_personalUnlocked=true;_pinAttempts=0;_pinLockUntil=0;reRender();return;}
@@ -1567,7 +1669,8 @@ function vPersonalLock(){const blocked=_pinLockUntil>Date.now();
     <p class="note" style="margin:0 0 4px">Enter your PIN to unlock the Personal section on this device.</p>
     <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="••••" ${blocked?'disabled':''} onkeydown="if(event.key==='Enter')pinTry()">
     <div id="pinErr" class="pinerr">${blocked?'Too many attempts — wait 30 seconds.':''}</div>
-    <button class="btn" ${blocked?'disabled':''} onclick="pinTry()">Unlock</button></div></div>`;}
+    <button class="btn" ${blocked?'disabled':''} onclick="pinTry()">Unlock</button>
+    <div style="margin-top:12px"><button type="button" class="btn gh2 xs" onclick="forgotPin()">Forgot PIN?</button></div></div></div>`;}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){_pinHiddenAt=Date.now();}else if(_pinHiddenAt&&pinIsSet()&&Date.now()-_pinHiddenAt>180000){_personalUnlocked=false;if(appMode==='personal')reRender();}});
 
 /* ═══ ONEDRIVE SYNC ═══ */
@@ -2243,7 +2346,7 @@ function gCard(){const on=gActive();
   ${on?'':`<div style="margin-top:8px"><input id="gClient" placeholder="Azure application (client) ID" value="${esc(_gCfg?_gCfg.clientId:'')}" style="width:100%"></div>`}
   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
     ${_gNeedsReauth?`<button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:on?`<button class="btn gh2 sm" onclick="gSyncNow()">Sync now ⇅</button><button class="btn gh2 sm" onclick="gSignOut()">Sign out</button>`:`<button class="btn sm" onclick="gSignIn()">Sign in with Microsoft</button>`}</div>
-  <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are pulled every 20 seconds. Saves pull-and-merge first and use an ETag check so two devices never overwrite each other; a failed save is kept pending and retried automatically (with backoff), on reconnect, and when the app is reopened.'}</p></div>`;}
+  <p class="note">${_gNeedsReauth?'Your Microsoft sign-in session expired — common after the app has been closed for a while, or a password/MFA change. Click <b>Reconnect</b> — no need to sign out first.':'Signs into your personal Microsoft account and syncs <b>Apps/Clario/db.json</b> in OneDrive directly — phone, iPad, laptop, any browser. Azure app registration must allow <b>personal Microsoft accounts</b> and have an SPA redirect URI of exactly <b>'+esc(location.origin+location.pathname)+'</b>. Changes from other devices are pulled every 20 seconds. Saves pull-and-merge first and use an ETag check so two devices never overwrite each other; a failed save is kept pending and retried automatically (with backoff), on reconnect, and when the app is reopened.'}</p><p class="note">Forgot your Microsoft password? Choose <b>Forgot password</b> in the Microsoft sign-in window, or reset it at <a href="https://account.live.com/password/reset" target="_blank" rel="noopener noreferrer">account.live.com</a> (personal account) / <a href="https://passwordreset.microsoftonline.com" target="_blank" rel="noopener noreferrer">passwordreset.microsoftonline.com</a> (work or school). Then use <b>Reconnect</b> here.</p></div>`;}
 /* ═══ PERSONAL MODE — minimal task list, family owners, birthdays ═══ */
 function prow(t){const td=today();const over=t.status!=='done'&&t.due&&t.due<td;
   return`<div class="row ${t.status==='done'?'done':''}"><button class="chk ${t.status==='done'?'on':''}" onclick="togglePersonalTask('${t.id}')">${t.status==='done'?'✓':''}</button>
@@ -5054,11 +5157,12 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     ${enc?(()=>{const d=encRememberDays(),o=(v,l)=>`<option value="${v}"${d===v?' selected':''}>${l}</option>`;
       return `<div class="srow"><span>Remember passphrase on this device</span><select id="encRemSel" onchange="setEncRemember(this.value)" style="width:auto">${o(0,'Ask every launch')}${o(1,'1 day')}${o(7,'7 days')}${o(30,'30 days')}</select></div>
       <div class="srow"><span>Status</span><b>${_encRemUntil>Date.now()?`Remembered until ${encRemLabel()}`:_encKey?'Unlocked for this session':'Locked'}</b></div>`;})():''}
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${enc?`<button class="btn gh2 sm" onclick="disableEnc()">Turn off</button>${_encRemUntil>Date.now()?'<button class="btn gh2 sm" onclick="encForget()">Forget on this device</button>':''}`:'<button class="btn sm" onclick="enableEnc()">Encrypt db.json</button>'}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${enc?`<button class="btn gh2 sm" onclick="changePassphrase()">Change passphrase</button><button class="btn gh2 sm" onclick="forgotPassphrase()">Forgot passphrase?</button><button class="btn gh2 sm" onclick="disableEnc()">Turn off</button>${_encRemUntil>Date.now()?'<button class="btn gh2 sm" onclick="encForget()">Forget on this device</button>':''}`:'<button class="btn sm" onclick="enableEnc()">Encrypt db.json</button>'}</div>
     <p class="note">${enc?'db.json in OneDrive is encrypted with your passphrase (PBKDF2 + AES-GCM). The local cache on each device is protected by your Windows/phone login. Remembering keeps a locked key in this browser (it can be used, never read out) until the date shown, counted from when you last typed the passphrase — then it asks again. Choose "Ask every launch" on a shared computer.':'Anyone who can open db.json in OneDrive can read it. Turn encryption on if it carries customer or KAM material.'} Losing the passphrase means losing the synced file — there is no recovery.</p></div>
   <div class="setcard"><h4>Personal section lock</h4>
     <div class="srow"><span>PIN lock</span><b>${pinIsSet()?'On':'Off'}</b></div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?'<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>':'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
+    ${pinIsSet()?`<div class="srow"><span>Recovery code</span><b>${_pinCfg.rc?'Saved':'<span style="color:var(--amb-d)">Not set — create one</span>'}</b></div>`:''}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${pinIsSet()?`<button class="btn gh2 sm" onclick="changePin()">Change PIN</button><button class="btn gh2 sm" onclick="forgotPin()">Forgot PIN?</button><button class="btn gh2 sm" onclick="newRecoveryCode()">${_pinCfg.rc?'New recovery code':'Create recovery code'}</button><button class="btn gh2 sm" onclick="removePin()">Remove lock</button>`:'<button class="btn sm" onclick="setPin()">Set a PIN</button>'}</div>
     <p class="note">A PIN gate on the Personal section (Money, Investments, personal tasks) so it isn't opened casually on an unlocked device. It re-locks on reload and after the app is in the background a few minutes; changing or removing it needs the current PIN. This is an access deterrent, not encryption — the data on this device is not encrypted at rest, so anyone with technical access to the browser storage can still read it. For real at-rest protection, keep a device passcode/disk encryption on and turn on db.json encryption above.</p></div>
   <div class="setcard"><h4>Weekly offs${coTag()}</h4>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${WEEKDAY_FULL.map((d,i)=>`<span class="attchip ${(workWeek.off||[]).includes(i)?'on':''}" onclick="toggleWeekOff(${i})" title="${esc(d)}">${esc(d.slice(0,3))}</span>`).join('')}</div>
@@ -5364,14 +5468,18 @@ function csvPickUI(){const k=g('csvPick')&&g('csvPick').value;if(!k)return;const
     :'Pick a data set, then download its template, export current data, or import a filled CSV. Templates open in Excel — fill rows, <b>File → Save As → CSV</b>, then Import. Names do the linking: owners, accounts and contacts are matched by name and created if missing. People, accounts, contacts, departments and products match existing records and update; tasks, deals, meetings, decisions and ideas always add new rows. Dates: YYYY-MM-DD or DD/MM/YYYY.';}
 /* ═══ DIALOG ENGINE (replaces prompt/confirm — reliable in iOS PWA) ═══ */
 let _askCb=null,_askKind='confirm';
-function askResolve(v){const o=g('mAsk');if(o)o.classList.remove('open');const cb=_askCb;_askCb=null;if(cb)cb(v);}
+let _askAltFn=null;
+function askAltSet(alt){const el=g('askAlt');if(!el)return;_askAltFn=alt?alt.fn:null;
+  el.style.display=alt?'':'none';el.innerHTML=alt?`<button type="button" class="btn gh2 xs" onclick="askAltGo()">${esc(alt.label)}</button>`:'';}
+function askAltGo(){const f=_askAltFn;askResolve(null);if(f)setTimeout(f,0);}
+function askResolve(v){const o=g('mAsk');if(o)o.classList.remove('open');askAltSet(null);const cb=_askCb;_askCb=null;if(cb)cb(v);}
 function askOk(){if(_askKind==='text'){askResolve(g('askInput').value);}else if(_askKind==='people'){askResolve([...(window._askPplSel||[])]);}else askResolve(true);}
-function askConfirm(msg,opts={}){return new Promise(res=>{_askKind='confirm';_askCb=res;
+function askConfirm(msg,opts={}){return new Promise(res=>{_askKind='confirm';_askCb=res;askAltSet(opts.alt||null);
   g('askTitle').textContent=opts.title||'Confirm';g('askMsg').textContent=msg;
   g('askField').style.display='none';g('askChoices').style.display='none';g('askOk').style.display='';
   g('askOk').textContent=opts.ok||'Confirm';g('askOk').className='btn'+(opts.danger?' dg':'');g('askCancel').style.display='';
   g('mAsk').classList.add('open');});}
-function askText(msg,opts={}){return new Promise(res=>{_askKind='text';_askCb=res;
+function askText(msg,opts={}){return new Promise(res=>{_askKind='text';_askCb=res;askAltSet(opts.alt||null);
   g('askTitle').textContent=opts.title||'Enter';g('askMsg').textContent=msg;
   g('askField').style.display='';g('askChoices').style.display='none';g('askOk').style.display='';
   const inp=g('askInput');inp.value=opts.value||'';inp.placeholder=opts.placeholder||'';inp.type=opts.type||'text';
@@ -5379,7 +5487,7 @@ function askText(msg,opts={}){return new Promise(res=>{_askKind='text';_askCb=re
   g('askOk').textContent=opts.ok||'Save';g('askOk').className='btn';g('askCancel').style.display='';
   g('mAsk').classList.add('open');setTimeout(()=>inp.focus(),60);
   inp.onkeydown=e=>{if(e.key==='Enter')askOk();};});}
-function askChoice(msg,choices,opts={}){return new Promise(res=>{_askKind='choice';_askCb=res;
+function askChoice(msg,choices,opts={}){return new Promise(res=>{_askKind='choice';_askCb=res;askAltSet(opts.alt||null);
   g('askTitle').textContent=opts.title||'Choose';g('askMsg').textContent=msg;
   g('askField').style.display='none';const box=g('askChoices');box.style.display='flex';
   box.innerHTML=choices.map((c,i)=>`<button class="btn gh2" style="justify-content:flex-start;text-align:left" onclick="askResolve('${c.value}')">${esc(c.label)}</button>`).join('');
