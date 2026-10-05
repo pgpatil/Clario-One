@@ -82,7 +82,7 @@ const URL_=process.env.CLARIO_URL || 'http://localhost:8934/index.html';
 
   console.log('\n═══ reset the PIN by signing in to Microsoft again');
   const viaMs = await page.evaluate(async()=>{const calls=[];
-    window._gAcct={homeAccountId:'acct-A',username:'pankaj@outlook.com'};
+    window._gAcct={homeAccountId:'acct-A',username:'user@example.com'};
     window._msal={acquireTokenPopup:async o=>{calls.push(o);return {account:{homeAccountId:window.T_msAcct}};}};
     window.T_msAcct='acct-B';
     await T_run(()=>forgotPin(),[{choose:'Microsoft'}]);

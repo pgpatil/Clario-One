@@ -20,7 +20,7 @@ const URL_=process.env.CLARIO_URL || 'http://localhost:8934/index.html';
     const n=now(), td=today();
     // a state exactly as the previous version saved it: no companies, no co
     const legacy={version:'8.0.0',updatedAt:n,companyName:'Acme Foods',depts:['Ops','Sales'],products:['Spices'],regions:['South'],
-      acctGroups:['Tata'],workWeek:{off:[0,6],satRule:'none'},locationsList:['Kochi'],taskLabels:[],myProfile:{name:'Pankaj'},
+      acctGroups:['Tata'],workWeek:{off:[0,6],satRule:'none'},locationsList:['Kochi'],taskLabels:[],myProfile:{name:'Test User'},
       tasks:[{id:'a1',title:'Acme task',type:'task',owner:'me',due:td,status:'open',created_at:n,updated_at:n},
              {id:'p1',scope:'personal',title:'Pay rent',type:'task',owner:'me',due:td,status:'open',created_at:n,updated_at:n},
              {id:'p1s',scope:'personal',parent_id:'p1',title:'Transfer',type:'task',owner:'me',due:td,status:'open',created_at:n,updated_at:n}],

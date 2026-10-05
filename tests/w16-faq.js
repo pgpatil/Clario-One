@@ -41,6 +41,10 @@ const FINDS = [
   ['3rd thursday',        'Recurring tasks'],
   ['clear future',        'Your location for the day'],
   ['birthday',            'Birthdays and family'],
+  ['privacy',             'Privacy — what leaves this device'],
+  ['analytics',           'Privacy — what leaves this device'],
+  ['wipe',                'Wipe this device vs delete everything'],
+  ['delete everything',   'Wipe this device vs delete everything'],
 ];
 
 (async () => {

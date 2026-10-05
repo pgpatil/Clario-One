@@ -48,6 +48,12 @@ Two independent, unrelated sync systems — check which one is relevant before d
 
 **Forgot PIN / Forgot passphrase** (`forgotPin`, `forgotPassphrase`, `changePassphrase`, `proveOwner`): there is no server, so a reset needs proof from something else the owner holds — Microsoft re-sign-in with `prompt:'login'` (must match `_gAcct.homeAccountId`), the db.json passphrase, the Personal PIN, or the single-use PIN recovery code (`_pinCfg.rc`, hash only, regenerated with every new PIN). Last resort for the PIN is `resetDevice()` (wipes this browser; synced data returns via OneDrive/folder). A passphrase can't be recovered: "forgot" re-keys db.json from this device's copy after saving the old file aside as `db-before-reset-….json`, and refuses on a device with no data. Devices that read a file with a new salt adopt it (`decEnvelope`) — otherwise their saves would label the file with the old salt. `tests/w15-forgot-reset.js` guards all of this.
 
+**Content-Security-Policy** (meta tag in `<head>`): scripts/styles/fonts/images from the app only; `connect-src` limited to Microsoft sign-in and OneDrive hosts, including the storage hosts a Graph `/content` download redirects to (`*.1drv.com`, `*.livefilestore.com`, `*.sharepoint.com`, `*.microsoftpersonalcontent.com`). If Microsoft moves downloads to a new host, sync fails with a "Blocked a connection to <host>" toast (`securitypolicyviolation` listener) — add that host to `connect-src`; never loosen it to `https:`. No `eval`/`new Function` in app code (the policy forbids it). Referrer policy is `no-referrer`.
+
+**Service worker** caches same-origin app files only. It used to cache every GET, which stored Graph responses (db.json contents) in Cache Storage where sign-out/reset never removed them — keep the origin check.
+
+**Wipe / reset** go through `eraseDevice()`: cut sync first, then clear localStorage, sessionStorage, IndexedDB `cx_fs` and Cache Storage. Never `persist()` after clearing — the old wipe did, and pushed an empty db.json over the synced copy.
+
 **The app now makes zero third-party requests** (verified by counting non-localhost hosts during a page load). Font, MSAL and icons are all local — keep it that way.
 
 ## Companies (multi-company Official data)
@@ -62,5 +68,7 @@ Two independent, unrelated sync systems — check which one is relevant before d
 - Syntax-check the inline script before testing: extract the largest `<script>` block and run it through `new Function(...)`.
 - Local test server: `python3 -m http.server 8934` from the repo root, then Playwright (`chromium` at `/opt/pw-browsers/chromium`) against `http://localhost:8934/index.html`. Always dismiss the `#mAsk` modal if open before interacting (`askResolve(null)`), since the app can boot into a location-confirmation or other prompt.
 - Always run the full navigation regression test before shipping, not just a targeted test for the change at hand.
+- **Escaping:** `esc()` is for HTML text and attributes; inside a JS string in an inline handler (`onclick="f('${…}')"`) use `jss()` — `esc()` leaves `'` alone, so a name like O'Brien broke the button. `tests/w17-health.js` renders hostile names everywhere and compiles all ~1,800 handlers.
+- **Dates:** format with `ymd(d)` (local parts), never `d.toISOString().slice(…)` — UTC conversion shifts the day east of UTC+12, and shifts local midnight back a day in India. Day differences use `Math.round` (DST days are 23/25 h).
 - **Keep Help/FAQ current.** Any user-facing feature or change ships with its FAQ entry in `vHelp()` (add or correct — stale answers are worse than missing ones), plus a search term in `tests/w16-faq.js`. Check the wording against the actual button labels, not memory.
 - Git branch `claude/tasks-home-click-open-5btm8i` has been reused across many merged PRs. If it's already merged into `main`, restart it from `origin/main` (`git checkout -B <branch> origin/main`) rather than stacking on old history — check `merged` state before assuming the branch is still open.
