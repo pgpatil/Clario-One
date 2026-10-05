@@ -11,7 +11,7 @@ Single-file HTML/JS/CSS personal/business CRM + task-management PWA. Everything 
   - `icon-maskable-512.png` — manifest `purpose:"maskable"` only. Same artwork inset to **72% of the canvas**: Android adaptive icons crop to a centre circle at 80%, and the full-bleed icons measured 95–96% so they were being clipped. If you regenerate icons, keep the maskable variant ≤80% and re-measure.
 - **Small-size legibility is the recurring failure mode with this logo.** The photoreal shading only reads at ~64px+; below that (header/favicon scale) it needs either a tight crop with minimal dead space, or — for the header specifically — real transparency (see above). If asked to touch the logo again, test at 26/32/34px before shipping, the same way past rounds did (crop tight, check contrast against the actual background it'll sit on, don't assume a background choice that worked at one size works at another).
 - **iOS/Android/Edge home-screen icon caching**: updating `icon-192.png`/`icon-512.png` does NOT refresh an already-installed home-screen icon or PWA title-bar icon — those are snapshotted at install/pin time by the OS. The fix is always "remove and re-add the icon" or "reinstall the PWA," never something fixable from app code. Don't re-diagnose this from scratch if reported again.
-- Bump the service worker cache name (`sw.js`, `const C='clario-vN'`) whenever `index.html`, `logo-mark.png`, or the icon files change, so installed PWAs actually pick up the update.
+- Bump the service worker cache name (`sw.js`, `const C='clario-vN'`) whenever `index.html`, `logo-mark.png`, or the icon files change, so installed PWAs actually pick up the update — and set `APP_BUILD` in index.html to the same N.
 
 ## Color system (`:root` in `index.html`, ~line 20)
 
@@ -62,6 +62,9 @@ Two independent, unrelated sync systems — check which one is relevant before d
 - In memory the globals always hold the **active** company (`activeCo`, device-local in `localStorage.cx_company`); inactive companies sit in `_coStore`. Switch only via `coActivate`/`switchCompany` — never assign the globals directly.
 - Saved/synced shape: the first company has the fixed id `home` and its data stays at the **top level** of the state (where it always lived), so an older app version keeps working and its pushes merge into `home` only. Other companies live under `state.co[id]`. `mergeRemote` must route rows by company — top-level official rows always go to `home`, whatever company is active. `tests/w13-companies.js` guards this; don't loosen it.
 - `home` can be renamed, not removed. Removal is a tombstone on the `companies` record (`deleted:true`), synced.
+- **Old app versions strip companies.** A version from before companies writes db.json with no `companies`/`co`, dropping every other company from the file. `mergeRemote` detects a remote with no `companies` array while this device has more than one company and calls `coLegacyRepair()` (re-push + a toast naming the fix). Don't remove it while any device might still run an old build.
+- **Duplicates / merge:** `addCompany` pulls first and reuses a same-name company. `mergeCompanies(keep,drop)` moves rows, tombstones the loser with `merged_into`; `coMergeInto` routes rows for a merged company to the survivor, and `coAbsorbMerged()` moves a device's own rows and switches it there.
+- **Build number:** `APP_BUILD` in index.html must equal the number in `sw.js`'s `clario-vN` (tests/w17 checks). Bump both together. Settings → About shows it so devices can be compared; the page calls `reg.update()` on every return to the screen and shows `#updbar` when a new version takes over.
 
 ## Workflow used throughout this project's history
 

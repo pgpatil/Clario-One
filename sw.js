@@ -1,4 +1,4 @@
-const C='clario-v72';
+const C='clario-v73';
 /* App shell only. This worker handles same-origin GETs and nothing else: it used to cache every
    GET, which put copies of Microsoft Graph responses -- db.json contents, file listings -- into
    Cache Storage, where signing out or resetting the device never removed them, and when offline

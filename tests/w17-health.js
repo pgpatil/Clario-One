@@ -143,6 +143,10 @@ const ROOT=path.join(__dirname,'..');
     chk('offline cache ignores other sites (never stores Graph responses)', /origin!==self\.location\.origin\)return/.test(sw));
     const shell=(sw.match(/SHELL=\[([^\]]*)\]/)||[,''])[1].match(/'\.\/([^']+)'/g)||[];
     const missing=shell.map(x=>x.slice(3,-1)).filter(f=>!fs.existsSync(path.join(ROOT,f)));
+    const html0=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+    const build=(html0.match(/APP_BUILD=(\d+)/)||[])[1], swv=(sw.match(/clario-v(\d+)/)||[])[1];
+    chk('the build shown in Settings matches the offline cache version', build&&build===swv, `APP_BUILD=${build}, sw=${swv}`);
+    chk('the app checks for updates whenever it comes back to the screen', /visibilitychange[^;]*reg\.update\(\)/.test(html0)&&/id="updbar"/.test(html0));
     chk('every precached file exists', shell.length>=7&&missing.length===0, missing.join(', ')); }
 
   console.log('\n═══ wiping this device never touches the synced copy');

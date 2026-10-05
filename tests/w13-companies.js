@@ -169,6 +169,65 @@ const URL_=process.env.CLARIO_URL || 'http://localhost:8934/index.html';
   chk('no horizontal scroll at 390px', ph.sw<=390, `scrollWidth=${ph.sw}`);
   chk('header still fits at 390px', ph.gh);
 
+  console.log('\n═══ multi-device: old app versions, new companies, duplicates');
+  await page.setViewportSize({width:1300,height:950});
+  const md = await page.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));
+    try{localStorage.clear();}catch(e){}
+    activeCo='home';applyState({companies:[{id:'home',name:'Acme',created_at:'',updated_at:''}],tasks:[]});
+    let pushes=0;window.gSched=()=>{pushes++;};window._gAcct={homeAccountId:'A',username:'u@example.com'};window._msal={acquireTokenSilent:async()=>({accessToken:'t'})};
+    const n=now(),td=today(),MK=(id,title)=>({id,title,type:'task',owner:'me',due:td,status:'open',created_at:n,updated_at:n});
+    const out={};
+    // 1. another device adds a company: it arrives, and you are told where to find it
+    const remote=JSON.parse(JSON.stringify(getState()));
+    remote.companies.push({id:'cB',name:'Beta',created_at:n,updated_at:n});remote.co={cB:Object.assign(coEmpty(),{tasks:[MK('b1','Beta work')]})};
+    mergeRemote(remote);await W(30);
+    out.arrived=COMP().map(c=>c.name);out.notice=document.getElementById('toast').textContent;
+    // 2. an older app version saves: no company list, no co -- the companies must be pushed back
+    const old=JSON.parse(JSON.stringify(getState()));delete old.companies;delete old.co;
+    const before=pushes;mergeRemote(old);await W(30);
+    out.repairPush=pushes>before;out.repairMsg=document.getElementById('toast').textContent;out.stillHasBeta=COMP().some(c=>c.id==='cB');
+    out.fileHasCo=!!getState().co.cB&&getState().co.cB.tasks.some(t=>t.id==='b1');
+    // ...and a current file does not trigger it
+    const p2=pushes;mergeRemote(JSON.parse(JSON.stringify(getState())));await W(30);out.noFalseRepair=pushes===p2;
+    // 3. adding a company that already exists (after pulling) offers it instead of a second copy
+    window.gPull=async()=>true;nav('settings');document.getElementById('coNewInp').value='  beta ';
+    let p=addCompany();await W(60);out.dupAsk=document.getElementById('askMsg').textContent;askResolve(true);await p;
+    out.afterAdd={n:COMP().length,active:coLabel(activeCo)};
+    // 4. duplicates from before: flagged, merged, and late rows for the merged one still arrive
+    companies.push({id:'cB2',name:'Beta',created_at:new Date(Date.now()+1000).toISOString(),updated_at:n});
+    _coStore.cB2=Object.assign(coEmpty(),{tasks:[MK('b2','Second Beta work')],depts:['Exports']});
+    out.flagged=coDuplicates().map(g=>g.map(c=>c.id));nav('settings');
+    out.mergeBtn=!!document.querySelector('#coCard .co-dup button');
+    p=mergeCompanies('cB','cB2');await W(40);askResolve(true);await p;
+    out.merged={companies:COMP().map(c=>c.id),tasks:T().map(t=>t.id).sort(),depts:depts.includes('Exports'),
+      tomb:companies.find(c=>c.id==='cB2')};
+    const late=JSON.parse(JSON.stringify(getState()));late.co.cB2.tasks=[MK('b3','Late row for the merged one')];
+    late.companies=late.companies.map(c=>c.id==='cB2'?Object.assign({},c,{deleted:false,merged_into:undefined,updated_at:''}):c);
+    mergeRemote(late);out.lateRouted=T().some(t=>t.id==='b3');
+    // 5. a device that had the merged company open moves to the survivor, with its own rows
+    switchCompany('home');
+    companies.push({id:'cX',name:'Gamma',created_at:n,updated_at:n},{id:'cY',name:'Gamma',created_at:n,updated_at:n});
+    _coStore.cX=coEmpty();_coStore.cY=coEmpty();switchCompany('cY');tasks.push(MK('y1','Only on this device'));
+    const fromOther=JSON.parse(JSON.stringify(getState()));
+    fromOther.companies=fromOther.companies.map(c=>c.id==='cY'?Object.assign({},c,{deleted:true,merged_into:'cX',updated_at:new Date(Date.now()+5000).toISOString()}):c);
+    fromOther.co.cY=coEmpty();
+    mergeRemote(fromOther);
+    out.absorbed={active:activeCo,tasks:T().map(t=>t.id)};
+    return out;
+  });
+  chk('a company added on another device arrives', md.arrived.includes('Beta'), JSON.stringify(md.arrived));
+  chk('...with a message saying where to switch to it', /Beta synced from another device/.test(md.notice), md.notice.slice(0,70));
+  chk('a file saved by an old version triggers an immediate re-push', md.repairPush);
+  chk('...the companies are still here and go back into the file', md.stillHasBeta&&md.fileHasCo);
+  chk('...and the message names the fix (update that device)', /older Clario/.test(md.repairMsg)&&/build \d+/.test(md.repairMsg), md.repairMsg.slice(0,80));
+  chk('a current file does not trigger a repair', md.noFalseRepair);
+  chk('adding an existing name offers it instead (case/space-insensitive)', /already exists/.test(md.dupAsk)&&md.afterAdd.n===2&&md.afterAdd.active==='Beta', JSON.stringify(md.afterAdd));
+  chk('same-name companies are flagged with a Merge button', JSON.stringify(md.flagged)===JSON.stringify([['cB','cB2']])&&md.mergeBtn, JSON.stringify(md.flagged));
+  chk('merging moves the records and lists into the older one', JSON.stringify(md.merged.companies)===JSON.stringify(['home','cB'])&&md.merged.tasks.includes('b2')&&md.merged.depts, JSON.stringify(md.merged));
+  chk('the merged one becomes a tombstone pointing at the survivor', md.merged.tomb&&md.merged.tomb.deleted&&md.merged.tomb.merged_into==='cB');
+  chk('rows that arrive later for the merged company land in the survivor', md.lateRouted);
+  chk('a device that had the merged company open moves to the survivor with its rows', md.absorbed.active==='cX'&&md.absorbed.tasks.includes('y1'), JSON.stringify(md.absorbed));
+
   // leave a clean single-company state for whatever runs next
   await page.evaluate(()=>{try{localStorage.clear();}catch(e){}});
   console.log('\n---page errors---', JSON.stringify(errs.slice(0,4)));
