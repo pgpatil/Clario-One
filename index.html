@@ -18,7 +18,20 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script>if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+<script>
+/* Installed apps (iPhone especially) can keep running an old copy for days, and an old copy that
+   predates a data change can damage the synced file. So: check for a new version every time the
+   app comes back to the screen, and when one has taken over, offer a one-tap reload. */
+if('serviceWorker'in navigator&&location.protocol==='https:'){
+  const hadController=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('./sw.js').then(reg=>{
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});
+  }).catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!hadController)return;
+    const show=()=>{const b=document.getElementById('updbar');if(b)b.classList.add('show');};
+    document.readyState==='loading'?document.addEventListener('DOMContentLoaded',show):show();});
+}
+</script>
 <!-- MSAL vendored locally (official @azure/msal-browser 2.38.1 npm build). Previously loaded from
      alcdn.msauth.net with no integrity check: a compromised CDN could have read localStorage.
      Serving it same-origin removes that supply-chain path and the third-party dependency. -->
@@ -142,6 +155,7 @@ table.t td.r,table.t th.r{text-align:right}
 .pill.n{background:var(--bg);color:var(--t2)}
 /* investment analysis. Gain text uses --grn-d: --grn is 4.19:1 on the selected-row tint, --grn-d 5.88 */
 .neg{color:var(--red)}.pos{color:var(--grn-d)}
+.co-dup{background:var(--amb-l);border:1px solid var(--amb);border-radius:var(--rs);padding:8px 10px;font-size:12.5px;color:var(--amb-d);margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .co-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bdr);flex-wrap:wrap}
 .co-row .co-bd{flex:1;min-width:160px;font-size:13px}.co-row .co-act{display:flex;gap:6px;flex-wrap:wrap}
 .gh-co{font-size:12px;font-weight:700;color:var(--blue-d);background:var(--blue-l);border:1px solid var(--blue-b);border-radius:12px;padding:3px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
@@ -571,6 +585,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 #resumebar.show{display:flex}
 #reauthbar{position:fixed;top:0;left:0;right:0;z-index:81;background:var(--red-l);border-bottom:1px solid var(--red);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap;color:var(--red)}
 #reauthbar.show{display:flex}
+#updbar{position:fixed;top:0;left:0;right:0;z-index:82;background:var(--blue-l);border-bottom:1px solid var(--blue);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap;color:var(--blue-d)}
+#updbar.show{display:flex}
 
 /* ═══ personal finance rows (responsive) ═══ */
 .finrow{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bdr)}
@@ -641,6 +657,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 <body>
 
 <div id="resumebar"><span id="resumeTxt"></span><button class="btn sm" onclick="resumeSync()">Resume sync</button><button class="btn gh2 sm" onclick="g('resumebar').classList.remove('show')">Not now</button></div>
+<div id="updbar"><span>A new version of Clario is ready.</span><button class="btn sm" onclick="location.reload()">Reload now</button><button class="btn gh2 sm" onclick="g('updbar').classList.remove('show')">Later</button></div>
 <div id="reauthbar"><span>Your Microsoft sign-in expired — OneDrive sync is paused.</span><button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="g('reauthbar').classList.remove('show')">Dismiss</button></div>
 
 <header id="gh">
@@ -1087,7 +1104,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='8.0.0',DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
+const APP_VER='9.1.0',APP_BUILD=73,   /* APP_BUILD must equal the number in sw.js's cache name */
+      DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
 const g=id=>document.getElementById(id);
@@ -1300,6 +1318,7 @@ function coActivate(id){if(id===activeCo)return;
   activeCo=id;companyName=coName(id);}
 const _union=(a,b)=>[...new Set([...(a||[]),...(Array.isArray(b)?b:[])])];
 function coMergeInto(id,rb){if(!rb||typeof rb!=='object')return;
+  const mc=companies.find(x=>x.id===id);if(mc&&mc.merged_into&&mc.merged_into!==id)return coMergeInto(mc.merged_into,rb);   // merged elsewhere: its rows belong to the survivor
   const live=id===activeCo, b=live?null:(_coStore[id]||(_coStore[id]=coEmpty()));
   CO_TABLES.forEach(t=>{const r=Array.isArray(rb[t])?rb[t]:[];
     if(!live){b[t]=mergeArr(b[t]||[],r.filter(x=>t!=='tasks'||isCoTask(x)));return;}
@@ -1309,10 +1328,22 @@ function coMergeInto(id,rb){if(!rb||typeof rb!=='object')return;
   L.regions=_union(L.regions,rb.regions);L.acctGroups=_union(L.acctGroups,rb.acctGroups);
   if(rb.workWeek&&typeof rb.workWeek==='object'&&!(L.workWeek&&L.workWeek._set))L.workWeek={...normWW(rb.workWeek),_set:true};
   if(live){({depts,products,regions,acctGroups,workWeek}=L);}}
+/* A merge done on another device: move this device's own rows for the merged company into the
+   survivor (otherwise they would sit there unseen), and if it was the open company, open the survivor. */
+function coAbsorbMerged(){companies.filter(c=>c.deleted&&c.merged_into&&c.merged_into!==c.id).forEach(c=>{
+  const tgt=companies.some(x=>x.id===c.merged_into&&!x.deleted)?c.merged_into:CO_HOME;
+  if(c.id===activeCo){coActivate(tgt);try{localStorage.setItem(CO_KEY,tgt);}catch(e){}}
+  const b=_coStore[c.id];
+  if(b&&CO_TABLES.some(t=>(b[t]||[]).length)){coMergeInto(tgt,b);_coStore[c.id]=coEmpty();}});}
+let _coLegacyWarned=false;
+function coLegacyRepair(){window._coLegacySeen=(window._coLegacySeen||0)+1;
+  setTimeout(()=>{try{if(gActive()&&!_gNeedsReauth)gSched();if(_fsDir)schedSave();}catch(e){}},0);
+  if(_coLegacyWarned)return;_coLegacyWarned=true;
+  setTimeout(()=>toast(`Another device is running an older Clario and dropped your other companies from the synced file — they have been put back. Update that device: close Clario fully and reopen it, then check Settings → About shows build ${APP_BUILD}.`),0);}
 function coEnsureHome(name){if(!companies.some(c=>c.id===CO_HOME))
   companies.unshift({id:CO_HOME,name:name||'',created_at:'',updated_at:''});}   // empty stamp: any real rename wins a merge
 function getState(){const home=coBucket(CO_HOME);
-  const s={version:APP_VER,updatedAt:stateUpdatedAt,locationsList,taskLabels,myProfile,companyName:coName(CO_HOME),
+  const s={version:APP_VER,build:APP_BUILD,updatedAt:stateUpdatedAt,locationsList,taskLabels,myProfile,companyName:coName(CO_HOME),
     depts:home.depts,products:home.products,regions:home.regions,acctGroups:home.acctGroups,workWeek:home.workWeek,companies};
   TABLES.forEach(t=>s[t]=CO_TABLES.includes(t)?home[t]:window[t]);
   s.tasks=activeCo===CO_HOME?tasks:tasks.filter(x=>!isCoTask(x)).concat(home.tasks);
@@ -1333,6 +1364,8 @@ function applyState(s){if(!s||typeof s!=='object')return;
   stateUpdatedAt=s.updatedAt||now();}
 function mergeArr(local,remote){const m=new Map(local.map(x=>[x.id,x]));for(const r of(remote||[])){const l=m.get(r.id);if(!l||(r.updated_at||'')>(l.updated_at||''))m.set(r.id,r);}return[...m.values()];}
 function mergeRemote(rm){if(!rm||typeof rm!=='object')return;
+  const known=new Set(companies.map(c=>c.id));
+  if(Array.isArray(rm.companies))companies=mergeArr(companies,rm.companies);   // first, so merged companies route correctly
   TABLES.filter(t=>!CO_TABLES.includes(t)).forEach(t=>{window[t]=mergeArr(window[t],rm[t]);});
   const rt=Array.isArray(rm.tasks)?rm.tasks:[];
   tasks=mergeArr(tasks,rt.filter(x=>!isCoTask(x)));                  // personal rows: shared
@@ -1341,10 +1374,16 @@ function mergeRemote(rm){if(!rm||typeof rm!=='object')return;
   Object.assign(hb,{depts:rm.depts,products:rm.products,regions:rm.regions,acctGroups:rm.acctGroups,workWeek:rm.workWeek});
   coMergeInto(CO_HOME,hb);
   if(rm.co&&typeof rm.co==='object')Object.keys(rm.co).forEach(id=>{if(id!==CO_HOME)coMergeInto(id,rm.co[id]);});
-  if(Array.isArray(rm.companies))companies=mergeArr(companies,rm.companies);
   coEnsureHome('');
+  // a company that arrived from another device is invisible until you switch to it -- say so
+  const fresh=Array.isArray(rm.companies)?rm.companies.filter(c=>!c.deleted&&c.id!==CO_HOME&&!known.has(c.id)):[];
+  if(fresh.length&&known.size)setTimeout(()=>toast(`${fresh.map(c=>c.name||'A company').join(', ')} synced from another device — switch to ${fresh.length>1?'them':'it'} in Settings → Companies.`),0);
+  // A file with no company list was saved by an older Clario that drops every company but the first.
+  // Put them straight back, and say which device needs updating.
+  if(!Array.isArray(rm.companies)&&(COMP().length>1||Object.keys(_coStore).some(id=>id!==CO_HOME)))coLegacyRepair();
   const h=companies.find(c=>c.id===CO_HOME);
   if(h&&!h.name&&typeof rm.companyName==='string'&&rm.companyName)h.name=rm.companyName;
+  coAbsorbMerged();
   if(!COMP().some(c=>c.id===activeCo))coActivate(CO_HOME);        // the active company was deleted on another device
   companyName=coName(activeCo);
   if(Array.isArray(rm.taskLabels))taskLabels=_union(taskLabels,rm.taskLabels);
@@ -4601,6 +4640,7 @@ function vHelp(){
   <div class="card faq"><div class="ch">Companies</div>
   ${faqItem('Several companies in Official','Settings → <b>Companies</b> → type a name → + Add. Each company has its own tasks, accounts, contacts, people, meetings, deals, plans, saved views, and its own departments, products, regions, account groups and weekly offs — nothing typed in one shows up in another, including in search. Switch with <b>Switch</b> on the company’s row; the header then shows which company you are in (tap it to go to Settings). Rename any company; remove one by typing its name (the first company can be renamed but not removed).')}
   ${faqItem('What is shared between companies','Personal (money, investments, personal tasks, birthdays), your profile, labels, the places list and your day locations are the same in every company — where you are on a date is one fact. Switching company changes Official only, and only on that device.')}
+  ${faqItem('A company is missing on another device','Companies sync like everything else, but each device has to be on a recent version of Clario. Compare <b>Settings → About</b> on both devices — the build number should match. An installed app (iPhone especially) can keep running an old copy: close Clario fully (swipe it away) and reopen it; when a new version is ready you will also see a <b>Reload now</b> bar. An old copy cannot see other companies and drops them when it saves — an up-to-date device puts them straight back and tells you. A company arriving from another device is not opened automatically: switch to it in Settings → Companies. If the same company was added separately on two devices, Settings shows both with a <b>Merge into one</b> button; adding a company now checks OneDrive first, so this does not happen again.')}
   </div>
   <div class="card faq"><div class="ch">Personal — money & investments</div>
   ${faqItem('Personal section','The Official / Personal switch at the top changes the whole app: Personal has Tasks (with family members as owners), Money, Investments and Birthdays, and its own search. Personal data is shared across all your companies and syncs like everything else.')}
@@ -5258,7 +5298,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
   <div class="setcard"><h4>Data</h4>
     <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button>
     <p class="note">Erases this browser only: data, PIN, OneDrive sign-in, folder link and remembered passphrase. Your synced copy is not touched. To delete that too, remove the <b>Apps/Clario</b> folder in OneDrive (db.json, monthly snapshots and any db-before-reset files) or the files in your linked folder.</p></div>
-  <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
+  <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER} · build ${APP_BUILD}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
   </div></div>`;}
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
 function addProd(){const v=g('newProd').value.trim();if(v&&!products.includes(v)){products.push(v);persist();renderView();}}
@@ -5279,7 +5319,11 @@ function coCounts(id){const b=coBucket(id),live=r=>!r.deleted;
     accounts:(b.customers||[]).filter(live).length,people:(b.people||[]).filter(live).length};}
 async function addCompany(){const i=g('coNewInp');const v=(i?i.value:'').trim();
   if(!v){toast('Type the company name first.');if(i)i.focus();return;}
-  if(COMP().some(c=>(c.name||'').toLowerCase()===v.toLowerCase())){toast('You already have a company called '+v+'.');return;}
+  if(gActive()&&!_gNeedsReauth){try{await gPull(true);}catch(e){}}            // it may already exist, added on another device
+  const same=COMP().find(c=>(c.name||'').trim().toLowerCase()===v.toLowerCase());
+  if(same){if(i)i.value='';
+    if(same.id!==activeCo&&await askConfirm(`${same.name} already exists — perhaps added on another device. Switch to it instead of creating a second one?`,{title:'Company exists',ok:'Switch to '+same.name}))switchCompany(same.id);
+    else renderView();return;}
   const n=now(),id=uid();companies.push({id,name:v,created_at:n,updated_at:n});_coStore[id]=coEmpty();
   persist();renderView();
   if(await askConfirm(`${v} starts with an empty Official section: no tasks, accounts or people. Personal stays as it is. Switch to it now?`,{title:'Company added',ok:'Switch to '+v}))switchCompany(id);}
@@ -5304,6 +5348,21 @@ async function deleteCompany(id){const c=companies.find(x=>x.id===id);if(!c)retu
 /* the lists below the Companies card belong to the active company -- say so once there are several */
 const coTag=()=>COMP().length>1?` <span class="note" style="font-weight:500">· ${esc(coLabel(activeCo))}</span>`:'';
 const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+/* Two companies with the same name hold separate data -- usually the same company added on two
+   devices before they had synced. Merging moves everything into the older one and leaves a
+   tombstone pointing at it (merged_into), so rows another device still has for the merged company
+   are routed to the survivor when they sync instead of disappearing. */
+function coDuplicates(){const by={};COMP().forEach(c=>{const k=(c.name||'').trim().toLowerCase();if(k)(by[k]=by[k]||[]).push(c);});
+  return Object.values(by).filter(g=>g.length>1).map(g=>g.sort((a,b)=>a.id===CO_HOME?-1:b.id===CO_HOME?1:(a.created_at||'').localeCompare(b.created_at||'')));}
+async function mergeCompanies(keepId,dropId){const K=companies.find(c=>c.id===keepId),D=companies.find(c=>c.id===dropId);
+  if(!K||!D||keepId===dropId||dropId===CO_HOME)return;
+  const k=coCounts(dropId);
+  if(!await askConfirm(`Merge the two “${coLabel(keepId)}” companies into one? Everything in the second one (${k.tasks} open tasks, ${k.accounts} accounts, ${k.people} people, plus meetings, deals and lists) moves into the first. This cannot be undone.`,{title:'Merge companies',ok:'Merge'}))return;
+  if(activeCo===dropId){coActivate(keepId);try{localStorage.setItem(CO_KEY,keepId);}catch(e){}}
+  const moving=coBucket(dropId);
+  D.deleted=true;D.merged_into=keepId;D.updated_at=now();
+  coMergeInto(keepId,moving);_coStore[dropId]=coEmpty();
+  persist();renderView();toast('Merged into '+coLabel(keepId)+'.');}
 function companiesCard(){const list=COMP();
   const row=c=>{const k=coCounts(c.id),on=c.id===activeCo;
     return `<div class="co-row${on?' on':''}"><div class="co-bd"><b>${esc(coLabel(c.id))}</b>${on?' <span class="pill b">Active</span>':''}
@@ -5311,7 +5370,10 @@ function companiesCard(){const list=COMP();
       <div class="co-act">${on?'':`<button class="btn sm" onclick="switchCompany('${c.id}')">Switch</button>`}
       <button class="btn gh2 sm" onclick="renameCompany('${c.id}')">Rename</button>
       ${c.id===CO_HOME||on?'':`<button class="btn gh2 sm" style="color:var(--red)" onclick="deleteCompany('${c.id}')">Remove</button>`}</div></div>`;};
+  const dups=coDuplicates();
   return `<div class="setcard" id="coCard"><h4>Companies</h4>
+    ${dups.map(g=>`<div class="co-dup"><b>${g.length} companies are called “${esc(g[0].name)}”</b> and hold separate data — usually the same company added on two devices before they synced.
+      ${g.slice(1).map(d=>`<button class="btn sm" onclick="mergeCompanies('${g[0].id}','${d.id}')">Merge into one</button>`).join(' ')}</div>`).join('')}
     ${list.map(row).join('')}
     <div style="display:flex;gap:7px;margin-top:10px"><input id="coNewInp" placeholder="Add a company, e.g. Acme Foods Pvt Ltd" style="flex:1" onkeydown="if(event.key==='Enter')addCompany()"><button class="btn sm" onclick="addCompany()">+ Add</button></div>
     <p class="note">Each company has its own tasks, accounts, contacts, people, meetings, deals, plans, saved views, and its own departments, products, regions, groups and work week. Personal, your profile and day locations are shared. Switching changes what Official shows on this device. The company name also labels your own team's attendees in meeting summaries ("${esc(coLabel(activeCo))} → Name").</p></div>`;}
