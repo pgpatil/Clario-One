@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <title>Clario One</title>
 <meta name="theme-color" content="#f3f2f2">
+<!-- Privacy: the app may only talk to itself and to Microsoft (sign-in + OneDrive, including the
+     storage hosts a db.json download redirects to). Even if hostile text ever got rendered as code,
+     it could not send your data anywhere else, load outside scripts, or post a form. A blocked
+     connection is announced in the app (securitypolicyviolation), never silent. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'self' https://*.microsoft.com https://*.microsoftonline.com https://*.live.com https://*.1drv.com https://*.livefilestore.com https://*.sharepoint.com https://*.microsoftpersonalcontent.com; frame-src https://*.microsoftonline.com https://*.live.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Clario One">
@@ -1087,6 +1093,8 @@ const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:
 const g=id=>document.getElementById(id);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const now=()=>new Date().toISOString();
+/* Dates are always formatted from LOCAL parts. toISOString() converts to UTC first, which shifts the
+   day east of UTC+12 (and shifts local midnight back a day anywhere east of UTC, e.g. India). */
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>ymd(new Date());
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1114,9 +1122,13 @@ function capMore(key,total,cap){cap=cap||50;const n=listShown(key,cap);
 /* reRender, not renderView: you are at the bottom of a list when you press these. */
 function showMore(key,cap){_shown[key]=listShown(key,cap)+LIST_PAGE;reRender();}
 function showLess(key){delete _shown[key];reRender();}
-const jss=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
-const ageDays=ds=>Math.floor((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000);
+/* For a JS string literal inside a double-quoted HTML attribute, e.g. onclick="f('${jss(x)}')".
+   & goes first: the attribute is HTML-decoded before the JS runs, so typed text like &#39; would
+   otherwise turn into a real quote and break out of the string. esc() is NOT safe here -- it
+   leaves ' alone, so a name like O'Brien broke the button. */
+const jss=s=>String(s??'').replace(/&/g,'&amp;').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/\n/g,'\\n').replace(/\r/g,'');
+const addDays=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return ymd(d);};
+const ageDays=ds=>Math.round((new Date(today()+'T12:00')-new Date(ds+'T12:00'))/86400000)   // round, not floor: a DST change makes a day 23 or 25 hours;
 const fmtD=ds=>ds?new Date(ds+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';
 const fmtDT=s=>s?new Date(s).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 const fmtMoney=v=>{v=+v||0;if(v<0)return'−'+fmtMoney(-v);if(v>=1e7)return'₹'+(v/1e7).toFixed(2).replace(/\.00$/,'')+' Cr';if(v>=1e5)return'₹'+(v/1e5).toFixed(2).replace(/\.00$/,'')+' L';return'₹'+v.toLocaleString('en-IN');};
@@ -1224,7 +1236,7 @@ function defaultFollowUp(dueDate){const td=today();
   if(dueDate&&dueDate>td)return addDays(dueDate,-1)+'T09:00';
   const d=new Date(Date.now()+3600000);const hhmm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
   return dueDate?(td+'T'+hhmm):(addDays(td,2)+'T09:00');}
-const mondayOf=ds=>{const d=new Date(ds+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);};
+const mondayOf=ds=>{const d=new Date(ds+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return ymd(d);};
 const weekKey=ds=>'W'+mondayOf(ds);
 const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
@@ -1456,7 +1468,7 @@ function birthdayBadge(){const bd=todaysBirthdays();if(!bd.length)return'';
 /* clickable name chips — navigate to the entity */
 const custLink=(id,cls)=>id&&cname(id)?`<span class="${cls||'pill p'} lnk" onclick="event.stopPropagation();nav('accounts','${id}')" title="Open account">${esc(cname(id))}</span>`:'';
 const personLink=(id,cls)=>id?(id==='me'?`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();openMyProfile()" title="Edit your profile">${esc(pname(id))}</span>`:`<span class="${cls||'pill b'} lnk" onclick="event.stopPropagation();nav('people','${id}')" title="Open person">${esc(pname(id))}</span>`):'';
-const deptLink=(d,cls)=>d?`<span class="${cls||'pill n'} lnk" onclick="event.stopPropagation();deptFilter('${esc(d)}')" title="Filter by department">${esc(d)}</span>`:'';
+const deptLink=(d,cls)=>d?`<span class="${cls||'pill n'} lnk" onclick="event.stopPropagation();deptFilter('${jss(d)}')" title="Filter by department">${esc(d)}</span>`:'';
 function deptFilter(d){window._cd=d;cTab='mine';nav('commit');}
 const openMine=()=>T().filter(t=>t.status==='open'&&(t.owner==='me'||!t.owner));
 const waiting=()=>T().filter(t=>t.status==='waiting');
@@ -1651,8 +1663,18 @@ async function resetDevice(){
   const synced=gActive()?'OneDrive':_fsDir?'the linked folder':'';
   const v=await askText(`This erases everything stored in this browser: all data, the PIN, the OneDrive sign-in, the folder link and the remembered passphrase. ${synced?`Your data stays in ${synced}; sign in or relink afterwards to get it back${_encMeta&&_encMeta.on?' (you will need the db.json passphrase)':''}. Changes not yet synced are lost.`:'Nothing is synced, so the data on this device will be gone for good — export a backup first if you can.'}\n\nType RESET to continue:`,{title:'Reset this device',ok:'Erase this device',placeholder:'RESET'});
   if((v||'').trim().toUpperCase()!=='RESET'){if(v!=null)toast('Nothing was erased.');return;}
+  await eraseDevice();}
+/* Erase this browser only. Sync is cut first so the empty state can never be pushed over the
+   synced copy -- the old "Wipe all data" saved after clearing, which overwrote db.json with an
+   empty file on a one-device setup, and left the PIN, sign-in and remembered key behind. */
+async function eraseDevice(){
+  try{clearInterval(_gTimer);clearTimeout(_gST);clearTimeout(_gRetryT);}catch(e){}
+  try{stopWatch();clearTimeout(_fsTimer);}catch(e){}
+  _gAcct=null;_msal=null;_fsDir=null;
+  window.persist=()=>{};                                  // nothing may write (or sync) after this point
   try{localStorage.clear();sessionStorage.clear();}catch(e){}
   try{await new Promise(res=>{const r=indexedDB.deleteDatabase('cx_fs');r.onsuccess=r.onerror=r.onblocked=()=>res();});}catch(e){}
+  try{if(window.caches)for(const k of await caches.keys())await caches.delete(k);}catch(e){}
   location.reload();}
 async function setPin(){if(pinIsSet())return changePin();if(await _pinCapture(false)){toast('Personal PIN set — it will ask for the PIN next time you open Personal.');renderView();}}
 async function changePin(){const cur=await askText('Enter your current PIN:',{title:'Change PIN',type:'password',ok:'Next',alt:{label:'Forgot PIN?',fn:forgotPin}});if(cur===null)return;if(!await pinVerify((cur||'').trim())){toast('Wrong PIN.');return;}if(await _pinCapture(true)){toast('PIN updated.');renderView();}}
@@ -1881,14 +1903,14 @@ function personalSearch(q){
     .forEach(b=>out.push({k:'P',kl:'B-day',label:b.name,sub:b.date?fmtD(nextBirthday(b.date)):'Birthday',go:()=>personalGo('birthdays')}));
   return out.slice(0,16);}
 function officialSearch(q){q=q.toLowerCase();const out=[];
-  T().filter(t=>t.status!=='done'&&(t.title+' '+(t.notes||'')).toLowerCase().includes(q)).slice(0,5).forEach(t=>out.push({k:'T',label:t.title,sub:t.type==='call'?'Call':'Task',go:()=>openTask(t.id)}));
-  CU().filter(c=>(c.name+' '+(c.city||'')).toLowerCase().includes(q)).slice(0,4).forEach(c=>out.push({k:'A',label:c.name,sub:c.city||'Account',go:()=>nav('accounts',c.id)}));
-  DL().filter(d=>d.name.toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
-  P().filter(p=>p.name.toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push({k:'P',label:p.name,sub:p.role||'Person',go:()=>nav('people',p.id)}));
-  M().filter(m=>m.title.toLowerCase().includes(q)).slice(0,3).forEach(m=>out.push({k:'M',label:m.title,sub:fmtD(m.date),go:()=>nav('meeting',m.id)}));
-  CO().filter(c=>(c.name+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>nav('contact',c.id)}));
-  OP().filter(o=>o.title.toLowerCase().includes(q)).slice(0,2).forEach(o=>out.push({k:'D',label:o.title,sub:'Improvement',go:()=>{dTool='impact';nav('decide');}}));
-  DC().filter(d=>d.what.toLowerCase().includes(q)).slice(0,2).forEach(d=>out.push({k:'D',label:d.what,sub:'Decision · '+fmtD(d.date),go:()=>{dTool=null;nav('decide');}}));
+  T().filter(t=>t.status!=='done'&&((t.title||'')+' '+(t.notes||'')).toLowerCase().includes(q)).slice(0,5).forEach(t=>out.push({k:'T',label:t.title,sub:t.type==='call'?'Call':'Task',go:()=>openTask(t.id)}));
+  CU().filter(c=>((c.name||'')+' '+(c.city||'')).toLowerCase().includes(q)).slice(0,4).forEach(c=>out.push({k:'A',label:c.name,sub:c.city||'Account',go:()=>nav('accounts',c.id)}));
+  DL().filter(d=>(d.name||'').toLowerCase().includes(q)).slice(0,4).forEach(d=>out.push({k:'D',label:d.name,sub:d.stage+' · '+fmtMoney(d.value),go:()=>nav('deal',d.id)}));
+  P().filter(p=>(p.name||'').toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push({k:'P',label:p.name,sub:p.role||'Person',go:()=>nav('people',p.id)}));
+  M().filter(m=>(m.title||'').toLowerCase().includes(q)).slice(0,3).forEach(m=>out.push({k:'M',label:m.title,sub:fmtD(m.date),go:()=>nav('meeting',m.id)}));
+  CO().filter(c=>((c.name||'')+' '+(c.role||'')).toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push({k:'P',label:c.name,sub:'Contact · '+cname(c.customer_id),go:()=>nav('contact',c.id)}));
+  OP().filter(o=>(o.title||'').toLowerCase().includes(q)).slice(0,2).forEach(o=>out.push({k:'D',label:o.title,sub:'Improvement',go:()=>{dTool='impact';nav('decide');}}));
+  DC().filter(d=>(d.what||'').toLowerCase().includes(q)).slice(0,2).forEach(d=>out.push({k:'D',label:d.what,sub:'Decision · '+fmtD(d.date),go:()=>{dTool=null;nav('decide');}}));
   return out.slice(0,16);}
 let _srchIdx=[],_srchSel=-1;
 function _srchPaint(){const box=g('srchres');[...box.querySelectorAll('.sr-item[data-i]')].forEach(el=>{el.classList.toggle('sel',+el.dataset.i===_srchSel);});}
@@ -2041,7 +2063,7 @@ function dayItems(ds,opts){
   const mt=M().filter(m=>m.date===ds).map(m=>({k:'m',s:(m.time||'')+' '+m.title,o:m,done:m.status==='done',sort:'0'+(m.time||'')}));
   const cl=T().filter(t=>t.type==='call'&&t.when&&t.when.slice(0,10)===ds&&keep(t)).map(t=>({k:'c',s:'Call: '+t.title,o:t,done:t.status==='done',sort:'1'+t.when}));
   const tk=T().filter(t=>t.type!=='call'&&t.due===ds&&keep(t)).map(t=>({k:'t',s:t.title,o:t,done:t.status==='done',sort:'2'+(t.at||'99')}));
-  return[...mt,...cl,...tk].sort((a,b)=>a.sort.localeCompare(b.sort));}
+  return[...mt,...cl,...tk].sort((a,b)=>(a.sort||'').localeCompare(b.sort||''));}
 /* ═══ MONTH GRID: LOAD, DENSITY, COMPLETED ═══
    A month grid that only lists titles tells you what is on a day but not whether the day is
    already full -- which is the question you are actually asking when you look at a month.
@@ -2449,14 +2471,14 @@ function finDupBanner(){const s=finDupSuspects();if(!s.length)return '';
 function finLinkDup(catId,loanId){const c=fincats.find(x=>x.id===catId);if(!c)return;c.loan_id=loanId;c.updated_at=now();persist();reRender();toast('Linked — counted once, on the loan.');}
 function finDismissDup(catId){const c=fincats.find(x=>x.id===catId);if(!c)return;c.dup_ok=true;c.updated_at=now();persist();reRender();}
 function finPlanRow(catId,ym){return finplan.find(p=>!p.deleted&&p.cat_id===catId&&p.month===ym);}
-function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
+function finPlanned(c,ym){const rows=finplan.filter(p=>!p.deleted&&p.cat_id===c.id&&p.month<=ym&&p.planned!=null).sort((a,b)=>(b.month||'').localeCompare(a.month||''));return rows.length?(+rows[0].planned||0):(+c.amount||0);}
 function finActual(c,ym){const ov=finPlanRow(c.id,ym);if(ov&&ov.actual_override!=null)return +ov.actual_override||0;return FTX().filter(t=>t.cat_id===c.id&&t.month===ym).reduce((a,t)=>a+(+t.amount||0),0);}
 function finUpsertPlan(catId,ym,patch){let r=finPlanRow(catId,ym);const n=now();if(r)Object.assign(r,patch,{updated_at:n});else finplan.push(Object.assign({id:uid(),cat_id:catId,month:ym,planned:null,actual_override:null,created_at:n,updated_at:n},patch));}
 function finSetPlan(catId,ym,val){finUpsertPlan(catId,ym,{planned:(val===''||val==null)?null:+val});persist();reRender();}
 async function finSetActual(catId,ym){const c=FCAT().find(x=>x.id===catId);if(!c)return;const r=finPlanRow(catId,ym);const cur=r&&r.actual_override!=null?r.actual_override:'';
   const v=await askText('Set actual for '+c.name+' — '+finMonthLabel(ym)+'. Leave blank to go back to summing logged payments.',{title:'Set actual amount',type:'number',value:String(cur),ok:'Set'});
   if(v===null)return;finUpsertPlan(catId,ym,{actual_override:v.trim()===''?null:+v});persist();reRender();}
-function finMonthShift(n){if(!finMonth)finMonth=monthKey(today());const d=new Date(finMonth+'-01T12:00');d.setMonth(d.getMonth()+n);finMonth=d.toISOString().slice(0,7);renderView();}
+function finMonthShift(n){if(!finMonth)finMonth=monthKey(today());const d=new Date(finMonth+'-01T12:00');d.setMonth(d.getMonth()+n);finMonth=ymd(d).slice(0,7);renderView();}
 function finMonthLabel(ym){return new Date(ym+'-01T12:00').toLocaleDateString('en-IN',{month:'long',year:'numeric'});}
 function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:uid(),name,group,amount:0,freq:group==='fixed'?'monthly':'',months:[],created_at:n,updated_at:n},extra||{});
   [['Salary','income'],['Bonus','income'],['Other income','income'],
@@ -2464,7 +2486,9 @@ function finSeed(){const n=now();const mk=(name,group,extra)=>Object.assign({id:
    ['Groceries','expense'],['Utilities','expense'],['Fuel / Transport','expense'],['Dining out','expense'],['Shopping','expense'],['Health','expense'],['Misc','expense'],
    ['SIP / Investments','savings'],['Emergency fund','savings']].forEach(d=>fincats.push(mk(d[0],d[1],d[2])));
   persist();renderView();toast('Starter categories added.');}
-function ymAdd(ym,n){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,7);}
+/* Mid-month anchor: noon on the 1st, turned into UTC, lands in the previous month in timezones far
+   enough east, so ISO-slicing it could return the wrong month. */
+function ymAdd(ym,k){const d=new Date(ym+'-15T12:00');d.setMonth(d.getMonth()+k);return ymd(d).slice(0,7);}
 function finBalRow(ym){return finbal.find(b=>!b.deleted&&b.month===ym);}
 function finIncomeActual(ym){return FCAT().filter(c=>c.group==='income'&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+iouCashIn(ym);}
 /* Total spending in the month, whatever funded it — bank or card. */
@@ -2473,7 +2497,7 @@ function finSpendActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDu
    Card-funded categories are deliberately excluded — their cash leaves via the card payment. */
 function finOutflowActual(ym){return FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&!finIsCardFunded(c)&&finDueIn(c,ym)).reduce((a,c)=>a+finActual(c,ym),0)+cardPaidTotal(ym)+loanBankPaidTotal(ym)+iouCashOut(ym);}
 function finOpening(ym){const r=finBalRow(ym);if(r)return +r.opening||0;
-  const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>a.month.localeCompare(b.month));
+  const priors=finbal.filter(b=>!b.deleted&&b.month<ym).sort((a,b)=>(a.month||'').localeCompare(b.month||''));
   if(!priors.length)return 0;
   const base=priors[priors.length-1];let bal=+base.opening||0,cur=base.month;
   while(cur<ym){bal+=finIncomeActual(cur)-finOutflowActual(cur);cur=ymAdd(cur,1);}
@@ -2530,7 +2554,7 @@ function saveFinCard(){const name=g('ccName').value.trim();if(!name){toast('Card
   if(editCard)Object.assign(editCard,d);else fincard.push(Object.assign({id:uid(),created_at:n},d));
   closeM();persist();reRender();toast('Card saved.');}
 async function delFinCard(){if(editCard&&await askConfirm('Delete "'+editCard.name+'"? Its statement history stays saved.',{ok:'Delete',danger:true})){editCard.deleted=true;editCard.updated_at=now();closeM();persist();reRender();toast('Deleted.');}}
-function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>a.name.localeCompare(b.name));
+function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const billed=cardBilledTotal(ym),paid=cardPaidTotal(ym),out=cardOutstandingTotal(ym);
   const [yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();
   const dueStr=c=>{if(!c.due_day)return'';const d=Math.min(c.due_day,dim);return new Date(ym+'-'+String(d).padStart(2,'0')+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'});};
@@ -2545,7 +2569,7 @@ function vFinCardsSection(ym){const cards=CARD().sort((a,b)=>a.name.localeCompar
 async function cardEditPaid(cardId,ym){const c=CARD().find(x=>x.id===cardId);if(!c)return;const cur=cardPaid(cardId,ym);
   const v=await askText('Amount paid on '+c.name+' — '+finMonthLabel(ym)+'.',{title:'Amount paid',type:'number',value:cur?String(cur):'',ok:'Set'});
   if(v===null)return;cardSetPaid(cardId,ym,v.trim()===''?0:+v);}
-function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((a,b)=>a.name.localeCompare(b.name));
+function vFinCommitments(){const list=FCAT().filter(c=>c.group==='fixed').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const annual=list.reduce((a,c)=>a+(finIsDup(c)?0:finAnnualTotal(c)),0);
   const rows=list.map(c=>`<div class="finrow"><div class="fr-bd"><div class="tt" style="font-size:12.5px">${esc(c.name)} <span class="pill n">${esc(finFreqLbl(c.freq).split(' ')[0])}</span>${finIsDup(c)?' <span class="pill n" title="Counted on the linked loan">tracked as loan</span>':''}</div>
     <div class="meta">📅 ${esc(finDueMonthsLabel(c))} · <span class="num">annual ${finIsDup(c)?'— counted on loan':fmtMoney(finAnnualTotal(c))}</span></div></div>
@@ -2659,7 +2683,7 @@ function vPersonalMoney(){if(!finMonth)finMonth=monthKey(today());const ym=finMo
   if(!cats.length)return pagehead('PERSONAL','Money','Plan the month, track actuals','')+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">No categories yet. Start with a ready-made set — income, fixed commitments, variable expenses and savings — all editable.</div><button class="btn" onclick="finSeed()">Load starter categories</button><div style="margin-top:10px"><button class="btn gh2 sm" onclick="openFinCat()">Add one manually</button></div></div></div>`;
   const active=cats.filter(c=>finDueIn(c,ym));
-  const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>((a.day||99)-(b.day||99))||a.name.localeCompare(b.name));
+  const byG=g=>active.filter(c=>c.group===g).sort((a,b)=>((a.day||99)-(b.day||99))||(a.name||'').localeCompare(b.name||''));
   // Loan-linked categories are shown for context but never counted (the loan owns the amount).
   const sumP=l=>l.reduce((a,c)=>a+(finIsDup(c)?0:finPlanned(c,ym)),0),sumA=l=>l.reduce((a,c)=>a+(finIsDup(c)?0:finActual(c,ym)),0);
   const inc=byG('income'),fix=byG('fixed'),exp=byG('expense'),sav=byG('savings');
@@ -2764,15 +2788,15 @@ function invIsWeight(h){return !!(h&&h.unit);}
 function invUnitLbl(u){return u==='kg'?'kg':'gms';}
 function IH(){return invhold.filter(h=>!h.deleted);}
 function IV(){return invval.filter(v=>!v.deleted);}
-function invPrevMonth(ym){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);}
-function invMonthShift(n){if(!invMonth)invMonth=monthKey(today());const d=new Date(invMonth+'-01T12:00');d.setMonth(d.getMonth()+n);invMonth=d.toISOString().slice(0,7);renderView();}
+function invPrevMonth(ym){const d=new Date(ym+'-01T12:00');d.setMonth(d.getMonth()-1);return ymd(d).slice(0,7);}
+function invMonthShift(n){if(!invMonth)invMonth=monthKey(today());const d=new Date(invMonth+'-01T12:00');d.setMonth(d.getMonth()+n);invMonth=ymd(d).slice(0,7);renderView();}
 function invExact(holdId,ym){return IV().find(v=>v.hold_id===holdId&&v.month===ym);}
-function invValueAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v.month<=ym).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].value||0):null;}
+function invValueAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v.month<=ym).sort((a,b)=>(b.month||'').localeCompare(a.month||''));return rows.length?(+rows[0].value||0):null;}
 function invTotalAsOf(ym){return IH().reduce((a,h)=>a+(invValueAsOf(h.id,ym)||0),0);}
 function invSetValue(holdId,ym,raw){const n=now();if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
   else{let r=invExact(holdId,ym);if(r){r.value=+raw;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,value:+raw,created_at:n,updated_at:n});}
   persist();reRender();}
-function invPriceAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v.month<=ym&&v.price!=null).sort((a,b)=>b.month.localeCompare(a.month));return rows.length?(+rows[0].price||0):null;}
+function invPriceAsOf(holdId,ym){const rows=IV().filter(v=>v.hold_id===holdId&&v.month<=ym&&v.price!=null).sort((a,b)=>(b.month||'').localeCompare(a.month||''));return rows.length?(+rows[0].price||0):null;}
 function invSetPrice(holdId,ym,raw){const h=IH().find(x=>x.id===holdId);if(!h)return;const n=now();const qty=+h.qty||0;
   if(raw===''||raw==null){const r=invExact(holdId,ym);if(r){r.deleted=true;r.updated_at=n;}}
   else{const price=+raw,value=qty*price;let r=invExact(holdId,ym);if(r){r.price=price;r.qty=qty;r.value=value;r.updated_at=n;}else invval.push({id:uid(),hold_id:holdId,month:ym,price,qty,value,created_at:n,updated_at:n});}
@@ -2814,7 +2838,7 @@ function loanOutstandingAt(l,ym){
   if(l.start_ym&&ym<l.start_ym)return 0;                 // the loan did not exist yet
   if(loanHasSchedule(l))return loanOutstanding(l,ym);
   return null;}                                           // no history: caller decides
-function nwSnapAt(ym){return nwsnap.filter(x=>!x.deleted&&x.month<=ym).sort((a,b)=>b.month.localeCompare(a.month))[0]||null;}
+function nwSnapAt(ym){return nwsnap.filter(x=>!x.deleted&&x.month<=ym).sort((a,b)=>(b.month||'').localeCompare(a.month||''))[0]||null;}
 function iouOutstandingAt(i,ym){
   if(!i.date||_ym(i.date)>ym)return 0;
   const repaid=IOUTX(i.id).filter(x=>_ym(x.date)<=ym).reduce((a,x)=>a+(+x.amount||0),0);
@@ -2866,7 +2890,6 @@ function nwAttrib(ym){
       {k:'Borrowed (net)',v:-(b.borrowed-a.borrowed)}]};}
 /* ═══ INVESTMENT ANALYSIS ═══ */
 var nwRange='12m', nwSel=null, nwShow={net:true,assets:false,debt:false};
-function ymAdd(ym,k){const d=new Date(ym+'-15T12:00');d.setMonth(d.getMonth()+k);return d.toISOString().slice(0,7);}
 function ymDiff(a,b){const[ay,am]=a.split('-').map(Number),[by,bm]=b.split('-').map(Number);return (by-ay)*12+(bm-am);}
 /* The first month anything worth counting exists -- a holding value, a loan start, an IOU, a recording. */
 function nwFirstMonth(){
@@ -2909,7 +2932,7 @@ function portXirr(ser,rows){if(ser.length<2)return null;const last=ser[ser.lengt
   f.push({t:ymDay(last.ym),v:last.holdings});
   return f.some(x=>x.v<0)&&last.holdings>0?xirr(f):null;}
 function holdingPerf(h){
-  const rows=IV().filter(v=>v.hold_id===h.id).sort((a,b)=>a.month.localeCompare(b.month));
+  const rows=IV().filter(v=>v.hold_id===h.id).sort((a,b)=>(a.month||'').localeCompare(b.month||''));
   if(!rows.length)return null;
   const first=rows[0], last=rows[rows.length-1], cur=invValueAsOf(h.id,monthKey(today()))||0;
   let invested=+first.value||0;
@@ -2929,7 +2952,7 @@ const sgnMoney=v=>(v>=0?'+':'−')+fmtMoney(Math.abs(v));
 var nwTab='moved', nwMode='net', nwTbl=false, nwHoldOpen=null;
 /* Money put into holdings as of a month: each holding's first value plus every "added" since. */
 function investedAsOf(ym){return IH().reduce((a,h)=>{
-  const rows=IV().filter(v=>v.hold_id===h.id&&v.month<=ym).sort((x,y)=>x.month.localeCompare(y.month));
+  const rows=IV().filter(v=>v.hold_id===h.id&&v.month<=ym).sort((x,y)=>(x.month||'').localeCompare(y.month||''));
   return rows.length?a+(+rows[0].value||0)+rows.slice(1).reduce((t,r)=>t+(+r.added||0),0):a;},0);}
 function setNwRange(r){nwRange=r;nwSel=null;reRender();}
 function setNwMode(m){nwMode=m;reRender();}
@@ -3213,7 +3236,7 @@ function vPersonalInvest(){if(!invMonth)invMonth=monthKey(today());const ym=invM
   if(invView==='overview')return vInvOverview();
   if(invView==='pf')return vInvPf();
   if(invView==='analysis')return vInvAnalysis();
-  const holds=IH().sort((a,b)=>a.name.localeCompare(b.name));
+  const holds=IH().sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!holds.length)return pagehead('PERSONAL','Investments','Track portfolio value month on month',invToggle())+
     `<div class="card"><div class="cb" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--t3);margin-bottom:12px;max-width:46ch;margin-left:auto;margin-right:auto">Add your holdings (mutual funds, stocks, gold/silver by weight, property, FDs…), then update their value each month. Clario saves each month's figure and shows the movement.</div><button class="btn" onclick="openInvHold()">+ Add investment</button></div></div>`;
   const isCur=ym===monthKey(td);
@@ -3456,7 +3479,7 @@ function loanUnpay(id,ym){const l=LOAN().find(x=>x.id===id);if(!l||l.last_paid_y
   l.paid_count=Math.max(0,(+l.paid_count||0)-1);l.last_paid_ym='';l.updated_at=now();persist();reRender();}
 function loanDueDate(l,ym){if(!l.due_day)return '';const[yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();return ym+'-'+String(Math.min(l.due_day,dim)).padStart(2,'0');}
 function loanDueDateLbl(l,ym){const d=loanDueDate(l,ym);return d?new Date(d+'T12:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'';}
-function vFinLoansSection(ym){const list=LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&loanDueIn(l,ym)).sort((a,b)=>((a.due_day||99)-(b.due_day||99))||a.name.localeCompare(b.name));
+function vFinLoansSection(ym){const list=LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&loanDueIn(l,ym)).sort((a,b)=>((a.due_day||99)-(b.due_day||99))||(a.name||'').localeCompare(b.name||''));
   if(!list.length)return '';
   const td=today();
   const paid=list.filter(l=>l.last_paid_ym===ym).reduce((a,l)=>a+(+l.emi||0),0),due=list.reduce((a,l)=>a+(+l.emi||0),0);
@@ -3602,7 +3625,7 @@ function saveJournal(key){const ta=g('jTa');if(!ta)return;const j=getJournal(key
 
 /* ═══ PLANNER ═══ */
 var plTab='day',plAnchor=today(),selDay=today();
-function plShift(n){if(plTab==='month'){const d=new Date(plAnchor.slice(0,7)+'-15T12:00');d.setMonth(d.getMonth()+n);plAnchor=d.toISOString().slice(0,10);}
+function plShift(n){if(plTab==='month'){const d=new Date(plAnchor.slice(0,7)+'-15T12:00');d.setMonth(d.getMonth()+n);plAnchor=ymd(d);}
   else if(plTab==='week')plAnchor=addDays(plAnchor,n*7);
   else plAnchor=addDays(plAnchor,n);renderView();}
 const H0=7,H1=21,HPX=46;
@@ -3775,8 +3798,8 @@ function vDayPlanner(ds){const td=today();
   const unplaced=T().filter(t=>t.type!=='call'&&t.due===ds&&!t.at&&t.status!=='done');
   const dump=T().filter(t=>t.type!=='call'&&!t.due&&t.status==='open'&&(t.owner==='me'||!t.owner));
   const mineOpen=t=>t.type!=='call'&&t.status!=='done'&&t.due&&(t.owner==='me'||!t.owner);
-  const overdue=T().filter(t=>mineOpen(t)&&t.due<ds).sort((a,b)=>a.due.localeCompare(b.due));
-  const soon=T().filter(t=>mineOpen(t)&&t.due>ds&&t.due<=addDays(ds,7)).sort((a,b)=>a.due.localeCompare(b.due));
+  const overdue=T().filter(t=>mineOpen(t)&&t.due<ds).sort((a,b)=>(a.due||'').localeCompare(b.due||''));
+  const soon=T().filter(t=>mineOpen(t)&&t.due>ds&&t.due<=addDays(ds,7)).sort((a,b)=>(a.due||'').localeCompare(b.due||''));
   const oaRow=t=>`<div class="row"><span class="pri ${t.priority||'medium'}"></span><div class="bd"><div class="tt" style="font-size:12.5px">${esc(t.title)}</div><div class="meta"><span class="due ${t.due<td?'over':t.due===td?'today':''}">${fmtD(t.due)}</span><span class="num">${t.estimate_min||30}m</span>${t.customer_id?`<span class="pill n">${esc(cname(t.customer_id))}</span>`:''}${t.dept?`<span class="pill n">${esc(t.dept)}</span>`:''}</div></div><button class="btn gh2 xs" onclick="setTaskDue('${t.id}','${ds}')" title="Move to this day">→ ${ds===td?'Today':'Day'}</button></div>`;
   const oaSub=l=>`<div style="padding:6px 14px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--t4);font-weight:700">${l}</div>`;
   const oaInner=(overdue.length?oaSub('Overdue')+overdue.map(oaRow).join(''):'')+(soon.length?oaSub('Next 7 days')+soon.map(oaRow).join(''):'');
@@ -4249,7 +4272,7 @@ function vPeople(){
     ag:AG().filter(a=>a.person_id===p.id&&a.status==='open').length,w:w.length,
     oldest:w.length?Math.max(...w.map(t=>ageDays((t.created_at||now()).slice(0,10)))):0};};
   const getters={name:p=>p.name,role:p=>p.role||'',dept:p=>p.dept||'',waiting:p=>stat(p).w,oldest:p=>stat(p).oldest};
-  let list=applySort('people',P(),getters);if(!_sort.people)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  let list=applySort('people',P(),getters);if(!_sort.people)list=list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const _pN=list.length;list=listCap('people',list);
   const head=pagehead('TEAM','People','Delegation and 1:1 agendas',`<button class="btn sm" onclick="openPerson()">+ Person</button>`)
     +`<div class="filters">${viewToggle('people',view)}</div>`;
@@ -4595,7 +4618,9 @@ function vHelp(){
   ${faqItem('Birthdays and family','Birthdays lists upcoming birthdays; today’s show in the header. + Family adds family members, who can then own personal tasks.')}
   </div>
   <div class="card faq"><div class="ch">Data, sync & devices</div>
-  ${faqItem('Where does my data live?','On each device (browser storage) and in one file — db.json — in your OneDrive. No server, no login to Clario itself. The app file and your data are fully separate.')}
+  ${faqItem('Where does my data live?','In two places only: in this browser on each device, and in one file — <b>Apps/Clario/db.json</b> — in your own OneDrive (or your linked folder), plus monthly snapshots and any db-before-reset files beside it. There is no Clario server and no Clario account. On the device the data is not encrypted, so it is protected by your device login/passcode; the synced file is encrypted if you turn on Settings → Encryption.')}
+  ${faqItem('Privacy — what leaves this device','Nothing, except to Microsoft for sign-in and OneDrive sync when you have set that up. The app makes no other connections: no analytics, no ads, no trackers, no fonts or scripts from other sites, and a built-in security policy blocks any other connection outright (you would see a “Blocked a connection” message). Data only goes elsewhere when you choose to — emailing a summary, tapping a phone number or link, exporting a file, or copying the recovery code. Links you open do not tell the other site where you came from. The offline cache holds only the app’s own files, never your data.')}
+  ${faqItem('Wipe this device vs delete everything','Settings → Data → <b>Wipe all data on this device</b> (type WIPE) erases this browser only — data, PIN, sign-in, folder link, remembered passphrase — and never touches the synced copy, so signing in again brings everything back. To delete your data completely, also remove the Apps/Clario folder in OneDrive (or the files in your linked folder), and wipe each device.')}
   ${faqItem('OneDrive account sync (all devices)','Settings → paste your Azure client ID → Sign in with Microsoft. Clario then reads/writes Apps/Clario/db.json in your OneDrive directly — works on iPhone, iPad, Android and desktop. It pulls before every save and checks for other-device changes every 20 seconds; edits merge record-by-record with the newer change winning.')}
   ${faqItem('OneDrive folder sync (desktop fallback)','Edge/Chrome on desktop can instead link a local OneDrive folder from Settings. Same file, same merging; the link persists across launches.')}
   ${faqItem('Excel import & export','Settings → Bulk data. Pick a data set from the dropdown, then Template, Export or Import — no long list of buttons. Importable sets: tasks, people, accounts, contacts, deals, decisions, meetings, improvement ideas, departments and products. Names do the linking — unknown people and accounts are created automatically. People, accounts, contacts, departments and products update existing records by name; tasks, deals, meetings, decisions and ideas always add new rows, so don’t import the same sheet twice. Logs — the activity history, 1:1 agenda items, planner goals, decision exercises and shutdown journal — are export-only: you can download them for reference, but they can’t be imported, since editing a record of what happened would fabricate it.')}
@@ -4633,7 +4658,7 @@ function vAccounts(){
   const getters={name:c=>c.name,group:c=>c.group||'zzz',kam:c=>c.kam_id?pname(c.kam_id):'',segment:c=>c.segment||'',city:c=>c.city||'',
     deals:c=>meta(c).dv,open:c=>meta(c).open,na:c=>{const t=acctNextTask(c.id);return t&&t.due?t.due:'9999';}};
   list=applySort('accounts',list,getters);
-  if(!_sort.accounts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
+  if(!_sort.accounts)list=list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const _aN=list.length;list=listCap('accounts',list);
   const segs=[...new Set(CU().map(c=>c.segment).filter(Boolean))].sort();
   const kams=[...new Set(CU().map(c=>c.kam_id).filter(Boolean))].sort((a,b)=>pname(a).localeCompare(pname(b)));
@@ -4649,20 +4674,20 @@ function vAccounts(){
   let body;
   if(!list.length){body='<div class="card"><div class="empty">No accounts match. Add one, or clear the filters.</div></div>';}
   else if(view==='card'){
-    body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>${c.group?`<div style="margin-bottom:4px"><span class="pill p lnk" onclick="event.stopPropagation();nav('group','${esc(c.group)}')">${esc(c.group)}</span></div>`:''}
+    body=`<div class="pgrid">${list.map(c=>{const m=meta(c);return`<div class="acard" onclick="nav('accounts','${c.id}')"><div class="an">${esc(c.name)}</div>${c.group?`<div style="margin-bottom:4px"><span class="pill p lnk" onclick="event.stopPropagation();nav('group','${jss(c.group)}')">${esc(c.group)}</span></div>`:''}
       <div class="ameta">${esc(c.segment||'')}${c.segment&&c.city?' · ':''}${esc(c.city||'')}${c.region?' · '+esc(c.region):''}${c.kam_id?' · KAM '+esc(pname(c.kam_id)):''}</div>
       <div class="astats"><span>Contacts <b class="num">${m.nCo}</b></span><span>Open <b class="num">${m.open}</b></span>${m.dls?`<span>Deals <b class="num">${m.dls}</b> · ${fmtMoney(m.dv)}</span>`:''}</div>
       ${m.nt?`<div class="ameta" style="margin-top:6px"><span class="due ${m.nt.due&&m.nt.due<td?'over':m.nt.due===td?'today':''}">${m.nt.due?fmtD(m.nt.due):''}</span> ${esc(m.nt.title)}</div>`:'<div class="ameta" style="margin-top:6px;color:var(--t4)">No next action</div>'}</div>`;}).join('')}</div>`;
   }else{
     const rows=list.map(c=>{const m=meta(c);const na=m.nt?esc(m.nt.title):'<span style="color:var(--t4)">—</span>';
       const nad=m.nt&&m.nt.due?`<span class="due ${m.nt.due<td?'over':m.nt.due===td?'today':''}">${fmtD(m.nt.due)}</span>`:'';
-      return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td>${GROUPS().length?`<td>${c.group?`<span class="pill p lnk" onclick="event.stopPropagation();nav('group','${esc(c.group)}')">${esc(c.group)}</span>`:'<span style="color:var(--t4)">—</span>'}</td>`:''}<td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
+      return`<tr class="click" onclick="nav('accounts','${c.id}')"><td style="font-weight:600;color:var(--blue-d)">${esc(c.name)}</td>${GROUPS().length?`<td>${c.group?`<span class="pill p lnk" onclick="event.stopPropagation();nav('group','${jss(c.group)}')">${esc(c.group)}</span>`:'<span style="color:var(--t4)">—</span>'}</td>`:''}<td>${c.kam_id?esc(pname(c.kam_id)):'<span style="color:var(--t4)">—</span>'}</td><td>${esc(c.segment||'')}</td><td>${esc(c.city||'')}</td><td>${na} ${nad}</td><td class="r num">${m.dls?m.dls+' · '+fmtMoney(m.dv):'—'}</td><td class="r num">${m.open||'—'}</td></tr>`;}).join('');
     body=`<div class="card" style="overflow-x:auto"><table class="t"><tr>${sortHead('accounts','name','Account')}${GROUPS().length?sortHead('accounts','group','Group'):''}${sortHead('accounts','kam','KAM')}${sortHead('accounts','segment','Segment')}${sortHead('accounts','city','City')}${sortHead('accounts','na','Next action')}${sortHead('accounts','deals','Open deals','r')}${sortHead('accounts','open','Open items','r')}</tr>${rows}</table></div>`;
   }
   return pagehead('CRM','Accounts',CU().length+' accounts',`<button class="btn sm" onclick="openCust()">+ Account</button>`)+filters+body+capMore('accounts',_aN);}
 
 function acctPage(c){const td=today();const cos=contactsFor(c.id).sort(byName);
-  const grpLink=c.group?`<span class="pill p lnk" onclick="nav('group','${esc(c.group)}')" title="Open the group rollup">\u25f1 ${esc(c.group)}</span>`:'';
+  const grpLink=c.group?`<span class="pill p lnk" onclick="nav('group','${jss(c.group)}')" title="Open the group rollup">\u25f1 ${esc(c.group)}</span>`:'';
   const open=T().filter(t=>t.customer_id===c.id&&t.status!=='done').sort((a,b)=>((a.due||a.when||'9')+'').localeCompare((b.due||b.when||'9')+''));
   const dls=DL().filter(d=>d.customer_id===c.id);
   const acts=AC().filter(a=>a.customer_id===c.id).sort((a,b)=>(b.at||'').localeCompare(a.at||'')).slice(0,25);
@@ -4893,10 +4918,10 @@ function setKam(cid,pid){const c=customers.find(x=>x.id===cid);if(!c)return;c.ka
 function vPipeline(){const td=today();
   const total=openDeals().reduce((a,d)=>a+(+d.value||0),0);
   const fc=openDeals().reduce((a,d)=>a+(+d.value||0)*(STAGE_P[d.stage]||0)/100,0);
-  const lastAct=did=>{const a=AC().filter(x=>x.deal_id===did).sort((x,y)=>(y.at||'').localeCompare(x.at||''))[0];return a?a.at.slice(0,10):null;};
+  const lastAct=did=>{const a=AC().filter(x=>x.deal_id===did).sort((x,y)=>(y.at||'').localeCompare(x.at||''))[0];return a?((a.at||a.created_at||'').slice(0,10)||null):null;};
   const cols=STAGES.map(st=>{const list=DL().filter(d=>d.stage===st).sort((a,b)=>(a.close_date||'9999').localeCompare(b.close_date||'9999'));
     const val=list.reduce((a,d)=>a+(+d.value||0),0);
-    const cards=list.map(d=>{const la=lastAct(d.id)||d.updated_at.slice(0,10);const stale=st!=='Won'&&st!=='Lost'&&ageDays(la)>14;
+    const cards=list.map(d=>{const la=lastAct(d.id)||(d.updated_at||d.created_at||today()).slice(0,10);const stale=st!=='Won'&&st!=='Lost'&&ageDays(la)>14;
       return`<div class="kcard ${stale?'stale':''}" draggable="true" data-id="${d.id}" title="${stale?'No activity '+ageDays(la)+' days':''}">
       <div class="kn" onclick="nav('deal','${d.id}')">${esc(d.name)}</div>
       <div class="km"><span>${esc(cname(d.customer_id)||'—')}</span><b class="num">${fmtMoney(d.value)}</b></div>
@@ -5103,8 +5128,8 @@ function vDash(){const td=today();
     const q0=td.slice(0,4)+'-'+(['01','04','07','10'][Math.floor((+td.slice(5,7)-1)/3)]);
     const won=DL().filter(d=>d.stage==='Won'&&(d.won_at||d.updated_at||'').slice(0,10)>=q0);
     const wonV=won.reduce((a,d)=>a+(+d.value||0),0);
-    const lastAct=did=>{const a=AC().filter(x=>x.deal_id===did).sort((x,y)=>(y.at||'').localeCompare(x.at||''))[0];return a?a.at.slice(0,10):null;};
-    const stale=open.filter(d=>ageDays(lastAct(d.id)||d.updated_at.slice(0,10))>14);
+    const lastAct=did=>{const a=AC().filter(x=>x.deal_id===did).sort((x,y)=>(y.at||'').localeCompare(x.at||''))[0];return a?((a.at||a.created_at||'').slice(0,10)||null):null;};
+    const stale=open.filter(d=>ageDays(lastAct(d.id)||(d.updated_at||d.created_at||today()).slice(0,10))>14);
     const naDue=CU().map(c=>({c,t:acctNextTask(c.id)})).filter(x=>x.t&&x.t.due&&x.t.due<=td);
     const slipped=open.filter(d=>d.close_date&&d.close_date<td);
     body=`<div class="kpis">
@@ -5217,7 +5242,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newRegion" placeholder="Add region" style="flex:1"><button class="btn sm" onclick="addRegion()">Add</button></div>
     <p class="note">Group accounts by region so travel plans can surface everyone nearby.</p></div>
   <div class="setcard"><h4>Account groups${coTag()}</h4>
-    <div class="chips">${GROUPS().map(gr=>`<span class="chip"><span class="lnk" onclick="nav('group','${esc(gr)}')">${esc(gr)}</span> <span class="n num">${groupMembers(gr).length}</span><button onclick="delAcctGroup('${esc(gr)}')">\u2715</button></span>`).join('')||'<span class="note">None yet.</span>'}</div>
+    <div class="chips">${GROUPS().map(gr=>`<span class="chip"><span class="lnk" onclick="nav('group','${jss(gr)}')">${esc(gr)}</span> <span class="n num">${groupMembers(gr).length}</span><button onclick="delAcctGroup('${jss(gr)}')">\u2715</button></span>`).join('')||'<span class="note">None yet.</span>'}</div>
     <div style="display:flex;gap:7px;margin-top:10px"><input id="newAcctGroup" placeholder="Add a parent group \u2014 e.g. Acme Group" style="flex:1"><button class="btn sm" onclick="addAcctGroup()">Add</button></div>
     <p class="note">Companies you deal with that sit under one parent. Set the group on each account, then a person can act for the whole group instead of being duplicated per company. The group page rolls up pipeline, commitments and activity across its members.</p></div>
   <div class="setcard"><h4>Locations</h4>
@@ -5231,7 +5256,8 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <p class="note">Completed tasks, calls, meetings, decisions and logged notes older than 6 months can be archived — hidden from lists and searches to keep the app fast, without deleting anything. ${archivedCount()?archivedCount()+' record(s) currently archived.':''}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm" onclick="runArchiveOld()">Archive records older than 6 months</button>${archivedCount()?`<button class="btn gh2 sm" onclick="restoreArchived()">Restore archived records</button>`:''}</div></div>
   <div class="setcard"><h4>Data</h4>
-    <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button></div>
+    <button class="btn dg sm" onclick="wipeAll()">Wipe all data on this device</button>
+    <p class="note">Erases this browser only: data, PIN, OneDrive sign-in, folder link and remembered passphrase. Your synced copy is not touched. To delete that too, remove the <b>Apps/Clario</b> folder in OneDrive (db.json, monthly snapshots and any db-before-reset files) or the files in your linked folder.</p></div>
   <div class="setcard"><h4>About & help</h4><div style="margin-bottom:8px"><button class="btn gh2 sm" onclick="nav('help')">Open FAQ — how everything works</button></div><p class="note">Clario One ${APP_VER}. Single file, no server, no login. Planner (day/week/month with rituals), CRM (accounts, contacts, pipeline, activity), commitments both ways, decision tools, dashboards, weekly review. Data lives in this browser and in your linked db.json.</p></div>
   </div></div>`;}
 function addDept(){const v=g('newDept').value.trim();if(v&&!depts.includes(v)){depts.push(v);persist();renderView();}}
@@ -5291,7 +5317,10 @@ function companiesCard(){const list=COMP();
     <p class="note">Each company has its own tasks, accounts, contacts, people, meetings, deals, plans, saved views, and its own departments, products, regions, groups and work week. Personal, your profile and day locations are shared. Switching changes what Official shows on this device. The company name also labels your own team's attendees in meeting summaries ("${esc(coLabel(activeCo))} → Name").</p></div>`;}
 function ensureLocation(l){if(l&&!locationsList.includes(l))locationsList.push(l);return l||'';}
 function fillRegion(sel,val){g(sel).innerHTML='<option value="">—</option>'+regions.sort((a,b)=>a.localeCompare(b)).map(r=>`<option${r===val?' selected':''}>${esc(r)}</option>`).join('');}
-async function wipeAll(){const v=await askText('Type WIPE to erase everything on this device:',{title:'Wipe all data',ok:'Wipe',placeholder:'WIPE'});if(v!=='WIPE')return;localStorage.removeItem(LS_KEY);TABLES.forEach(t=>window[t]=[]);companies=[];_coStore={};activeCo=CO_HOME;try{localStorage.removeItem(CO_KEY);}catch(e){}coEnsureHome('');companyName='';coToGlobals(coEmpty());persist();renderView();toast('Wiped. Linked db.json will be overwritten on next save.');}
+async function wipeAll(){
+  const v=await askText('This erases everything Clario keeps in this browser — all data, the PIN, the OneDrive sign-in, the folder link and the remembered passphrase. Your synced db.json in OneDrive or the linked folder is not touched, so signing in again brings it back.\n\nType WIPE to erase this device:',{title:'Wipe this device',ok:'Wipe',placeholder:'WIPE'});
+  if((v||'').trim().toUpperCase()!=='WIPE'){if(v!=null)toast('Nothing was erased.');return;}
+  await eraseDevice();}
 function monthsAgoDate(n){const d=new Date();d.setMonth(d.getMonth()-n);return ymd(d);}
 function archivableCounts(cutoff){
   const tk=tasks.filter(t=>!t.deleted&&!t.archived&&t.status==='done'&&(t.completed_at||t.updated_at||t.created_at||'').slice(0,10)<cutoff).length;
@@ -5324,8 +5353,8 @@ async function restoreArchived(){const cnt=archivedCount();if(!cnt){toast('Nothi
 function vContacts(){const q=(window._coq||'').toLowerCase();const af=window._coAcct||'';
   let list=CO().filter(x=>(!q||(x.name+' '+(x.role||'')+' '+(x.phone||'')+' '+(x.email||'')+' '+cname(x.customer_id)).toLowerCase().includes(q))&&(!af||x.customer_id===af));
   const getters={name:x=>x.name,role:x=>x.role||'',account:x=>cname(x.customer_id),phone:x=>x.phone||'',email:x=>x.email||''};
-  list=applySort('contacts',list,getters);if(!_sort.contacts)list=list.sort((a,b)=>a.name.localeCompare(b.name));
-  const accts=[...new Set(CO().map(x=>x.customer_id).filter(Boolean))].map(id=>({id,name:cname(id)})).sort((a,b)=>a.name.localeCompare(b.name));
+  list=applySort('contacts',list,getters);if(!_sort.contacts)list=list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const accts=[...new Set(CO().map(x=>x.customer_id).filter(Boolean))].map(id=>({id,name:cname(id)})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const filters=`<div class="filters"><input placeholder="Search name, role, phone, email, account" value="${esc(window._coq||'')}" oninput="window._coq=this.value;clearTimeout(window._cot);window._cot=setTimeout(()=>{renderView();const i=document.querySelector('.filters input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},260)" style="min-width:240px">
     <select data-ssel onchange="window._coAcct=this.value;renderView()"><option value="">All accounts</option>${accts.map(a=>`<option value="${a.id}"${af===a.id?' selected':''}>${esc(a.name)}</option>`).join('')}</select>
     ${(q||af)?`<button class="btn gh2 sm" onclick="window._coq='';window._coAcct='';renderView()">Clear</button>`:''}</div>`;
@@ -5400,7 +5429,7 @@ tasks:{label:'Tasks & calls',cols:['title','type','owner','due','time','estimate
       dept:ensureDept(o.department),customer_id:o.account?getOrCreateAccount(o.account):null,
       status,follow_up:normD(o.follow_up)?(normD(o.follow_up)+'T'+(normT(o.follow_up)||'09:00')):(status==='waiting'?defaultFollowUp(due):null),
       phone:o.phone||'',when:type==='call'&&wd?wd+'T'+wt:null,notes:o.notes||'',created_at:n,updated_at:n});return null;}},
-people:{label:'People',cols:['name','department','role','phone','email','notes'],example:['Priya Sharma','Finance','Finance Head','+91 98xxxxxx01','priya@x.com',''],
+people:{label:'People',cols:['name','department','role','phone','email','notes'],example:['Priya Sharma','Finance','Finance Head','+91 98xxxxxx01','priya@example.com',''],
   rows(){return P().map(p=>[p.name,p.dept||'',p.role||'',p.phone||'',p.email||'',p.notes||'']);},
   imp(o){if(!o.name)return'no name';const ex=P().find(x=>x.name.toLowerCase()===o.name.toLowerCase());const n=now();
     if(ex){if(o.department)ex.dept=ensureDept(o.department);if(o.role)ex.role=o.role;if(o.phone)ex.phone=o.phone;if(o.email)ex.email=o.email;if(o.notes)ex.notes=o.notes;ex.updated_at=n;return'updated';}
@@ -5763,7 +5792,7 @@ async function delPerson(){if(editP&&await askConfirm('Delete '+editP.name+'? Th
 let editC=null;
 function openCust(id){editC=id?customers.find(x=>x.id===id):null;
   g('mCustTitle').textContent=editC?'Edit Account':'New Account';
-  g('cName').value=editC?.name||'';g('cGroup').value=c?.group||'';g('cGroupDL').innerHTML=GROUPS().map(gr=>`<option value="${esc(gr)}">`).join('');
+  g('cName').value=editC?.name||'';g('cGroup').value=editC?.group||'';g('cGroupDL').innerHTML=GROUPS().map(gr=>`<option value="${esc(gr)}">`).join('');
   g('cSeg').value=editC?.segment||'';g('cCity').value=editC?.city||'';
   fillDept('cDept',editC?.dept||'');fillOwner('cKam',editC?.kam_id||'me');fillRegion('cRegion',editC?.region||'');g('cVisitCadence').value=editC?.visit_cadence||'';g('cAddr').value=editC?.address||'';g('cCadence').value=editC?.cadence||'';g('cLastOrder').value=editC?.last_order||'';g('cSupplyNote').value=editC?.supply_note||'';g('cNotes').value=editC?.notes||'';
   g('cDel').style.display=editC?'':'none';g('mCust').classList.add('open');setTimeout(()=>g('cName').focus(),50);}
@@ -5890,7 +5919,7 @@ async function delMeeting(){if(editM&&await askConfirm('Delete meeting?',{ok:'De
 function planPeriodRange(tab,anchor){
   if(tab==='week'){const mon=mondayOf(anchor);return[mon,addDays(mon,6)];}
   const mk=monthKey(anchor),first=mk+'-01';const d=new Date(first+'T12:00');
-  const last=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+  const last=ymd(new Date(d.getFullYear(),d.getMonth()+1,0));   // local date: toISOString() gave the day before in IST
   return[first,last];}
 function openPlanPrompt(tab,anchor){
   const[start,end]=planPeriodRange(tab,anchor);
@@ -6026,6 +6055,12 @@ try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
 applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
 setTimeout(()=>checkLocationConfirmation(),350);
+/* A blocked connection must be loud: if Microsoft ever moves db.json downloads to a host the policy
+   does not list, sync would otherwise just stop. Report it once per host. */
+const _cspSeen=new Set();
+document.addEventListener('securitypolicyviolation',e=>{let h='';try{h=new URL(e.blockedURI).host;}catch(x){h=e.blockedURI||e.violatedDirective;}
+  if(_cspSeen.has(h))return;_cspSeen.add(h);window._cspBlocked=[..._cspSeen];
+  toast(`Blocked a connection to ${h||'an outside site'} (privacy policy). If sync stops, report this host.`);});
 if(_encMeta&&_encMeta.on)setTimeout(()=>{ensureEncKey(_encMeta.salt,true).catch(()=>{});},900);
 setTimeout(()=>{try{finRunAutoDebits();}catch(e){}},1200);
 setTimeout(()=>{try{snapMaybe();}catch(e){}},6000);})();
