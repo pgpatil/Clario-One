@@ -597,6 +597,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 .rc-list{margin:0 0 8px 22px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
 .rc-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:22px}
 .rc-snz{width:auto;font-size:12px;padding:4px 6px}
+.remcard.pay{border-left-color:var(--amb)}
+.rc-pay{display:flex;align-items:center;justify-content:space-between;gap:8px}.rc-pay .lnk{flex:1;min-width:0;overflow-wrap:anywhere}
 #remPanel{position:fixed;top:calc(var(--ghH,52px) + 6px);right:12px;z-index:85;display:none;width:360px;max-width:calc(100vw - 24px);max-height:calc(100vh - var(--ghH,52px) - 24px);overflow:auto;background:#fff;border:1px solid var(--bdr2);border-radius:var(--r);box-shadow:0 10px 30px rgba(24,24,24,.2)}
 #remPanel.show{display:block}
 .rp-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:14px}
@@ -1128,7 +1130,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='9.3.0',APP_BUILD=75,   /* APP_BUILD must equal the number in sw.js's cache name */
+const APP_VER='9.4.0',APP_BUILD=76,   /* APP_BUILD must equal the number in sw.js's cache name */
       DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
@@ -2769,14 +2771,14 @@ function vFinForecast(){const rows=finForecast(12);
 function finDueItems(ym){const td=today(),out=[];
   const dayDate=(day)=>{if(!day)return '';const[yy,mm]=ym.split('-').map(Number);const dim=new Date(yy,mm,0).getDate();return ym+'-'+String(Math.min(day,dim)).padStart(2,'0');};
   CARD().forEach(c=>{const o=cardOutstanding(c.id,ym);if(cardStatement(c.id,ym)>0&&o>0){const d=dayDate(c.due_day);
-    out.push({kind:'card',name:c.name+(c.last4?' ••'+c.last4:''),sub:'Credit card bill',amount:o,due:d,
+    out.push({kind:'card',id:c.id,ym,name:c.name+(c.last4?' ••'+c.last4:''),sub:'Credit card bill',amount:o,due:d,
       act:`<button class="btn xs" onclick="cardPayFull('${c.id}','${ym}')">✓ pay full</button>`});}});
   LOAN().filter(l=>(l.pay_method||'bank')==='bank'&&loanDueIn(l,ym)&&l.last_paid_ym!==ym&&(+l.emi>0)).forEach(l=>{
-    out.push({kind:'emi',name:l.name,sub:'Loan EMI',amount:+l.emi||0,due:loanDueDate(l,ym),
+    out.push({kind:'emi',id:l.id,ym,name:l.name,sub:'Loan EMI',amount:+l.emi||0,due:loanDueDate(l,ym),
       act:`<button class="btn xs" onclick="loanPayEmi('${l.id}','${ym}')">✓ pay EMI</button>`});});
   FCAT().filter(c=>c.group!=='income'&&!finIsDup(c)&&c.day&&finDueIn(c,ym)).forEach(c=>{
     const rem=finPlanned(c,ym)-finActual(c,ym);if(rem>0)
-      out.push({kind:'commit',name:c.name,sub:finGroupLbl(c.group),amount:rem,due:dayDate(c.day),
+      out.push({kind:'commit',id:c.id,ym,name:c.name,sub:finGroupLbl(c.group),amount:rem,due:dayDate(c.day),
         act:`<button class="btn xs" onclick="finPayPlanned('${c.id}','${ym}')">✓ planned</button>`});});
   out.forEach(i=>{i.overdue=!!(i.due&&i.due<td);});
   return out.sort((a,b)=>(b.overdue-a.overdue)||((a.due||'9999-99')).localeCompare(b.due||'9999-99'));}
@@ -4738,8 +4740,9 @@ function vHelp(){
   ${faqItem('Weekly review','One page to close the week: done vs added, overdue, stuck delegations, deals won, this week’s priorities scored, oldest slips by original date, and decisions due for review. <b>Run guided review</b> walks you through it in four steps — Achieved, Slipped, Where time went (from estimates; Clario does not track time) and Next week, where you set next week’s priorities. Export as .md or print.')}
   </div>
   <div class="card faq"><div class="ch">Reminders &amp; notifications</div>
-  ${faqItem('Reminders — what reminds you and when','Calls, meetings and tasks with a time alert at that time, with a heads-up before calls and meetings (10 min by default). Everything dated for the day — tasks without a time, follow-ups, decision reviews, birthdays, bills, EMIs, card dues and money lent or borrowed — comes together in one <b>morning digest</b> (9:00 by default, or as soon as you open Clario after that). Bills and EMIs also remind 2 days before. Reminders cover every company, not only the one open. Change all of this in Settings → <b>Reminders &amp; notifications</b>.')}
-  ${faqItem('The bell, snooze and dismiss','The 🔔 in the header counts what is due; tap it for Now, Later today and Snoozed. Each reminder pops up with <b>Open</b>, <b>Snooze</b> (10 min, 1 hour, tomorrow), <b>Dismiss</b>, and <b>Mark done</b> for tasks. A heads-up drops out once the real time arrives. Dismissing or snoozing syncs, so the same reminder does not alert again on your other devices. When more than three arrive together they come as one summary.')}
+  ${faqItem('Reminders — what reminds you and when','Calls, meetings and tasks with a time alert at that time, with a heads-up before calls and meetings (10 min by default). Everything dated for the day — tasks without a time, follow-ups, decision reviews, birthdays and money someone is due to repay you — comes together in one <b>morning digest</b> (9:00 by default, or as soon as you open Clario after that). Bills, EMIs, card dues and money you owe work differently: they keep reminding until paid (see below). Reminders cover every company, not only the one open. Change all of this in Settings → <b>Reminders &amp; notifications</b>.')}
+  ${faqItem('Bills and payments remind until paid','A bill, EMI, card due or money you owe starts reminding 2 days before its date (change this in Settings) and does not go away until it is paid. It pops up <b>every time you open Clario</b> and <b>every hour</b> while Clario is open — overdue ones included, and last month’s unpaid cards and bills too. It cannot be dismissed: choose <b>Snooze 1 hour</b>, <b>Snooze 1 day</b>, or <b>Mark paid</b>, which records it as paid in full exactly as the Money screen does. Once it is recorded as paid — here or in Money, on any device — the reminder disappears by itself. Money you owe to a person is cleared by logging the repayment under Borrowed &amp; lent. As with all personal reminders, no amount is ever shown.')}
+  ${faqItem('The bell, snooze and dismiss','The 🔔 in the header counts what is due; tap it for Payments, Now, Later today and Snoozed. Each reminder pops up with <b>Open</b>, <b>Snooze</b> (10 min, 1 hour, tomorrow), <b>Dismiss</b>, and <b>Mark done</b> for tasks — payments only offer Snooze 1 hour / 1 day and Mark paid. A heads-up drops out once the real time arrives. Dismissing or snoozing syncs, so the same reminder does not alert again on your other devices. When more than three arrive together they come as one summary.')}
   ${faqItem('Personal reminders stay discreet','A personal reminder says what is due and when — “Home loan — EMI due today”, “HDFC card bill due in 2 days” — and never the amount: not in Official, not in Personal, not in the notification on your lock screen. Opening it goes through the Personal section, so your PIN still applies.')}
   ${faqItem('Notifications on the phone or laptop','Settings → Reminders → <b>Turn on</b> (or the button in the 🔔 panel) lets Clario show system notifications while it is running in the background; tap one to jump to that reminder. On iPhone and iPad this needs Clario added to the Home Screen and opened from there. A closed app cannot be woken on iPhone without a push server, which Clario deliberately does not use — anything you missed is waiting in the 🔔 the next time you open it.')}
   </div>
@@ -6225,6 +6228,8 @@ nav=async function(v,arg,_fromPop,_fromGoBack){if(v!=='decide'){dTool=null;windo
    is running in the background. A closed iPhone app cannot be woken without a push server, which
    Clario deliberately does not have; the morning digest catches up on the next open. */
 const REM_CFG_KEY='cx_rem_cfg', REM_FIRED_KEY='cx_rem_fired';
+/* one clock for every reminder decision (tests set window.__remNow to a fixed moment) */
+const remNowMs=()=>window.__remNow||Date.now(), remToday=()=>ymd(new Date(remNowMs()));
 const REM_DEF={on:true,digest:'09:00',lead:10,moneyDays:2,src:{tasks:true,follow:true,money:true,bday:true,review:true}};
 function remCfg(){try{const c=JSON.parse(localStorage.getItem(REM_CFG_KEY)||'null')||{};return {...REM_DEF,...c,src:{...REM_DEF.src,...(c.src||{})}};}catch(e){return {...REM_DEF,src:{...REM_DEF.src}};}}
 function remSetCfg(patch){const c=remCfg();const n={...c,...patch,src:{...c.src,...(patch.src||{})}};try{localStorage.setItem(REM_CFG_KEY,JSON.stringify(n));}catch(e){}remTick();renderView();}
@@ -6262,21 +6267,32 @@ function remCollect(ds){const c=remCfg(),out=[];const dg=remAt(ds,c.digest),lead
   if(c.src.tasks)TP().filter(t=>t.status!=='done').forEach(t=>{
     if(t.due===ds&&t.at)out.push({key:`p:${t.id}:${ds}T${t.at}`,at:remAt(ds,t.at),title:t.title,sub:'Personal · at '+t.at,kind:'ptask',personal:true,ref:t.id});
     else if(t.due===ds)out.push({key:`d:p:${t.id}:${ds}`,at:dg,digest:true,title:t.title,sub:'Personal · due today',kind:'ptask',personal:true,ref:t.id});});
-  if(c.src.money){const days=Math.max(0,+c.moneyDays||0),until=addDays(ds,days);
-    [monthKey(ds),monthKey(until)].filter((x,i,a)=>a.indexOf(x)===i).forEach(ym=>{
+  /* Payments stay until they are paid: bills, EMIs, card dues and money you owe. The key has no day
+     in it, so the same reminder carries on from day to day -- overdue included -- and disappears by
+     itself once the payment is recorded. Last month's unpaid cards and bills are included; last
+     month's EMIs are not, because a loan only records its latest paid month. */
+  if(c.src.money){const days=Math.max(0,+c.moneyDays||0),until=addDays(ds,days),cur=monthKey(ds),prev=ymAdd(cur,-1),seen=new Set();
+    const what=k=>k==='card'?'card bill':k==='emi'?'EMI':'payment';
+    const when=due=>due<ds?`overdue since ${fmtD(due)}`:`due ${remDayWord(due,ds)}`;
+    [prev,cur,monthKey(until)].filter((x,i,a)=>a.indexOf(x)===i).forEach(ym=>{
       let items=[];try{items=finDueItems(ym);}catch(e){}
-      items.filter(i=>i.due&&(i.due===ds||i.due===until)).forEach(i=>{const w=remDayWord(i.due,ds);
-        out.push({key:`d:$:${i.kind}:${i.name}:${i.due}:${ds}`,at:dg,digest:true,personal:true,kind:'money',
-          title:`${i.name} — ${i.kind==='card'?'card bill':i.kind==='emi'?'EMI':'payment'} due ${w}`,sub:'Personal · Money',ref:i.kind==='card'?'card':'month'});});});
-    IOU().filter(i=>i.due&&iouOutstanding(i)>0&&(i.due===ds||i.due===until)).forEach(i=>{const w=remDayWord(i.due,ds);
-      out.push({key:`d:i:${i.id}:${i.due}:${ds}`,at:dg,digest:true,personal:true,kind:'money',
-        title:i.dir==='lent'?`${i.person||'Someone'} is due to repay you ${w}`:`Repayment to ${i.person||'someone'} due ${w}`,sub:'Personal · Borrowed & lent',ref:'iou'});});}
+      items.filter(i=>i.due&&i.due<=until&&!(ym===prev&&i.kind==='emi')).forEach(i=>{
+        const key=`$:${i.kind}:${i.id||i.name}:${i.ym||ym}`;if(seen.has(key))return;seen.add(key);
+        out.push({key,at:remAt(ds,'00:00'),sticky:true,personal:true,kind:'money',overdue:i.due<ds,due:i.due,
+          pay:i.id?{kind:i.kind,id:i.id,ym:i.ym||ym}:null,title:`${i.name} — ${what(i.kind)} ${when(i.due)}`,sub:'Personal · Money',ref:'month'});});});
+    IOU().filter(i=>i.due&&iouOutstanding(i)>0).forEach(i=>{
+      if(i.dir!=='lent'&&i.due<=until)
+        out.push({key:`$:iou:${i.id}`,at:remAt(ds,'00:00'),sticky:true,personal:true,kind:'money',overdue:i.due<ds,due:i.due,
+          title:`Repayment to ${i.person||'someone'} ${when(i.due)}`,sub:'Personal · Borrowed & lent',ref:'iou'});
+      else if(i.dir==='lent'&&(i.due===ds||i.due===until)){const w=remDayWord(i.due,ds);
+        out.push({key:`d:i:${i.id}:${i.due}:${ds}`,at:dg,digest:true,personal:true,kind:'money',
+          title:`${i.person||'Someone'} is due to repay you ${w}`,sub:'Personal · Borrowed & lent',ref:'iou'});}});}
   if(c.src.bday)BD().filter(b=>b.date&&b.date.slice(5)===ds.slice(5)).forEach(b=>
     out.push({key:`d:b:${b.id}:${ds}`,at:dg,digest:true,personal:true,kind:'bday',title:`${b.name}’s birthday today`,sub:'Personal · Birthdays',ref:b.id}));
   return out.sort((a,b)=>a.at-b.at);}
 const remLog=key=>remlog.find(r=>r.id===key&&!r.deleted);
 function remState(it,nowMs){const r=remLog(it.key);
-  if(r&&r.status==='done')return'done';
+  if(r&&r.status==='done'&&!it.sticky)return'done';                     // a payment cannot be dismissed, only paid
   if(it.main){if(nowMs>=it.main)return'done';                  // a heads-up is over once the real time comes
     const m=remLog(it.key.replace(/:pre$/,''));if(m&&m.status==='done')return'done';}
   if(r&&r.status==='snoozed'&&r.until>nowMs)return'snoozed';
@@ -6285,22 +6301,39 @@ function remFired(){try{return new Set(JSON.parse(localStorage.getItem(REM_FIRED
 function remSaveFired(set){try{localStorage.setItem(REM_FIRED_KEY,JSON.stringify([...set].slice(-400)));}catch(e){}}
 /* the alert fingerprint changes when a snooze ends, so a snoozed reminder alerts again */
 const remFp=it=>{const r=remLog(it.key);return it.key+(r&&r.status==='snoozed'?'@'+r.until:'');};
-function remActive(nowMs){nowMs=nowMs||Date.now();const ds=ymd(new Date(nowMs));
+function remActive(nowMs){nowMs=nowMs||remNowMs();const ds=ymd(new Date(nowMs));
   return remCollect(ds).filter(it=>remState(it,nowMs)==='due');}
 let _remShown=[];
+/* Payments come back every time the app is opened (a fresh load, or a return after 5+ minutes away)
+   and every hour while it stays open, until paid or snoozed. */
+const REM_STICKY_KEY='cx_rem_pay_at', REM_PAY_EVERY=3600e3;
+let _remOpenRound=true,_remHiddenAt=0;const _remPaySeen=new Set();
+document.addEventListener('visibilitychange',()=>{if(document.hidden)_remHiddenAt=Date.now();
+  else if(_remHiddenAt&&Date.now()-_remHiddenAt>=5*60e3)_remOpenRound=true;});   // real elapsed time away, not the reminder clock
+function remPayCard(nowMs,list){
+  const fresh=list.some(i=>!_remPaySeen.has(remFp(i)));
+  let last=0;try{last=+(localStorage.getItem(REM_STICKY_KEY)||0);}catch(e){}
+  if(!(_remOpenRound||fresh||nowMs-last>=REM_PAY_EVERY))return null;
+  _remOpenRound=false;list.forEach(i=>_remPaySeen.add(remFp(i)));try{localStorage.setItem(REM_STICKY_KEY,String(nowMs));}catch(e){}
+  const od=list.filter(i=>i.overdue).length;
+  return {key:'pay',payOf:list,at:nowMs,title:list.length===1?list[0].title:`${list.length} payments need attention${od?` · ${od} overdue`:''}`,
+    sub:list.length===1?list[0].sub:list.map(i=>i.title.split(' — ')[0]).join(' · ')};}
 function remTick(nowMs){try{
-  const c=remCfg();nowMs=nowMs||Date.now();remBadge(nowMs);
+  const c=remCfg();nowMs=nowMs||remNowMs();remBadge(nowMs);
   if(!c.on)return [];
-  const ds=ymd(new Date(nowMs)),fired=remFired();
-  const due=remCollect(ds).filter(it=>remState(it,nowMs)==='due'&&nowMs-it.at<12*3600e3);
+  const ds=ymd(new Date(nowMs)),fired=remFired(),all=remCollect(ds);
+  const pays=all.filter(it=>it.sticky&&remState(it,nowMs)==='due');
+  const payCard=pays.length?remPayCard(nowMs,pays):null;
+  const due=all.filter(it=>!it.sticky&&remState(it,nowMs)==='due'&&nowMs-it.at<12*3600e3);
   const fresh=due.filter(it=>!fired.has(remFp(it)));
-  if(!fresh.length)return [];
+  if(!fresh.length){if(payCard)remShow([payCard]);return [];}
   fresh.forEach(it=>fired.add(remFp(it)));remSaveFired(fired);
   // dated items arrive together in one morning digest; timed ones one by one
   const timed=fresh.filter(it=>!it.digest),dig=fresh.filter(it=>it.digest);
   const cards=[...timed];
   if(dig.length)cards.push({key:'digest:'+ds,digestOf:dig,at:dig[0].at,title:`Today: ${dig.length} reminder${dig.length===1?'':'s'}`,sub:remDigestLine(dig)});
-  remShow(cards.length>3?[{key:'many:'+nowMs,manyOf:fresh,title:`${fresh.length} reminders`,sub:'Open the bell to see them all'}]:cards);
+  const shown=cards.length>3?[{key:'many:'+nowMs,manyOf:fresh,title:`${fresh.length} reminders`,sub:'Open the bell to see them all'}]:cards;
+  remShow(payCard?[...shown.slice(-2),payCard]:shown);           // the payments card is never crowded out
   return fresh;}catch(e){return [];}}
 function remDigestLine(items){const n=k=>items.filter(i=>i.kind===k).length;const parts=[];
   const t=n('task')+n('ptask');if(t)parts.push(t+' task'+(t>1?'s':''));
@@ -6321,8 +6354,15 @@ async function remNotify(c){try{
   const body=c.sub||'',opts={body,tag:c.key,icon:'icon-192.png',badge:'icon-192.png',data:{key:c.key}};
   const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
   if(reg&&reg.showNotification)await reg.showNotification(c.title,opts);else new Notification(c.title,opts);}catch(e){}}
+function remPayRow(i){const k=jss(i.key);
+  return `<div class="rc-pay"><span class="lnk" onclick="remOpen('${k}')">${esc(i.title)}</span>${i.pay?`<button class="btn xs" onclick="remPay('${k}')">Mark paid</button>`:`<button class="btn gh2 xs" onclick="remOpen('${k}')">Open</button>`}</div>`;}
 function remPaintPop(){const box=g('remPop');if(!box)return;
   box.innerHTML=_remShown.map(c=>{const k=jss(c.key);
+    if(c.payOf){const live=c.payOf.filter(i=>remState(i,remNowMs())==='due');if(!live.length)return '';
+      return `<div class="remcard pay" data-k="pay"><div class="rc-top"><span class="rc-ic">💳</span><b>${esc(live.length===1?live[0].title:`${live.length} payments need attention`)}</b><button class="iconb" aria-label="Remind me in an hour" title="Remind me in an hour" onclick="remSnoozePays(60)">✕</button></div>
+        <div class="rc-sub">Stays until paid · reminds every hour</div>
+        <div class="rc-list">${live.map(remPayRow).join('')}</div>
+        <div class="rc-act"><button class="btn gh2 sm" onclick="remSnoozePays(60)">Snooze 1 hour</button><button class="btn gh2 sm" onclick="remSnoozePays(1440)">Snooze 1 day</button></div></div>`;}
     const list=c.digestOf||c.manyOf;
     return `<div class="remcard" data-k="${esc(c.key)}"><div class="rc-top"><span class="rc-ic">🔔</span><b>${esc(c.title)}</b><button class="iconb" aria-label="Close" onclick="remClosePop('${k}')">✕</button></div>
       <div class="rc-sub">${esc(c.sub||'')}</div>
@@ -6336,19 +6376,40 @@ function remPaintPop(){const box=g('remPop');if(!box)return;
 function remClosePop(key){_remShown=_remShown.filter(c=>c.key!==key);remPaintPop();}
 function remLogSet(key,patch){const n=now();let r=remlog.find(x=>x.id===key);
   if(r)Object.assign(r,patch,{deleted:false,updated_at:n});else remlog.push({id:key,...patch,created_at:n,updated_at:n});persist();}
-function remDismiss(key){remLogSet(key,{status:'done'});remClosePop(key);remBadge();remRefreshPanel();}
-function remDismissMany(cardKey){const c=_remShown.find(x=>x.key===cardKey);(c&&(c.digestOf||c.manyOf)||[]).forEach(i=>remLogSet(i.key,{status:'done'}));remClosePop(cardKey);remBadge();remRefreshPanel();}
-function remSnooze(key,v){const until=v==='tom'?remAt(addDays(today(),1),remCfg().digest):Date.now()+(+v)*60e3;
+function remDismiss(key){const it=remFind(key);
+  if(it&&it.sticky){toast('Payment reminders stay until paid — snooze it instead.');return;}
+  remLogSet(key,{status:'done'});remClosePop(key);remBadge();remRefreshPanel();}
+/* snooze every payment on the card (or one, from the bell) for an hour or a day */
+function remSnoozePays(min,key){const until=remNowMs()+min*60e3;
+  const c=_remShown.find(x=>x.key==='pay');const keys=key?[key]:(c?c.payOf.map(i=>i.key):remActive().filter(i=>i.sticky).map(i=>i.key));
+  keys.forEach(k=>remLogSet(k,{status:'snoozed',until}));
+  if(!key)remClosePop('pay');else remPaintPop();
+  remBadge();remRefreshPanel();toast(`Payment reminder${keys.length>1?'s':''} snoozed for ${min>=1440?'1 day':'1 hour'}.`);}
+/* Mark paid records it with the same action as the Money screen, but quietly: those actions announce
+   the amount, and this may be happening on the Official screen. */
+async function remPay(key){const it=remFind(key);if(!it||!it.pay)return;
+  const name=it.title.split(' — ')[0];
+  if(!await askConfirm(`Record “${name}” as paid in full?`,{title:'Mark paid',ok:'Mark paid'}))return;
+  const fn={card:cardPayFull,emi:loanPayEmi,commit:finPayPlanned}[it.pay.kind];if(!fn)return;
+  const orig=window.toast;let said='';window.toast=m=>{said=String(m||'');};
+  try{fn(it.pay.id,it.pay.ym);}catch(e){}finally{window.toast=orig;}
+  const still=remCollect(remToday()).some(i=>i.key===key);
+  toast(!still?`${name} recorded as paid.`:(/₹|\d{3,}/.test(said)?'Could not record it here — open Money to pay.':(said||'Could not record it here — open Money to pay.')));
+  remPaintPop();remBadge();remRefreshPanel();}
+function remDismissMany(cardKey){const c=_remShown.find(x=>x.key===cardKey);(c&&(c.digestOf||c.manyOf)||[]).filter(i=>!i.sticky).forEach(i=>remLogSet(i.key,{status:'done'}));remClosePop(cardKey);remBadge();remRefreshPanel();}
+function remSnooze(key,v){const until=v==='tom'?remAt(addDays(remToday(),1),remCfg().digest):remNowMs()+(+v)*60e3;
   remLogSet(key,{status:'snoozed',until});remClosePop(key);remBadge();remRefreshPanel();
   toast('Snoozed until '+(v==='tom'?'tomorrow '+remCfg().digest:remHM(until))+'.');}
 /* the day a reminder belongs to is in its key (the last date in it), so yesterday's can still be opened */
-function remFind(key){const ds=(String(key).match(/\d{4}-\d{2}-\d{2}/g)||[]).pop()||today();
-  return remCollect(ds).find(i=>i.key===key)||(ds!==today()?remCollect(today()).find(i=>i.key===key):null);}
+function remFind(key){const ds=(String(key).match(/\d{4}-\d{2}-\d{2}/g)||[]).pop()||remToday();
+  return remCollect(ds).find(i=>i.key===key)||(ds!==remToday()?remCollect(remToday()).find(i=>i.key===key):null);}
 function remMarkDone(key){const it=remFind(key);if(it&&it.ref){const t=tasks.find(x=>x.id===it.ref);
     if(t&&t.status!=='done'){it.personal?togglePersonalTask(t.id):(it.co&&it.co!==activeCo?null:toggleTask(t.id));}}
   remDismiss(key);}
 /* Opening goes to the record. Personal ones go through the Personal section, so its PIN still applies. */
-function remOpen(key){const it=remFind(key);remClosePop(key);remPanel(false);if(!it)return;
+function remOpen(key){let it=remFind(key);remClosePop(key);remPanel(false);
+  if(!it&&/^\$:/.test(key))it={personal:true,kind:'money',ref:/^\$:iou:/.test(key)?'iou':'month'};   // a payment always has a home: Money
+  if(!it)return;
   if(it.personal){setMode('personal');
     if(it.kind==='money'){personalTab='money';finView=it.ref==='iou'?'iou':'month';}
     else if(it.kind==='bday')personalTab='birthdays';else personalTab='tasks';
@@ -6364,13 +6425,16 @@ function remBadge(nowMs){const b=g('ghBellN');if(!b)return;const n=remCfg().on?r
 function remPanel(open){const p=g('remPanel');if(!p)return;const on=open===undefined?!p.classList.contains('show'):open;
   p.classList.toggle('show',on);if(on)remRefreshPanel();}
 function remRefreshPanel(){const p=g('remPanel');if(!p||!p.classList.contains('show'))return;
-  const nowMs=Date.now(),all=remCollect(today());
-  const due=all.filter(i=>remState(i,nowMs)==='due'),later=all.filter(i=>remState(i,nowMs)==='later'),snz=all.filter(i=>remState(i,nowMs)==='snoozed');
+  const nowMs=remNowMs(),all=remCollect(remToday());
+  const pays=all.filter(i=>i.sticky&&remState(i,nowMs)==='due');
+  const due=all.filter(i=>!i.sticky&&remState(i,nowMs)==='due'),later=all.filter(i=>remState(i,nowMs)==='later'),snz=all.filter(i=>remState(i,nowMs)==='snoozed');
+  const payRow=i=>`<div class="rp-row"><div class="rp-bd lnk" onclick="remOpen('${jss(i.key)}')"><b class="${i.overdue?'neg':''}">${esc(i.title)}</b><div class="note">${esc(i.sub||'')} · stays until paid</div></div><div class="rp-act">${i.pay?`<button class="btn xs" onclick="remPay('${jss(i.key)}')">Mark paid</button>`:''}<select class="rc-snz" aria-label="Snooze" onchange="if(this.value)remSnoozePays(+this.value,'${jss(i.key)}')"><option value="">Snooze…</option><option value="60">1 hour</option><option value="1440">1 day</option></select></div></div>`;
   const row=(i,act)=>`<div class="rp-row"><div class="rp-bd lnk" onclick="remOpen('${jss(i.key)}')"><b>${esc(i.title)}</b><div class="note">${esc(i.sub||'')}</div></div>${act?`<div class="rp-act"><select class="rc-snz" aria-label="Snooze" onchange="if(this.value)remSnooze('${jss(i.key)}',this.value)"><option value="">Snooze…</option><option value="10">10 min</option><option value="60">1 hour</option><option value="tom">Tomorrow</option></select><button class="iconb" title="Dismiss" aria-label="Dismiss" onclick="remDismiss('${jss(i.key)}')">✓</button></div>`:''}</div>`;
   const perm=typeof Notification==='undefined'?'unsupported':Notification.permission;
   p.innerHTML=`<div class="rp-head"><b>Reminders</b><button class="iconb" aria-label="Close" onclick="remPanel(false)">✕</button></div>
     ${remCfg().on?'':'<div class="note" style="padding:8px 12px">Reminders are off — Settings → Reminders.</div>'}
     ${perm==='default'?`<div class="rp-perm">Get alerts even when Clario is in the background. <button class="btn xs" onclick="remAskPermission()">Turn on notifications</button></div>`:''}
+    ${pays.length?`<div class="rp-sec">Payments — until paid</div>${pays.map(payRow).join('')}`:''}
     <div class="rp-sec">Now</div>${due.map(i=>row(i,true)).join('')||'<div class="empty" style="padding:10px">Nothing due right now.</div>'}
     ${later.length?`<div class="rp-sec">Later today</div>${later.map(i=>row(i,false)).join('')}`:''}
     ${snz.length?`<div class="rp-sec">Snoozed</div>${snz.map(i=>row(i,false)).join('')}`:''}
@@ -6390,7 +6454,7 @@ function remCard(){const c=remCfg(),perm=typeof Notification==='undefined'?'unsu
     <div class="srow"><span>Heads-up before calls &amp; meetings</span><select onchange="remSetCfg({lead:+this.value})" style="width:auto">${[0,5,10,15,30].map(v=>opt(v,c.lead,v?v+' min':'None')).join('')}</select></div>
     <div class="srow"><span>Bills, EMIs, cards — remind</span><select onchange="remSetCfg({moneyDays:+this.value})" style="width:auto">${[0,1,2,3,7].map(v=>opt(v,c.moneyDays,v?v+' day'+(v>1?'s':'')+' before and on the day':'On the day only')).join('')}</select></div>
     <div class="rm-src">${chk('tasks','Tasks, calls &amp; meetings')}${chk('follow','Follow-ups')}${chk('money','Bills, EMIs &amp; money lent/borrowed')}${chk('bday','Birthdays')}${chk('review','Decision reviews')}</div>
-    <p class="note">Timed items alert at their time; everything dated for the day comes together in the morning digest (or when you first open Clario after it). Personal reminders say what is due, never the amount — also on the lock screen and in Official. Alerts appear while Clario is open or running in the background; a closed app on iPhone cannot be woken without a push server, which Clario does not use, so anything missed is waiting in the 🔔 when you open it.${perm==='unsupported'?' '+remNotifyHelp():''}</p></div>`;}
+    <p class="note">Timed items alert at their time; everything dated for the day comes together in the morning digest (or when you first open Clario after it). <b>Bills, EMIs, card dues and money you owe stay until paid</b>: they pop up every time you open Clario and every hour while it is open, overdue ones included, and can only be snoozed (1 hour or 1 day) or marked paid. Personal reminders say what is due, never the amount — also on the lock screen and in Official. Alerts appear while Clario is open or running in the background; a closed app on iPhone cannot be woken without a push server, which Clario does not use, so anything missed is waiting in the 🔔 when you open it.${perm==='unsupported'?' '+remNotifyHelp():''}</p></div>`;}
 setInterval(()=>remTick(),30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)remTick();});
 if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='rem-open')remOpen(e.data.key);});
