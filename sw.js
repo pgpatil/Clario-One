@@ -1,4 +1,4 @@
-const C='clario-v74';
+const C='clario-v75';
 /* App shell only. This worker handles same-origin GETs and nothing else: it used to cache every
    GET, which put copies of Microsoft Graph responses -- db.json contents, file listings -- into
    Cache Storage, where signing out or resetting the device never removed them, and when offline
@@ -14,3 +14,9 @@ self.addEventListener('fetch',e=>{
   e.respondWith(fetch(req).then(r=>{if(r.ok&&r.type==='basic'){const cp=r.clone();caches.open(C).then(c=>c.put(req,cp));}return r;})
     .catch(()=>caches.match(req).then(m=>m||(req.mode==='navigate'?caches.match('./index.html'):Response.error()))));
 });
+/* Tapping a reminder notification: bring Clario forward and open that reminder; start it if closed. */
+self.addEventListener('notificationclick',e=>{e.notification.close();const key=(e.notification.data||{}).key||'';
+  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(cs=>{
+    const c=cs.find(x=>x.url.includes('index.html')||x.url.endsWith('/'))||cs[0];
+    if(c){c.postMessage({type:'rem-open',key});return c.focus();}
+    return self.clients.openWindow('./index.html#rem='+encodeURIComponent(key));}));});

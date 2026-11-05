@@ -587,6 +587,27 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 #reauthbar.show{display:flex}
 #updbar{position:fixed;top:0;left:0;right:0;z-index:82;background:var(--blue-l);border-bottom:1px solid var(--blue);padding:7px 16px;display:none;align-items:center;justify-content:center;gap:12px;font-size:12.5px;flex-wrap:wrap;color:var(--blue-d)}
 #updbar.show{display:flex}
+.gh-bell{position:relative;font-size:14px}
+.bell-n{position:absolute;top:-3px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--red);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center}
+#remPop{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:90;display:none;flex-direction:column;gap:8px;width:340px;max-width:calc(100vw - 32px)}
+#remPop.show{display:flex}
+.remcard{background:#fff;border:1px solid var(--bdr2);border-left:4px solid var(--blue);border-radius:var(--r);box-shadow:0 8px 24px rgba(24,24,24,.18);padding:10px 12px;font-size:13px}
+.rc-top{display:flex;align-items:center;gap:8px}.rc-top b{flex:1;min-width:0;overflow-wrap:anywhere}.rc-ic{font-size:14px}
+.rc-sub{color:var(--t3);font-size:12px;margin:3px 0 8px 22px}
+.rc-list{margin:0 0 8px 22px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.rc-act{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:22px}
+.rc-snz{width:auto;font-size:12px;padding:4px 6px}
+#remPanel{position:fixed;top:calc(var(--ghH,52px) + 6px);right:12px;z-index:85;display:none;width:360px;max-width:calc(100vw - 24px);max-height:calc(100vh - var(--ghH,52px) - 24px);overflow:auto;background:#fff;border:1px solid var(--bdr2);border-radius:var(--r);box-shadow:0 10px 30px rgba(24,24,24,.2)}
+#remPanel.show{display:block}
+.rp-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bdr);font-size:14px}
+.rp-sec{padding:8px 12px 4px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);font-weight:700}
+.rp-row{display:flex;gap:8px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--bdr);font-size:12.5px}
+.rp-bd{flex:1;min-width:0}.rp-bd.lnk:hover{text-decoration:none;filter:none}.rp-bd b{display:block;overflow-wrap:anywhere}
+.rp-act{display:flex;gap:4px;align-items:center}
+.rp-perm{margin:8px 12px;padding:8px 10px;background:var(--blue-l);border-radius:var(--rs);font-size:12px;color:var(--blue-d);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rp-foot{padding:8px 12px}
+.rm-src{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 2px;font-size:12.5px}.rm-chk{display:flex;align-items:center;gap:5px}
+@media(max-width:600px){#remPop{right:8px;left:8px;width:auto;max-width:none}#remPanel{right:8px;left:8px;width:auto}}
 
 /* ═══ personal finance rows (responsive) ═══ */
 .finrow{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--bdr)}
@@ -658,6 +679,8 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <div id="resumebar"><span id="resumeTxt"></span><button class="btn sm" onclick="resumeSync()">Resume sync</button><button class="btn gh2 sm" onclick="g('resumebar').classList.remove('show')">Not now</button></div>
 <div id="updbar"><span>A new version of Clario is ready.</span><button class="btn sm" onclick="location.reload()">Reload now</button><button class="btn gh2 sm" onclick="g('updbar').classList.remove('show')">Later</button></div>
+<div id="remPop" role="status" aria-live="polite"></div>
+<div id="remPanel" role="dialog" aria-label="Reminders"></div>
 <div id="reauthbar"><span>OneDrive sync is paused — Microsoft needs you to sign in again. Your changes are kept and sync as soon as you reconnect.</span><button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="g('reauthbar').classList.remove('show')">Dismiss</button></div>
 
 <header id="gh">
@@ -668,6 +691,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
   <div class="gh-right">
     <div class="vtog" id="modeToggle"></div>
     <button class="gh-sync" id="ghRefresh" onclick="refreshApp()" title="Refresh — pull the latest data and redraw">⟳</button>
+    <button class="gh-sync gh-bell" id="ghBell" type="button" onclick="remPanel()" title="Reminders" aria-label="Reminders">🔔<span id="ghBellN" class="bell-n" style="display:none"></span></button>
     <button class="gh-sync" id="ghSyncBtn" onclick="nav('settings')" title="Sync: green = synced, blue = syncing, red = attention, grey = not connected. Tap for Settings."><span class="sdot" id="sdot"></span><span id="stxt">Local only</span></button>
     <div style="position:relative" id="ghNewWrap"><button class="btn sm" onclick="toggleNewMenu(event)">+ New ▾</button><div id="newmenu"></div></div>
     <button class="gh-sync" style="font-weight:800;font-size:14px" title="Help & FAQ" onclick="nav('help')">?</button>
@@ -1104,7 +1128,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='9.2.0',APP_BUILD=74,   /* APP_BUILD must equal the number in sw.js's cache name */
+const APP_VER='9.3.0',APP_BUILD=75,   /* APP_BUILD must equal the number in sw.js's cache name */
       DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
@@ -1260,7 +1284,7 @@ const monthKey=ds=>ds.slice(0,7);
 function toast(m){const t=g('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove('show'),2600);}
 
 /* ═══ STATE ═══ */
-var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[],ious=[],ioutx=[],nwsnap=[];
+var tasks=[],people=[],agenda=[],meetings=[],decisions=[],customers=[],contacts=[],plans=[],deals=[],activities=[],toolruns=[],opps=[],journals=[],family=[],birthdays=[],locations=[],fincats=[],finplan=[],fintx=[],invhold=[],invval=[],finbal=[],fincard=[],fincardtx=[],invpf=[],loans=[],savedviews=[],ious=[],ioutx=[],nwsnap=[],remlog=[];
 var depts=['Operations','Finance','Sales','Supply Chain','HR','Quality'];
 var products=['Ingredients supply','Solutions consulting','Private label'];
 var regions=[];
@@ -1281,7 +1305,7 @@ var _finCollapse={};
 function finToggleSec(g){_finCollapse[g]=!_finCollapse[g];reRender();}
 var invMonth='';
 var invView='overview';
-const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx','nwsnap'];
+const TABLES=['tasks','people','agenda','meetings','decisions','customers','contacts','plans','deals','activities','toolruns','opps','journals','family','birthdays','locations','fincats','finplan','fintx','invhold','invval','finbal','fincard','fincardtx','invpf','loans','savedviews','ious','ioutx','nwsnap','remlog'];
 /* ═══ COMPANIES ═══
    Official data is kept per company; Personal data is one set shared by every company.
    In memory the globals (tasks, people, customers…) always hold the ACTIVE company; inactive
@@ -3694,7 +3718,7 @@ function vHome(){const td=today();
     :'';
   return pagehead(dt.toLocaleDateString('en-IN',{weekday:'long'}).toUpperCase(),dt.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})+birthdayBadge(),'Your day at a glance',
     `<button class="btn gh2 sm" onclick="plTab='day';plAnchor=today();nav('planner')">Plan my day</button><button class="btn sm" onclick="openTask()">+ New</button>`)+
-  `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1" placeholder="Capture anything — '@Priya MIS by friday' · 'call Rajesh 20 Aug 3pm' · 'GST filing every 3 months #finance p1'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
+  `<div class="card"><div class="cb" style="display:flex;gap:8px"><input id="qaInput" style="flex:1;min-width:0" placeholder="Capture anything — '@Priya MIS by friday' · 'call Rajesh 20 Aug 3pm' · 'GST filing every 3 months #finance p1'"><button class="btn gh2" onclick="startVoice()" title="Voice">🎙</button><button class="btn" onclick="quickAdd()">Add</button></div></div>
   <div class="kpis">
     <div class="kpi ${dueMe.length?'warn':'good'}" onclick="cTab='mine';nav('commit')"><div class="kv num">${dueMe.length}</div><div class="kl">Due today</div></div>
     <div class="kpi ${overdue.length?'bad':''}" onclick="cTab='mine';nav('commit')"><div class="kv num">${overdue.length}</div><div class="kl">Overdue</div></div>
@@ -4713,6 +4737,12 @@ function vHelp(){
   ${faqItem('Sales dashboard','Open pipeline, weighted forecast, won this quarter, stage-wise value, stale deals, slipped close dates, and account next actions due.')}
   ${faqItem('Weekly review','One page to close the week: done vs added, overdue, stuck delegations, deals won, this week’s priorities scored, oldest slips by original date, and decisions due for review. <b>Run guided review</b> walks you through it in four steps — Achieved, Slipped, Where time went (from estimates; Clario does not track time) and Next week, where you set next week’s priorities. Export as .md or print.')}
   </div>
+  <div class="card faq"><div class="ch">Reminders &amp; notifications</div>
+  ${faqItem('Reminders — what reminds you and when','Calls, meetings and tasks with a time alert at that time, with a heads-up before calls and meetings (10 min by default). Everything dated for the day — tasks without a time, follow-ups, decision reviews, birthdays, bills, EMIs, card dues and money lent or borrowed — comes together in one <b>morning digest</b> (9:00 by default, or as soon as you open Clario after that). Bills and EMIs also remind 2 days before. Reminders cover every company, not only the one open. Change all of this in Settings → <b>Reminders &amp; notifications</b>.')}
+  ${faqItem('The bell, snooze and dismiss','The 🔔 in the header counts what is due; tap it for Now, Later today and Snoozed. Each reminder pops up with <b>Open</b>, <b>Snooze</b> (10 min, 1 hour, tomorrow), <b>Dismiss</b>, and <b>Mark done</b> for tasks. A heads-up drops out once the real time arrives. Dismissing or snoozing syncs, so the same reminder does not alert again on your other devices. When more than three arrive together they come as one summary.')}
+  ${faqItem('Personal reminders stay discreet','A personal reminder says what is due and when — “Home loan — EMI due today”, “HDFC card bill due in 2 days” — and never the amount: not in Official, not in Personal, not in the notification on your lock screen. Opening it goes through the Personal section, so your PIN still applies.')}
+  ${faqItem('Notifications on the phone or laptop','Settings → Reminders → <b>Turn on</b> (or the button in the 🔔 panel) lets Clario show system notifications while it is running in the background; tap one to jump to that reminder. On iPhone and iPad this needs Clario added to the Home Screen and opened from there. A closed app cannot be woken on iPhone without a push server, which Clario deliberately does not use — anything you missed is waiting in the 🔔 the next time you open it.')}
+  </div>
   <div class="card faq"><div class="ch">Companies</div>
   ${faqItem('Several companies in Official','Settings → <b>Companies</b> → type a name → + Add. Each company has its own tasks, accounts, contacts, people, meetings, deals, plans, saved views, and its own departments, products, regions, account groups and weekly offs — nothing typed in one shows up in another, including in search. Switch with <b>Switch</b> on the company’s row; the header then shows which company you are in (tap it to go to Settings). Rename any company; remove one by typing its name (the first company can be renamed but not removed).')}
   ${faqItem('What is shared between companies','Personal (money, investments, personal tasks, birthdays), your profile, labels, the places list and your day locations are the same in every company — where you are on a date is one fact. Switching company changes Official only, and only on that device.')}
@@ -5313,6 +5343,7 @@ function vSettings(){const enc=_encMeta&&_encMeta.on;
     <div style="margin-top:10px"><button class="btn sm" onclick="openMyProfile()">${myProfile.name?'Edit':'Set your name'}</button></div>
     <p class="note">Your name replaces "Me" as the owner on tasks, calls and meeting actions — in the app and in summaries printed or sent to Outlook.</p></div>
   ${companiesCard()}
+  ${remCard()}
   ${gCard()}
   <div class="setcard"><h4>OneDrive folder sync (desktop Edge/Chrome)</h4>
     <div class="srow"><span>Folder</span><b>${_fsDir?esc(_fsDir.name):'Not linked'}</b></div>
@@ -6184,6 +6215,186 @@ document.addEventListener('keydown',e=>{
 const _origNav=nav;
 nav=async function(v,arg,_fromPop,_fromGoBack){if(v!=='decide'){dTool=null;window._trId=null;window._mtx=null;window._pm=null;window._fw=null;window._pa=null;window._sw=null;}return _origNav(v,arg,_fromPop,_fromGoBack);};
 
+/* ═══ REMINDERS & NOTIFICATIONS ═══
+   Reminders are derived from the data every time, never stored as a schedule, so moving a task
+   moves its reminder and deleting it removes it. What is stored is only what you did about one:
+   remlog {id:key, status:'done'|'snoozed', until} -- synced, so dismissing on the laptop clears the
+   phone too. Which reminders this device has already shown is device-local (cx_rem_fired).
+   Personal reminders say WHAT is due and when, never an amount -- in either section and on the
+   lock screen. Delivery: a popup card and the bell in the app; a system notification when the app
+   is running in the background. A closed iPhone app cannot be woken without a push server, which
+   Clario deliberately does not have; the morning digest catches up on the next open. */
+const REM_CFG_KEY='cx_rem_cfg', REM_FIRED_KEY='cx_rem_fired';
+const REM_DEF={on:true,digest:'09:00',lead:10,moneyDays:2,src:{tasks:true,follow:true,money:true,bday:true,review:true}};
+function remCfg(){try{const c=JSON.parse(localStorage.getItem(REM_CFG_KEY)||'null')||{};return {...REM_DEF,...c,src:{...REM_DEF.src,...(c.src||{})}};}catch(e){return {...REM_DEF,src:{...REM_DEF.src}};}}
+function remSetCfg(patch){const c=remCfg();const n={...c,...patch,src:{...c.src,...(patch.src||{})}};try{localStorage.setItem(REM_CFG_KEY,JSON.stringify(n));}catch(e){}remTick();renderView();}
+const remAt=(ds,hm)=>new Date(ds+'T'+(hm||'09:00')).getTime();
+const remHM=ms=>{const d=new Date(ms);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');};
+const remDayWord=(due,ds)=>{const n=Math.round((new Date(due+'T12:00')-new Date(ds+'T12:00'))/864e5);
+  return n===0?'today':n===1?'tomorrow':n<0?(n===-1?'yesterday':`${-n} days ago`):`in ${n} days`;};
+/* Everything that should remind on day ds. Each: {key, at, title, sub, personal, kind, digest, co, ref}.
+   digest:true items have no clock time; they are listed in the morning digest. */
+function remCollect(ds){const c=remCfg(),out=[];const dg=remAt(ds,c.digest),lead=(+c.lead||0)*60e3;
+  // official work in every company, not only the one open -- a call does not wait for you to switch
+  const buckets=COMP().map(co=>{const b=co.id===activeCo?{tasks:T(),meetings:M(),decisions:DC()}:(()=>{const x=_coStore[co.id]||{};
+      const live=r=>!r.deleted;return {tasks:(x.tasks||[]).filter(t=>live(t)&&!t.archived&&t.scope!=='personal'&&!t.parent_id),meetings:(x.meetings||[]).filter(live),decisions:(x.decisions||[]).filter(live)};})();
+    return {co:co.id,name:COMP().length>1?coLabel(co.id):'',...b};});
+  buckets.forEach(b=>{const tag=b.name?b.name+' · ':'';
+    if(c.src.tasks){
+      b.tasks.filter(t=>t.status!=='done').forEach(t=>{
+        let when=null;
+        if(t.type==='call'&&t.when&&t.when.slice(0,10)===ds)when=t.when.slice(11,16)||null;
+        else if(t.due===ds&&t.at)when=t.at;
+        if(when){const at=remAt(ds,when);
+          out.push({key:`t:${t.id}:${ds}T${when}`,at,title:t.title,sub:tag+(t.type==='call'?'Call':'Task')+' at '+when,kind:t.type==='call'?'call':'task',co:b.co,ref:t.id});
+          if(lead&&t.type==='call')out.push({key:`t:${t.id}:${ds}T${when}:pre`,at:at-lead,main:at,title:t.title,sub:tag+`Call in ${c.lead} min (${when})`,kind:'call',co:b.co,ref:t.id});}
+        else if(t.due===ds&&t.type!=='call')out.push({key:`d:t:${t.id}:${ds}`,at:dg,digest:true,title:t.title,sub:tag+'Due today',kind:'task',co:b.co,ref:t.id});});
+      b.meetings.filter(m=>m.date===ds&&m.status!=='done').forEach(m=>{
+        if(m.time){const at=remAt(ds,m.time);
+          out.push({key:`m:${m.id}:${ds}T${m.time}`,at,title:m.title||'Meeting',sub:tag+'Meeting at '+m.time,kind:'meeting',co:b.co,ref:m.id});
+          if(lead)out.push({key:`m:${m.id}:${ds}T${m.time}:pre`,at:at-lead,main:at,title:m.title||'Meeting',sub:tag+`Meeting in ${c.lead} min (${m.time})`,kind:'meeting',co:b.co,ref:m.id});}
+        else out.push({key:`d:m:${m.id}:${ds}`,at:dg,digest:true,title:m.title||'Meeting',sub:tag+'Meeting today',kind:'meeting',co:b.co,ref:m.id});});}
+    if(c.src.follow)b.tasks.filter(t=>t.status==='waiting'&&t.follow_up===ds).forEach(t=>
+      out.push({key:`d:f:${t.id}:${ds}`,at:dg,digest:true,title:t.title,sub:tag+'Follow up today'+(t.owner&&t.owner!=='me'?' with '+pname(t.owner):''),kind:'follow',co:b.co,ref:t.id}));
+    if(c.src.review)b.decisions.filter(d=>d.review_date===ds).forEach(d=>
+      out.push({key:`d:r:${d.id}:${ds}`,at:dg,digest:true,title:d.what||'Decision',sub:tag+'Decision due for review',kind:'review',co:b.co,ref:d.id}));});
+  // personal -- what is due, never how much
+  if(c.src.tasks)TP().filter(t=>t.status!=='done').forEach(t=>{
+    if(t.due===ds&&t.at)out.push({key:`p:${t.id}:${ds}T${t.at}`,at:remAt(ds,t.at),title:t.title,sub:'Personal · at '+t.at,kind:'ptask',personal:true,ref:t.id});
+    else if(t.due===ds)out.push({key:`d:p:${t.id}:${ds}`,at:dg,digest:true,title:t.title,sub:'Personal · due today',kind:'ptask',personal:true,ref:t.id});});
+  if(c.src.money){const days=Math.max(0,+c.moneyDays||0),until=addDays(ds,days);
+    [monthKey(ds),monthKey(until)].filter((x,i,a)=>a.indexOf(x)===i).forEach(ym=>{
+      let items=[];try{items=finDueItems(ym);}catch(e){}
+      items.filter(i=>i.due&&(i.due===ds||i.due===until)).forEach(i=>{const w=remDayWord(i.due,ds);
+        out.push({key:`d:$:${i.kind}:${i.name}:${i.due}:${ds}`,at:dg,digest:true,personal:true,kind:'money',
+          title:`${i.name} — ${i.kind==='card'?'card bill':i.kind==='emi'?'EMI':'payment'} due ${w}`,sub:'Personal · Money',ref:i.kind==='card'?'card':'month'});});});
+    IOU().filter(i=>i.due&&iouOutstanding(i)>0&&(i.due===ds||i.due===until)).forEach(i=>{const w=remDayWord(i.due,ds);
+      out.push({key:`d:i:${i.id}:${i.due}:${ds}`,at:dg,digest:true,personal:true,kind:'money',
+        title:i.dir==='lent'?`${i.person||'Someone'} is due to repay you ${w}`:`Repayment to ${i.person||'someone'} due ${w}`,sub:'Personal · Borrowed & lent',ref:'iou'});});}
+  if(c.src.bday)BD().filter(b=>b.date&&b.date.slice(5)===ds.slice(5)).forEach(b=>
+    out.push({key:`d:b:${b.id}:${ds}`,at:dg,digest:true,personal:true,kind:'bday',title:`${b.name}’s birthday today`,sub:'Personal · Birthdays',ref:b.id}));
+  return out.sort((a,b)=>a.at-b.at);}
+const remLog=key=>remlog.find(r=>r.id===key&&!r.deleted);
+function remState(it,nowMs){const r=remLog(it.key);
+  if(r&&r.status==='done')return'done';
+  if(it.main){if(nowMs>=it.main)return'done';                  // a heads-up is over once the real time comes
+    const m=remLog(it.key.replace(/:pre$/,''));if(m&&m.status==='done')return'done';}
+  if(r&&r.status==='snoozed'&&r.until>nowMs)return'snoozed';
+  return it.at<=nowMs?'due':'later';}
+function remFired(){try{return new Set(JSON.parse(localStorage.getItem(REM_FIRED_KEY)||'[]'));}catch(e){return new Set();}}
+function remSaveFired(set){try{localStorage.setItem(REM_FIRED_KEY,JSON.stringify([...set].slice(-400)));}catch(e){}}
+/* the alert fingerprint changes when a snooze ends, so a snoozed reminder alerts again */
+const remFp=it=>{const r=remLog(it.key);return it.key+(r&&r.status==='snoozed'?'@'+r.until:'');};
+function remActive(nowMs){nowMs=nowMs||Date.now();const ds=ymd(new Date(nowMs));
+  return remCollect(ds).filter(it=>remState(it,nowMs)==='due');}
+let _remShown=[];
+function remTick(nowMs){try{
+  const c=remCfg();nowMs=nowMs||Date.now();remBadge(nowMs);
+  if(!c.on)return [];
+  const ds=ymd(new Date(nowMs)),fired=remFired();
+  const due=remCollect(ds).filter(it=>remState(it,nowMs)==='due'&&nowMs-it.at<12*3600e3);
+  const fresh=due.filter(it=>!fired.has(remFp(it)));
+  if(!fresh.length)return [];
+  fresh.forEach(it=>fired.add(remFp(it)));remSaveFired(fired);
+  // dated items arrive together in one morning digest; timed ones one by one
+  const timed=fresh.filter(it=>!it.digest),dig=fresh.filter(it=>it.digest);
+  const cards=[...timed];
+  if(dig.length)cards.push({key:'digest:'+ds,digestOf:dig,at:dig[0].at,title:`Today: ${dig.length} reminder${dig.length===1?'':'s'}`,sub:remDigestLine(dig)});
+  remShow(cards.length>3?[{key:'many:'+nowMs,manyOf:fresh,title:`${fresh.length} reminders`,sub:'Open the bell to see them all'}]:cards);
+  return fresh;}catch(e){return [];}}
+function remDigestLine(items){const n=k=>items.filter(i=>i.kind===k).length;const parts=[];
+  const t=n('task')+n('ptask');if(t)parts.push(t+' task'+(t>1?'s':''));
+  if(n('meeting'))parts.push(n('meeting')+' meeting'+(n('meeting')>1?'s':''));
+  if(n('follow'))parts.push(n('follow')+' follow-up'+(n('follow')>1?'s':''));
+  if(n('money'))parts.push(n('money')+' payment'+(n('money')>1?'s':''));
+  if(n('bday'))parts.push(n('bday')+' birthday'+(n('bday')>1?'s':''));
+  if(n('review'))parts.push(n('review')+' review'+(n('review')>1?'s':''));
+  return parts.join(' · ');}
+/* in the app: popup cards; in the background: a system notification with the same wording */
+function remShow(cards){
+  const sys=typeof Notification!=='undefined'&&Notification.permission==='granted';
+  if(document.hidden&&sys){cards.forEach(c=>remNotify(c));return;}
+  _remShown=[..._remShown.filter(x=>!cards.some(c=>c.key===x.key)),...cards].slice(-3);
+  remPaintPop();
+  try{if(navigator.vibrate)navigator.vibrate(120);}catch(e){}}
+async function remNotify(c){try{
+  const body=c.sub||'',opts={body,tag:c.key,icon:'icon-192.png',badge:'icon-192.png',data:{key:c.key}};
+  const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();
+  if(reg&&reg.showNotification)await reg.showNotification(c.title,opts);else new Notification(c.title,opts);}catch(e){}}
+function remPaintPop(){const box=g('remPop');if(!box)return;
+  box.innerHTML=_remShown.map(c=>{const k=jss(c.key);
+    const list=c.digestOf||c.manyOf;
+    return `<div class="remcard" data-k="${esc(c.key)}"><div class="rc-top"><span class="rc-ic">🔔</span><b>${esc(c.title)}</b><button class="iconb" aria-label="Close" onclick="remClosePop('${k}')">✕</button></div>
+      <div class="rc-sub">${esc(c.sub||'')}</div>
+      ${list?`<div class="rc-list">${list.slice(0,5).map(i=>`<div class="lnk" onclick="remOpen('${jss(i.key)}')">${esc(i.title)}</div>`).join('')}${list.length>5?`<div class="note">+${list.length-5} more</div>`:''}</div>
+        <div class="rc-act"><button class="btn sm" onclick="remClosePop('${k}');remPanel(true)">View all</button><button class="btn gh2 sm" onclick="remDismissMany('${k}')">Dismiss all</button></div>`
+      :`<div class="rc-act"><button class="btn sm" onclick="remOpen('${k}')">Open</button>
+        ${/^[tp]:|^d:[tpf]:/.test(c.key)?`<button class="btn gh2 sm" onclick="remMarkDone('${k}')">✓ Mark done</button>`:''}
+        <select class="rc-snz" aria-label="Snooze" onchange="if(this.value)remSnooze('${k}',this.value)"><option value="">Snooze…</option><option value="10">10 min</option><option value="60">1 hour</option><option value="tom">Tomorrow 9:00</option></select>
+        <button class="btn gh2 sm" onclick="remDismiss('${k}')">Dismiss</button></div>`}</div>`;}).join('');
+  box.classList.toggle('show',_remShown.length>0);}
+function remClosePop(key){_remShown=_remShown.filter(c=>c.key!==key);remPaintPop();}
+function remLogSet(key,patch){const n=now();let r=remlog.find(x=>x.id===key);
+  if(r)Object.assign(r,patch,{deleted:false,updated_at:n});else remlog.push({id:key,...patch,created_at:n,updated_at:n});persist();}
+function remDismiss(key){remLogSet(key,{status:'done'});remClosePop(key);remBadge();remRefreshPanel();}
+function remDismissMany(cardKey){const c=_remShown.find(x=>x.key===cardKey);(c&&(c.digestOf||c.manyOf)||[]).forEach(i=>remLogSet(i.key,{status:'done'}));remClosePop(cardKey);remBadge();remRefreshPanel();}
+function remSnooze(key,v){const until=v==='tom'?remAt(addDays(today(),1),remCfg().digest):Date.now()+(+v)*60e3;
+  remLogSet(key,{status:'snoozed',until});remClosePop(key);remBadge();remRefreshPanel();
+  toast('Snoozed until '+(v==='tom'?'tomorrow '+remCfg().digest:remHM(until))+'.');}
+/* the day a reminder belongs to is in its key (the last date in it), so yesterday's can still be opened */
+function remFind(key){const ds=(String(key).match(/\d{4}-\d{2}-\d{2}/g)||[]).pop()||today();
+  return remCollect(ds).find(i=>i.key===key)||(ds!==today()?remCollect(today()).find(i=>i.key===key):null);}
+function remMarkDone(key){const it=remFind(key);if(it&&it.ref){const t=tasks.find(x=>x.id===it.ref);
+    if(t&&t.status!=='done'){it.personal?togglePersonalTask(t.id):(it.co&&it.co!==activeCo?null:toggleTask(t.id));}}
+  remDismiss(key);}
+/* Opening goes to the record. Personal ones go through the Personal section, so its PIN still applies. */
+function remOpen(key){const it=remFind(key);remClosePop(key);remPanel(false);if(!it)return;
+  if(it.personal){setMode('personal');
+    if(it.kind==='money'){personalTab='money';finView=it.ref==='iou'?'iou':'month';}
+    else if(it.kind==='bday')personalTab='birthdays';else personalTab='tasks';
+    renderView();
+    if(it.kind==='ptask'&&it.ref&&(!pinIsSet()||_personalUnlocked))try{openPersonalTask(it.ref);}catch(e){}   // a locked Personal asks for the PIN first
+    return;}
+  if(appMode!=='official')setMode('official');
+  if(it.co&&it.co!==activeCo)switchCompany(it.co);
+  if(it.kind==='meeting')nav('meeting',it.ref);else if(it.kind==='review')nav('decide');else nav('task',it.ref);}
+function remBadge(nowMs){const b=g('ghBellN');if(!b)return;const n=remCfg().on?remActive(nowMs).length:0;
+  b.textContent=n>9?'9+':n;b.style.display=n?'':'none';
+  const btn=g('ghBell');if(btn)btn.title=n?`${n} reminder${n>1?'s':''} due`:'Reminders';}
+function remPanel(open){const p=g('remPanel');if(!p)return;const on=open===undefined?!p.classList.contains('show'):open;
+  p.classList.toggle('show',on);if(on)remRefreshPanel();}
+function remRefreshPanel(){const p=g('remPanel');if(!p||!p.classList.contains('show'))return;
+  const nowMs=Date.now(),all=remCollect(today());
+  const due=all.filter(i=>remState(i,nowMs)==='due'),later=all.filter(i=>remState(i,nowMs)==='later'),snz=all.filter(i=>remState(i,nowMs)==='snoozed');
+  const row=(i,act)=>`<div class="rp-row"><div class="rp-bd lnk" onclick="remOpen('${jss(i.key)}')"><b>${esc(i.title)}</b><div class="note">${esc(i.sub||'')}</div></div>${act?`<div class="rp-act"><select class="rc-snz" aria-label="Snooze" onchange="if(this.value)remSnooze('${jss(i.key)}',this.value)"><option value="">Snooze…</option><option value="10">10 min</option><option value="60">1 hour</option><option value="tom">Tomorrow</option></select><button class="iconb" title="Dismiss" aria-label="Dismiss" onclick="remDismiss('${jss(i.key)}')">✓</button></div>`:''}</div>`;
+  const perm=typeof Notification==='undefined'?'unsupported':Notification.permission;
+  p.innerHTML=`<div class="rp-head"><b>Reminders</b><button class="iconb" aria-label="Close" onclick="remPanel(false)">✕</button></div>
+    ${remCfg().on?'':'<div class="note" style="padding:8px 12px">Reminders are off — Settings → Reminders.</div>'}
+    ${perm==='default'?`<div class="rp-perm">Get alerts even when Clario is in the background. <button class="btn xs" onclick="remAskPermission()">Turn on notifications</button></div>`:''}
+    <div class="rp-sec">Now</div>${due.map(i=>row(i,true)).join('')||'<div class="empty" style="padding:10px">Nothing due right now.</div>'}
+    ${later.length?`<div class="rp-sec">Later today</div>${later.map(i=>row(i,false)).join('')}`:''}
+    ${snz.length?`<div class="rp-sec">Snoozed</div>${snz.map(i=>row(i,false)).join('')}`:''}
+    <div class="rp-foot"><button class="btn gh2 xs" onclick="remPanel(false);nav('settings');setTimeout(()=>{const c=g('remCard');if(c)c.scrollIntoView({block:'center'});},60)">Reminder settings</button></div>`;}
+async function remAskPermission(){if(typeof Notification==='undefined'){toast(remNotifyHelp());return;}
+  try{const r=await Notification.requestPermission();toast(r==='granted'?'Notifications are on.':'Notifications were not allowed — you can change this in the browser or phone settings.');}catch(e){}
+  remRefreshPanel();renderView();}
+function remNotifyHelp(){const ios=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  return ios&&!navigator.standalone?'On iPhone/iPad, add Clario to the Home Screen (Share → Add to Home Screen) and open it from there to allow notifications.':'This browser does not support notifications.';}
+function remCard(){const c=remCfg(),perm=typeof Notification==='undefined'?'unsupported':Notification.permission;
+  const chk=(k,l)=>`<label class="rm-chk"><input type="checkbox" ${c.src[k]?'checked':''} onchange="remSetCfg({src:{${k}:this.checked}})"> ${l}</label>`;
+  const opt=(v,cur,l)=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`;
+  return `<div class="setcard" id="remCard"><h4>Reminders &amp; notifications</h4>
+    <div class="srow"><span>Reminders</span><select onchange="remSetCfg({on:this.value==='1'})" style="width:auto">${opt(1,c.on?1:0,'On')}${opt(0,c.on?1:0,'Off')}</select></div>
+    <div class="srow"><span>System notifications</span><b>${perm==='granted'?'On':perm==='denied'?'Blocked in browser settings':perm==='unsupported'?'Not available here':`<button class="btn xs" onclick="remAskPermission()">Turn on</button>`}</b></div>
+    <div class="srow"><span>Morning digest</span><input type="time" value="${esc(c.digest)}" onchange="if(this.value)remSetCfg({digest:this.value})" style="width:auto"></div>
+    <div class="srow"><span>Heads-up before calls &amp; meetings</span><select onchange="remSetCfg({lead:+this.value})" style="width:auto">${[0,5,10,15,30].map(v=>opt(v,c.lead,v?v+' min':'None')).join('')}</select></div>
+    <div class="srow"><span>Bills, EMIs, cards — remind</span><select onchange="remSetCfg({moneyDays:+this.value})" style="width:auto">${[0,1,2,3,7].map(v=>opt(v,c.moneyDays,v?v+' day'+(v>1?'s':'')+' before and on the day':'On the day only')).join('')}</select></div>
+    <div class="rm-src">${chk('tasks','Tasks, calls &amp; meetings')}${chk('follow','Follow-ups')}${chk('money','Bills, EMIs &amp; money lent/borrowed')}${chk('bday','Birthdays')}${chk('review','Decision reviews')}</div>
+    <p class="note">Timed items alert at their time; everything dated for the day comes together in the morning digest (or when you first open Clario after it). Personal reminders say what is due, never the amount — also on the lock screen and in Official. Alerts appear while Clario is open or running in the background; a closed app on iPhone cannot be woken without a push server, which Clario does not use, so anything missed is waiting in the 🔔 when you open it.${perm==='unsupported'?' '+remNotifyHelp():''}</p></div>`;}
+setInterval(()=>remTick(),30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)remTick();});
+if('serviceWorker'in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='rem-open')remOpen(e.data.key);});
+
 /* ═══ BOOT ═══ */
 (function boot(){loadLS();
 try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
@@ -6194,6 +6405,7 @@ try{const nv=JSON.parse(localStorage.getItem(NAV_KEY)||'null');if(nv){
 applyModeUI();renderView();restoreFolder();gRestore();
 try{if(typeof matchMedia==='function'&&matchMedia('(max-width:840px)').matches)g('ghSearch').placeholder='Search everything…';}catch(e){}
 setTimeout(()=>checkLocationConfirmation(),350);
+setTimeout(()=>{remTick();const m=/#rem=([^&]+)/.exec(location.hash);if(m){history.replaceState(null,'',location.pathname+location.search);remOpen(decodeURIComponent(m[1]));}},1500);
 /* A blocked connection must be loud: if Microsoft ever moves db.json downloads to a host the policy
    does not list, sync would otherwise just stop. Report it once per host. */
 const _cspSeen=new Set();

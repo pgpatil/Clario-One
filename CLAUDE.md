@@ -56,6 +56,13 @@ Two independent, unrelated sync systems — check which one is relevant before d
 
 **The app now makes zero third-party requests** (verified by counting non-localhost hosts during a page load). Font, MSAL and icons are all local — keep it that way.
 
+## Reminders & notifications
+
+- Reminders are **derived**, never scheduled: `remCollect(ds)` builds the day's list from tasks/calls/meetings (every company, not just the active one), follow-ups, decision reviews, personal tasks, `finDueItems()` money, IOUs and birthdays. Only what the user did about one is stored — `remlog` {id:key, status:'done'|'snoozed', until}, a synced global table — so dismissals carry across devices. Which ones this device already alerted is local (`cx_rem_fired`); settings are local (`cx_rem_cfg`).
+- Keys embed the day (`t:<id>:<date>T<hh:mm>`, `d:<kind>:<id>:<date>`, `…:pre` for heads-ups); `remFind` reads the date from the key so old reminders can still be opened. A heads-up (`main`) is 'done' once its real time passes.
+- **Privacy rule: a personal reminder never contains an amount** — title says what and when only, on every surface (popup, bell, system notification, Official and Personal). `tests/w19-reminders.js` greps all of them; keep it that way when adding sources.
+- Delivery: popup cards (`#remPop`, max 3; >3 fresh → one summary) and the bell (`#ghBell`/`#remPanel`) while visible; `registration.showNotification` when hidden and permitted; `sw.js` `notificationclick` focuses the app and posts `rem-open` (or opens `#rem=<key>`). Timed items older than 12 h do not pop up, they wait in the bell. There is no push server — a closed iOS app cannot be woken; say so rather than promising it.
+
 ## Companies (multi-company Official data)
 
 - Official data is per company; Personal data, `myProfile`, `taskLabels`, `locationsList` and day `locations` are shared. Per-company tables are `CO_TABLES` (official rows of `tasks` — anything with `scope!=='personal'` — plus people, customers, contacts, meetings, deals, plans, journals, savedviews…) and the lists `depts/products/regions/acctGroups/workWeek`.
