@@ -658,7 +658,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <div id="resumebar"><span id="resumeTxt"></span><button class="btn sm" onclick="resumeSync()">Resume sync</button><button class="btn gh2 sm" onclick="g('resumebar').classList.remove('show')">Not now</button></div>
 <div id="updbar"><span>A new version of Clario is ready.</span><button class="btn sm" onclick="location.reload()">Reload now</button><button class="btn gh2 sm" onclick="g('updbar').classList.remove('show')">Later</button></div>
-<div id="reauthbar"><span>Your Microsoft sign-in expired — OneDrive sync is paused.</span><button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="g('reauthbar').classList.remove('show')">Dismiss</button></div>
+<div id="reauthbar"><span>OneDrive sync is paused — Microsoft needs you to sign in again. Your changes are kept and sync as soon as you reconnect.</span><button class="btn sm" onclick="gReconnect()">Reconnect</button><button class="btn gh2 sm" onclick="g('reauthbar').classList.remove('show')">Dismiss</button></div>
 
 <header id="gh">
   <button class="gh-sync" id="ghBack" onclick="goBack()" title="Back" style="display:none">←</button>
@@ -1104,7 +1104,7 @@ select.sselhide{position:absolute!important;opacity:0;pointer-events:none;height
 
 <script>
 /* ═══ CORE ═══ */
-const APP_VER='9.1.0',APP_BUILD=73,   /* APP_BUILD must equal the number in sw.js's cache name */
+const APP_VER='9.2.0',APP_BUILD=74,   /* APP_BUILD must equal the number in sw.js's cache name */
       DB_FILE='db.json',DB_TMP='db.tmp',LS_KEY='cx_state',THEME_KEY='cx_theme',ENC_KEY='cx_enc',MODE_KEY='cx_mode',LOC_CHECK_KEY='cx_loc_check',PIN_KEY='cx_pin',NAV_KEY='cx_nav';
 const STAGES=['Prospect','Qualified','Proposal','Negotiation','Won','Lost'];
 const STAGE_P={Prospect:10,Qualified:30,Proposal:55,Negotiation:75,Won:100,Lost:0};
@@ -1672,6 +1672,7 @@ async function newRecoveryCode(){const cur=await askText('Enter your current PIN
 
 /* ── Prove you own this data, for a reset. Offers only what is set up on this device. ── */
 async function proveOwner(purpose){const ch=[];
+  if(gTakeProof(purpose))return'ms';                     // already proven by a Microsoft redirect a moment ago
   if(gActive())ch.push({value:'ms',label:`Sign in again with Microsoft (${_gAcct.username||'your account'})`});
   if(purpose==='pin'&&_encMeta&&_encMeta.on&&_encMeta.chk)ch.push({value:'pass',label:'Enter your db.json encryption passphrase'});
   if(purpose==='pass'&&pinIsSet())ch.push({value:'pin',label:'Enter your Personal PIN'});
@@ -1681,7 +1682,10 @@ async function proveOwner(purpose){const ch=[];
   const how=await askChoice(purpose==='pin'?'Prove it is you, then choose a new PIN:':'Prove it is you before replacing the passphrase:',ch,{title:'Verify it is you'});
   if(!how)return false;
   if(how==='reset')return'reset';
-  if(how==='ms'){try{const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite'],account:_gAcct,prompt:'login'});
+  if(how==='ms'){try{
+      if(gUseRedirect()){try{sessionStorage.setItem(G_PROOF_KEY+'_for',_gAcct.homeAccountId);}catch(e){}   // who must come back
+        await _msal.acquireTokenRedirect({scopes:G_SCOPES,account:_gAcct,prompt:'login',state:'clario:prove:'+purpose});return false;}  // continues after the page comes back
+      const r=await _msal.acquireTokenPopup({scopes:G_SCOPES,account:_gAcct,prompt:'login'});
       if(r&&r.account&&r.account.homeAccountId===_gAcct.homeAccountId)return'ms';toast('That is a different Microsoft account.');return false;}
     catch(e){toast(/popup/i.test(e&&e.message||'')?'The sign-in window was blocked — allow pop-ups for this app and try again.':'Microsoft sign-in was not completed.');return false;}}
   if(how==='pass'){const v=await askText('db.json passphrase:',{title:'Verify it is you',type:'password',ok:'Verify'});if(!v)return false;
@@ -2327,29 +2331,93 @@ function gInit(){if(!_gCfg||!_gCfg.clientId)return false;
   if(typeof msal==='undefined'){return false;}
   if(!_msal)_msal=new msal.PublicClientApplication({auth:{clientId:_gCfg.clientId,authority:'https://login.microsoftonline.com/common',redirectUri:location.origin+location.pathname},cache:{cacheLocation:'localStorage',storeAuthStateInCookie:true}});
   return true;}
-async function gRestore(){try{if(!gInit())return;const as=_msal.getAllAccounts();
-  if(as.length){_gAcct=as[0];gStart();syncUI('ok','OneDrive · '+(_gAcct.username||'account'));await gPull(true);}}catch(e){}}
+/* ── Signing in on iPhone/iPad ──
+   Microsoft gives browser apps a refresh token that lasts 24 hours, no longer. After that MSAL
+   renews in a hidden iframe, which Safari (all iOS browsers are Safari underneath) always blocks
+   as third-party tracking, so sync stopped once a day. Popups do not rescue it in an installed
+   iOS app either: the popup opens in a separate sheet that cannot hand the result back, which is
+   why only a full sign-out/sign-in worked. Microsoft's guidance for Safari is a full-page
+   redirect, which runs in first-party context where the Microsoft session cookie still works.
+   So on iOS, Safari and any installed app, every interactive step is a redirect, and when the
+   token runs out the app renews it by itself with a prompt=none redirect at a quiet moment
+   (launch or return to the app): no password, no tap, while the Microsoft session ("Stay signed
+   in") lives. Desktop Chrome/Edge keep the popup, which works there and avoids a page reload. */
+const G_SCOPES=['Files.ReadWrite'], G_AUTO_KEY='cx_g_auto', G_AUTO_GAP=6*3600e3, G_PROOF_KEY='cx_g_proof';
+function gUseRedirect(){try{const ua=navigator.userAgent||'';
+  const ios=/iP(hone|ad|od)/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const standalone=navigator.standalone===true||(!!window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  const safari=/safari/i.test(ua)&&!/chrome|chromium|crios|fxios|edg|android/i.test(ua);
+  return ios||standalone||safari;}catch(e){return false;}}
+async function gRestore(){try{if(!gInit())return;
+  let res=null;
+  try{res=await _msal.handleRedirectPromise();}
+  catch(e){                                             // back from a redirect that could not finish silently
+    const as=_msal.getAllAccounts();if(as.length)_gAcct=as[0];
+    if(_gAcct){setReauth(true);syncUI('err','Sign-in expired — reconnect');gStart();}
+    else toast('Microsoft sign-in was not completed.');
+    return;}
+  let proveFor=null;try{proveFor=sessionStorage.getItem(G_PROOF_KEY+'_for');}catch(e){}
+  if(res&&res.account&&/^clario:prove:/.test(res.state||'')&&proveFor){
+    try{sessionStorage.removeItem(G_PROOF_KEY+'_for');}catch(e){}           // consumed only by the check it was set for
+    // an ownership check never changes which account syncs: keep the linked one, and record who answered
+    _gAcct=_msal.getAllAccounts().find(a=>a.homeAccountId===proveFor)||null;
+    res={...res,proven:res.account.homeAccountId===proveFor};}
+  else if(res&&res.account){_gAcct=res.account;setReauth(false);}
+  else{const as=_msal.getAllAccounts();if(as.length)_gAcct=as[0];}
+  if(!_gAcct)return;
+  gStart();syncUI('ok','OneDrive · '+(_gAcct.username||'account'));
+  await gPull(true);
+  let pending=false;try{pending=!!localStorage.getItem(G_DIRTY_KEY);}catch(e){}
+  if(pending){_gDirty=true;await gSave();}                // edits from before the app was closed
+  else if(res&&res.account&&res.state==='clario:signin')await gSave();
+  if(res&&res.account)gAfterRedirect(res);
+}catch(e){}}
+/* What to do once a redirect comes back: the state names the step that sent it. */
+function gAfterRedirect(res){const st=res.state||'';
+  if(st==='clario:signin'){toast('Signed in as '+(res.account.username||'account'));renderView();}
+  else if(st==='clario:reconnect'){toast('Reconnected to OneDrive.');renderView();}
+  else if(st.startsWith('clario:prove:')){const purpose=st.slice(13);
+    if(!res.proven){toast('That is a different Microsoft account — sign in with the one linked to Clario.');return;}
+    try{sessionStorage.setItem(G_PROOF_KEY,JSON.stringify({purpose,acct:res.account.homeAccountId,at:Date.now()}));}catch(e){}
+    setTimeout(()=>{purpose==='pin'?forgotPin():forgotPassphrase();},400);}}   // resume the reset where it stopped
+/* A Microsoft check completed by redirect a moment ago, for this account and this purpose. Used once. */
+function gTakeProof(purpose){try{const p=JSON.parse(sessionStorage.getItem(G_PROOF_KEY)||'null');sessionStorage.removeItem(G_PROOF_KEY);
+  return !!(p&&p.purpose===purpose&&_gAcct&&p.acct===_gAcct.homeAccountId&&Date.now()-p.at<5*60e3);}catch(e){return false;}}
 async function gSignIn(){const inp=g('gClient');const id=(inp&&inp.value.trim())||(_gCfg&&_gCfg.clientId)||'';
   if(!id){toast('Paste the Azure client ID first.');return;}
   _gCfg={clientId:id};localStorage.setItem('cx_graph',JSON.stringify(_gCfg));_msal=null;setReauth(false);
   if(!gInit()){toast('Sign-in library not loaded — needs internet on first load.');return;}
-  try{const r=await _msal.loginPopup({scopes:['Files.ReadWrite'],prompt:'select_account'});
+  try{if(gUseRedirect()){await _msal.loginRedirect({scopes:G_SCOPES,prompt:'select_account',state:'clario:signin'});return;}
+    const r=await _msal.loginPopup({scopes:G_SCOPES,prompt:'select_account'});
     _gAcct=r.account;setReauth(false);gStart();await gPull(true);await gSave();toast('Signed in as '+(_gAcct.username||'account'));renderView();}
   catch(e){toast('Sign-in failed: '+(e.errorCode||e.message||e));}}
-function gSignOut(){try{if(_msal&&_gAcct)_msal.logoutPopup({account:_gAcct}).catch(()=>{});}catch(e){}
+/* Sign out of Clario only: clear this app's sign-in without opening a Microsoft window
+   (a logout popup fails on iOS, and signing you out of Microsoft everywhere is not the point). */
+function gSignOut(){try{if(_msal&&_gAcct)_msal.logoutRedirect({account:_gAcct,onRedirectNavigate:()=>false}).catch(()=>{});}catch(e){}
   _gAcct=null;setReauth(false);clearInterval(_gTimer);syncUI(_fsDir?'ok':'', _fsDir?_fsDir.name:'Local only');renderView();}
-/* Reconnect: interactive re-auth without a full sign-out, for when the cached
-   session has gone stale (expired/revoked refresh token). Must only ever be
-   called from a genuine user gesture (button click) — acquireTokenPopup is
-   blocked by browsers outside one, which is exactly the trap the old silent-
-   refresh fallback fell into from background timers. */
+/* Reconnect: interactive re-auth without a full sign-out, for when the cached session has gone
+   stale. A popup must come from a real tap (browsers block it otherwise), which is why the
+   automatic path below uses a redirect, and only at a quiet moment. */
 async function gReconnect(){if(!_msal){toast('Not set up.');return;}
-  try{const r=await _msal.acquireTokenPopup({scopes:['Files.ReadWrite'],account:_gAcct||undefined,prompt:_gAcct?undefined:'select_account'});
+  try{if(gUseRedirect()){await _msal.acquireTokenRedirect({scopes:G_SCOPES,account:_gAcct||undefined,prompt:_gAcct?undefined:'select_account',state:'clario:reconnect'});return;}
+    const r=await _msal.acquireTokenPopup({scopes:G_SCOPES,account:_gAcct||undefined,prompt:_gAcct?undefined:'select_account'});
     _gAcct=r.account;setReauth(false);gStart();syncUI('busy');await gPull(true);await gSave();toast('Reconnected to OneDrive.');renderView();}
   catch(e){toast('Reconnect failed: '+(e.errorCode||e.message||e));}}
+/* Renew without asking: a prompt=none redirect comes straight back with a token while the Microsoft
+   session lives. Only where redirects are the method, only when the app is visible and idle
+   (nothing being typed, no dialog open), and at most once per 6 hours so a dead session cannot
+   loop -- then the Reconnect banner stays up for a tap. */
+function gAutoReauth(){try{
+  if(!gUseRedirect()||!_msal||!_gAcct||document.hidden)return false;
+  const ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)||ae&&ae.isContentEditable)return false;
+  if(document.querySelector('.ovl.open'))return false;
+  const last=+(localStorage.getItem(G_AUTO_KEY)||0);if(Date.now()-last<G_AUTO_GAP)return false;
+  localStorage.setItem(G_AUTO_KEY,String(Date.now()));
+  _msal.acquireTokenRedirect({scopes:G_SCOPES,account:_gAcct,prompt:'none',state:'clario:auto'}).catch(()=>{});
+  return true;}catch(e){return false;}}
 function gAuthErr(e){return e&&(e.name==='InteractionRequiredAuthError'||/interaction_required|login_required|consent_required|no_tokens_found/.test(e.errorCode||''));}
-async function gToken(){try{return(await _msal.acquireTokenSilent({scopes:['Files.ReadWrite'],account:_gAcct})).accessToken;}
-  catch(e){if(gAuthErr(e)){setReauth(true);syncUI('err','Sign-in expired — reconnect');}throw e;}}
+async function gToken(){try{return(await _msal.acquireTokenSilent({scopes:G_SCOPES,account:_gAcct})).accessToken;}
+  catch(e){if(gAuthErr(e)){setReauth(true);syncUI('err','Sign-in expired — reconnect');gAutoReauth();}throw e;}}
 function gCheckAuthResp(r){if(r.status===401){setReauth(true);syncUI('err','Sign-in expired — reconnect');return true;}return false;}
 async function gMeta(){const t=await gToken();const r=await fetch(GRAPH_FILE+'?select=lastModifiedDateTime,eTag',{headers:{Authorization:'Bearer '+t}});
   if(gCheckAuthResp(r))throw new Error('reauth');
@@ -2384,12 +2452,20 @@ async function gSave(){if(!gActive()||_gNeedsReauth)return;if(_gSaving){_gQ=true
     if(!r.ok)throw new Error('save '+r.status);
     const j=await r.json().catch(()=>null);
     if(j){if(j.lastModifiedDateTime)_gLastM=j.lastModifiedDateTime;if(j.eTag)_gEtag=j.eTag;}else{const mt2=await gMeta().catch(()=>null);if(mt2){_gLastM=mt2.m;if(mt2.etag)_gEtag=mt2.etag;}}
-    _gDirty=false;_gRetryN=0;syncUI('ok','OneDrive · '+(_gAcct.username||''));}
+    gMarkDirty(false);_gRetryN=0;syncUI('ok','OneDrive · '+(_gAcct.username||''));}
   catch(e){if(_gNeedsReauth){return;}
     if(e&&e.message==='no pass'){syncUI('err');}   // passphrase entry cancelled — not a transient error
     else{_gDirty=true;syncUI('err','Sync pending — will retry');gRetry(e&&e.retryAfter);}}
   finally{_gSaving=false;if(_gQ){_gQ=false;if(!_gNeedsReauth)gSave();}}}
-function gSched(){_gDirty=true;clearTimeout(_gST);_gST=setTimeout(gSave,1200);}
+document.addEventListener('visibilitychange',()=>{if(document.hidden||!gActive())return;
+  if(_gNeedsReauth){gAutoReauth();return;}
+  if(_gDirty&&!_gSaving){gSave();return;}
+  gMeta().then(mt=>{if(mt&&mt.m>_gLastM)gPull(true);}).catch(()=>{});});
+/* "Changes not yet uploaded" survives a restart: iOS often kills a backgrounded app before its save
+   finishes, and a flag kept only in memory meant those edits sat on the phone until the next edit. */
+const G_DIRTY_KEY='cx_g_dirty';
+function gMarkDirty(on){_gDirty=on;try{on?localStorage.setItem(G_DIRTY_KEY,'1'):localStorage.removeItem(G_DIRTY_KEY);}catch(e){}}
+function gSched(){gMarkDirty(true);clearTimeout(_gST);_gST=setTimeout(gSave,1200);}
 function gStart(){clearInterval(_gTimer);_gTimer=setInterval(async()=>{if(!gActive()||_gNeedsReauth)return;
   if(_gDirty&&!_gSaving){gSave();return;}
   if(_gSaving)return;
@@ -4662,6 +4738,7 @@ function vHelp(){
   ${faqItem('Privacy — what leaves this device','Nothing, except to Microsoft for sign-in and OneDrive sync when you have set that up. The app makes no other connections: no analytics, no ads, no trackers, no fonts or scripts from other sites, and a built-in security policy blocks any other connection outright (you would see a “Blocked a connection” message). Data only goes elsewhere when you choose to — emailing a summary, tapping a phone number or link, exporting a file, or copying the recovery code. Links you open do not tell the other site where you came from. The offline cache holds only the app’s own files, never your data.')}
   ${faqItem('Wipe this device vs delete everything','Settings → Data → <b>Wipe all data on this device</b> (type WIPE) erases this browser only — data, PIN, sign-in, folder link, remembered passphrase — and never touches the synced copy, so signing in again brings everything back. To delete your data completely, also remove the Apps/Clario folder in OneDrive (or the files in your linked folder), and wipe each device.')}
   ${faqItem('OneDrive account sync (all devices)','Settings → paste your Azure client ID → Sign in with Microsoft. Clario then reads/writes Apps/Clario/db.json in your OneDrive directly — works on iPhone, iPad, Android and desktop. It pulls before every save and checks for other-device changes every 20 seconds; edits merge record-by-record with the newer change winning.')}
+  ${faqItem('OneDrive on iPhone and iPad','Microsoft only lets a web app stay signed in for 24 hours at a time, and Safari blocks the hidden step browsers normally use to renew it. So on iPhone and iPad Clario signs in with a full-page visit to Microsoft instead of a pop-up, and when the 24 hours run out it renews by itself the next time you open or return to the app — the screen briefly reloads, with no password needed while your Microsoft account is still signed in (tick <b>Stay signed in</b> when you sign in). It never does this while you are typing. If Microsoft does need your password, a banner offers <b>Reconnect</b>; your changes are kept on the phone and sent as soon as you reconnect, even if iOS closed the app in between. You do not need to sign out and back in.')}
   ${faqItem('OneDrive folder sync (desktop fallback)','Edge/Chrome on desktop can instead link a local OneDrive folder from Settings. Same file, same merging; the link persists across launches.')}
   ${faqItem('Excel import & export','Settings → Bulk data. Pick a data set from the dropdown, then Template, Export or Import — no long list of buttons. Importable sets: tasks, people, accounts, contacts, deals, decisions, meetings, improvement ideas, departments and products. Names do the linking — unknown people and accounts are created automatically. People, accounts, contacts, departments and products update existing records by name; tasks, deals, meetings, decisions and ideas always add new rows, so don’t import the same sheet twice. Logs — the activity history, 1:1 agenda items, planner goals, decision exercises and shutdown journal — are export-only: you can download them for reference, but they can’t be imported, since editing a record of what happened would fabricate it.')}
   ${faqItem('Encryption','Settings → Encrypt db.json protects the synced file with a passphrase (AES-256). Each device remembers the passphrase for 7 days after you type it (change this to every launch, 1 day or 30 days under Settings → Encryption), then asks again. Losing the passphrase means losing the synced file — there is no recovery.')}
