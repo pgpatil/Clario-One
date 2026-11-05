@@ -124,8 +124,73 @@ const URL_=process.env.CLARIO_URL || 'http://localhost:8934/index.html';
     Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});
     return {perm:Notification.permission,sent};});
   chk('in the background, alerts go to the system', nt.perm==='granted'&&nt.sent.length>=1, JSON.stringify(nt.sent).slice(0,140));
-  chk('more than three at once become one notification', nt.sent.length===1&&/reminders/.test(nt.sent[0].t), JSON.stringify(nt.sent.map(x=>x.t)));
+  chk('more than three at once become one notification (payments keep their own)', nt.sent.length===2&&/^\d+ reminders$/.test(nt.sent[0].t)&&/payments need attention/.test(nt.sent[1].t), JSON.stringify(nt.sent.map(x=>x.t)));
   chk('notification text carries no amount', !nt.sent.some(x=>/₹|45,?678|23,?456/.test(x.t+' '+x.b)));
+
+  console.log('\n═══ bills and payments: until paid, every open and every hour');
+  const pay = await page.evaluate(async()=>{const r={},H=3600e3,D=T_D;
+    const tk=ms=>{window.__remNow=ms;return remTick(ms);};window.__remNow=T_ms('08:00');
+    // Money due: last month's unpaid card bill, this month's EMI (overdue), an EMI from last month, rent far ahead
+    window.T_paid=new Set();
+    window.finDueItems=ym=>({'2026-10':[{kind:'card',id:'cc1',ym,name:'HDFC Regalia ••4821',amount:23456,due:'2026-10-28'},{kind:'emi',id:'ln0',ym,name:'Old EMI',amount:1,due:'2026-10-05'}],
+      '2026-11':[{kind:'emi',id:'ln1',ym,name:'Home loan',amount:45678,due:'2026-11-08'},{kind:'commit',id:'fc1',ym,name:'Rent',amount:30000,due:'2026-11-25'}]}[ym]||[]).filter(i=>!T_paid.has(i.id));
+    window.cardPayFull=(id,ym)=>{T_paid.add(id);toast('Paid ₹23,456 — HDFC Regalia.');};
+    window.loanPayEmi=(id,ym)=>{toast('Set the EMI amount first.');};
+    ious.push({id:'iB',dir:'borrowed',person:'Uncle',principal:5000,date:'2026-09-01',due:'2026-11-01',created_at:now(),updated_at:now()});
+    remlog.length=0;_remShown=[];remPaintPop();localStorage.removeItem('cx_rem_pay_at');_remOpenRound=true;
+    const list=remCollect(D).filter(i=>i.sticky);
+    r.titles=list.map(i=>i.title);r.keys=list.map(i=>i.key);
+    r.inDigest=remCollect(D).some(i=>i.sticky&&i.digest);
+    const cardTitle=()=>{const c=document.querySelector('#remPop .remcard.pay');return c?c.querySelector('b').textContent:null;};
+    tk(T_ms('08:00'));r.onOpen=cardTitle();r.rows=[...document.querySelectorAll('#remPop .remcard.pay .rc-pay')].length;
+    r.btns=[...document.querySelectorAll('#remPop .remcard.pay button')].map(b=>b.textContent.trim());
+    _remShown=[];remPaintPop();
+    tk(T_ms('08:30'));r.halfHour=cardTitle();
+    tk(T_ms('09:00')+60e3);r.hourLater=cardTitle();_remShown=[];remPaintPop();
+    // coming back to the app after 5+ minutes counts as opening it
+    _remHiddenAt=Date.now()-6*60e3;document.dispatchEvent(new Event('visibilitychange'));
+    tk(T_ms('09:10'));r.reopen=cardTitle();_remShown=[];remPaintPop();
+    // dismiss is refused
+    remDismiss(list[0].key);r.afterDismiss=remActive(T_ms('09:11')).some(i=>i.key===list[0].key);
+    // snooze 1 hour, then 1 day
+    const k=r.keys.find(x=>x.startsWith('$:emi:ln1'));
+    remLogSet(k,{status:'snoozed',until:T_ms('10:15')});
+    r.snoozed=remActive(T_ms('10:00')).some(i=>i.key===k);r.back=remActive(T_ms('10:16')).some(i=>i.key===k);
+    remSnoozePays(1440,k);const until=remLog(k).until;r.dayMin=Math.round((until-window.__remNow)/60e3);
+    // the payments card survives a crowd of other reminders
+    localStorage.setItem('cx_rem_fired','[]');localStorage.removeItem('cx_rem_pay_at');_remOpenRound=true;remlog.length=0;
+    tk(T_ms('14:31'));r.crowd=[...document.querySelectorAll('#remPop .remcard')].map(c=>c.classList.contains('pay')?'PAY':c.querySelector('b').textContent);
+    // mark paid: records it, quietly, and the reminder goes away by itself
+    const ck=r.keys.find(x=>x.startsWith('$:card:cc1'));
+    const p=remPay(ck);await new Promise(x=>setTimeout(x,60));r.confirm=document.getElementById('askMsg').textContent;askResolve(true);await p;
+    r.toast=document.getElementById('toast').textContent;r.paidGone=!remCollect(D).some(i=>i.key===ck);
+    // a payment that cannot be recorded here says so, without the amount
+    const ek=r.keys.find(x=>x.startsWith('$:emi:ln1'));remlog.length=0;
+    const p2=remPay(ek);await new Promise(x=>setTimeout(x,60));askResolve(true);await p2;r.failToast=document.getElementById('toast').textContent;
+    r.stillThere=remCollect(D).some(i=>i.key===ek);
+    // opening goes to Money
+    remOpen(ek);r.open={mode:appMode,tab:personalTab,fv:finView};setMode('official');
+    r.allText=document.getElementById('remPop').textContent+' '+r.titles.join(' ')+' '+r.confirm+' '+r.toast+' '+r.failToast;
+    _remShown=[];remPaintPop();window.__remNow=0;return r;});
+  chk('overdue and upcoming payments are listed; far-off ones are not', pay.titles.some(t=>/Home loan — EMI overdue since/.test(t))&&!pay.titles.some(t=>/Rent/.test(t)), JSON.stringify(pay.titles));
+  chk('last month’s unpaid card bill is still there', pay.titles.some(t=>/HDFC Regalia ••4821 — card bill overdue since/.test(t)));
+  chk('last month’s EMI is not (loans only record their latest paid month)', !pay.titles.some(t=>/Old EMI/.test(t)));
+  chk('money you owe a person stays until repaid', pay.titles.some(t=>/Repayment to Uncle overdue since/.test(t)));
+  chk('payment reminders are not in the digest, and their key carries no day', !pay.inDigest&&pay.keys.every(k=>/^\$:/.test(k)&&!/\d{4}-\d{2}-\d{2}/.test(k)), JSON.stringify(pay.keys));
+  chk('on opening the app: one payments card listing them all', /payments need attention/.test(pay.onOpen||'')&&pay.rows===3, `${pay.onOpen} / ${pay.rows} rows`);
+  chk('its options: Mark paid, Snooze 1 hour, Snooze 1 day — no Dismiss', pay.btns.includes('Snooze 1 hour')&&pay.btns.includes('Snooze 1 day')&&pay.btns.includes('Mark paid')&&!pay.btns.includes('Dismiss'), JSON.stringify(pay.btns));
+  chk('not again within the hour', pay.halfHour===null);
+  chk('again an hour later', /payments need attention/.test(pay.hourLater||''));
+  chk('again whenever you come back to the app', /payments need attention/.test(pay.reopen||''));
+  chk('it cannot be dismissed', pay.afterDismiss===true);
+  chk('Snooze 1 hour hides it, then it is back', pay.snoozed===false&&pay.back===true);
+  chk('Snooze 1 day is a day', Math.abs(pay.dayMin-1440)<=1, `${pay.dayMin} min`);
+  chk('the payments card is never crowded out by other reminders', pay.crowd.includes('PAY'), JSON.stringify(pay.crowd));
+  chk('Mark paid records it, and the reminder goes away by itself', pay.paidGone);
+  chk('…confirming by name, never by amount', /Record “HDFC Regalia ••4821” as paid in full\?/.test(pay.confirm)&&/recorded as paid/.test(pay.toast), pay.confirm+' | '+pay.toast);
+  chk('a payment that cannot be recorded here stays, and says so without the amount', pay.stillThere&&/Set the EMI amount first/.test(pay.failToast));
+  chk('opening a payment goes to Money', pay.open.mode==='personal'&&pay.open.tab==='money'&&pay.open.fv==='month', JSON.stringify(pay.open));
+  chk('no amount anywhere: card, titles, confirm, messages', !/₹|23,?456|45,?678|30,?000|5,?000/.test(pay.allText.replace(/••\d{4}/g,'')), pay.allText.slice(0,120));
 
   console.log('\n═══ settings and the bell panel');
   const ui = await page.evaluate(()=>{const r={};nav('settings');
